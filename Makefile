@@ -22,3 +22,6 @@ check: install-tools
 	@ golangci-lint run $(PACKAGE_DIRECTORIES)
 	@ echo "revive ..."
 	@ revive -formatter friendly -config revive.toml $(PACKAGES)
+
+# TODO: support build rule
+build: check
