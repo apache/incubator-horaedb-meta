@@ -13,25 +13,23 @@ import (
 
 const (
 	defaultEtcdStartTimeoutMs int64 = 10 * 1000
-	defaultDailTimeoutMs      int64 = 5 * 1000
+	defaultDailTimeoutMs            = 5 * 1000
 
-	defaultNodeNamePrefix string = "ceresmeta"
-	defaultDataDir               = "/tmp/ceresmeta/data"
-	defaultWalDir                = "/tmp/ceresmeta/wal"
-
-	defaultClientUrls                     = "http://127.0.0.1:2379"
-	defaultPeerUrls                       = "http://127.0.0.1:2380"
-	defaultInitialClusterState            = embed.ClusterStateFlagNew
-	defaultInitialClusterToken            = "ceresmeta-cluster"
-	defaultCompactionMode          string = "periodic"
-	defaultAutoCompactionRetention        = "1h"
+	defaultNodeNamePrefix          = "ceresmeta"
+	defaultDataDir                 = "/tmp/ceresmeta/data"
+	defaultWalDir                  = "/tmp/ceresmeta/wal"
+	defaultClientUrls              = "http://127.0.0.1:2379"
+	defaultPeerUrls                = "http://127.0.0.1:2380"
+	defaultInitialClusterState     = embed.ClusterStateFlagNew
+	defaultInitialClusterToken     = "ceresmeta-cluster"
+	defaultCompactionMode          = "periodic"
+	defaultAutoCompactionRetention = "1h"
 
 	defaultTickIntervalMs    int64 = 500
 	defaultElectionTimeoutMs       = 3000
 	defaultQuotaBackendBytes       = 8 * 1024 * 1024 * 1024 // 8GB
 
 	defaultMaxRequestBytes uint = 2 * 1024 * 1024 // 2MB
-
 )
 
 type Config struct {
