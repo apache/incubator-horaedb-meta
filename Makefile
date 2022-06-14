@@ -16,7 +16,7 @@ PACKAGES := $(shell go list ./... | tail -n +2)
 PACKAGE_DIRECTORIES := $(subst $(META_PKG)/,,$(PACKAGES))
 
 check: install-tools
-	@ echo "gofmt ... $(PACKAGE_DIRECTORIES)"
+	@ echo "gofmt ..."
 	@ gofmt -s -l -d $(PACKAGE_DIRECTORIES) 2>&1 | awk '{ print } END { if (NR > 0) { exit 1 } }'
 	@ echo "golangci-lint ..."
 	@ golangci-lint run $(PACKAGE_DIRECTORIES)
