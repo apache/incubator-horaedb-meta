@@ -9,7 +9,6 @@ output:
 
 linters:
   enable:
-    - bodyclose
     - depguard
     - gocritic
     - gofumpt
@@ -19,6 +18,9 @@ linters:
     - revive
     - stylecheck
     - whitespace
-    - unparam
     - unconvert
+  disable: # these linters have not been supported by go1.18 yet
+    - bodyclose
+    - structcheck
+    - unparam
 
