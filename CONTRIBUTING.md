@@ -27,7 +27,7 @@ For features we don't plan to support we will close the feature request ticket (
 
 ## Contributing Changes
 
-CeresMeta is written mostly in Golang and please see the [Style Guide](docs/style_guide.md) for more details.
+Please see the [Style Guide](docs/style_guide.md) for more details.
 
 ### Making a PR
 
