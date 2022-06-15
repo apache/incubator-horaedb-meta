@@ -55,7 +55,7 @@ There are some tips on verifying the above in the [next section](#running-tests)
 
 ## Running Tests
 
-The running test rule has been configured in the [Makefile](./Makefile) so just run:
+The rule for running test has been configured in the [Makefile](./Makefile) so just run:
 
 ```shell
 make test
