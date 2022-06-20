@@ -10,8 +10,8 @@ Besides the [CodeReviewComments](https://github.com/golang/go/wiki/CodeReviewCom
 - Global error code:
   - Any error defined in the repo should be assigned an error code,
   - An error code can be used by multiple different errors,
-  - The error codes are defined in the single global package [codeerr](https://github.com/CeresDB/ceresmeta/tree/main/pkg/coderr).
-- Construct: define leaf errors on package level(often in a separate `error.go` file) by package [coderr](https://github.com/CeresDB/ceresmeta/tree/main/pkg/coderr).
+  - The error codes are defined in the single global package [coderr](https://github.com/CeresDB/ceresmeta/tree/main/pkg/coderr).
+- Construct: define leaf errors on package level (often in a separate `error.go` file) by package [coderr](https://github.com/CeresDB/ceresmeta/tree/main/pkg/coderr).
 - Wrap: wrap errors by `errors.Wrap` or `errors.Wrapf`.
 - Check: test the error identity by calling `coderr.EqualsByCode` or `coderr.EqualsByValue`.
 - Log: only log the error on the top level package.
@@ -20,8 +20,8 @@ Besides the [CodeReviewComments](https://github.com/golang/go/wiki/CodeReviewCom
 ### Example
 `errors.go` in the package `server`:
 ```go
-var ErrStartEtcd        = coderr.NewCodeErrorWrapper(coderr.Internal, "fail to start embed etcd")
-var ErrStartEtcdTimeout = coderr.NewNormalizedCodeError(coderr.Internal, "fail to start etcd server in time")
+var ErrStartEtcd        = coderr.NewCodeErrorWrapper(coderr.Internal, "start embed etcd")
+var ErrStartEtcdTimeout = coderr.NewNormalizedCodeError(coderr.Internal, "start etcd server timeout")
 ```
 
 `server.go` in the package `server`:
@@ -43,17 +43,17 @@ func main() {
         return 
     }
     if coderr.EqualsByCode(err, coderr.Internal) {
-        log.Errorf("internal error, err:%v", err)
+        log.Error("internal error")
     }
     if coderr.EqualsByValue(err, server.EtcdStartEtcdTimeout) {
-        log.Errorf("start etcd server timeout, err:%v", err)
+        log.Errorf("start etcd server timeout")
     }
 	
     cerr, ok := err.(coderr.CodeError)
     if ok {
-        log.Errorf("error code is:%v", cerr.Code())	
+        log.Error("found a CodeError")	
     } else {
-        log.Errorf("not a CodeError, err:%v", err)	
+        log.Error("not a CodeError)	
     }
 		
     return

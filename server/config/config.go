@@ -135,7 +135,7 @@ func (p *Parser) Parse(arguments []string) (*Config, error) {
 		return nil, ErrInvalidCommandArgs.Wrap(err)
 	}
 
-	// TODO: support load config from file.
+	// TODO: support loading config from file.
 
 	return p.cfg, nil
 }
