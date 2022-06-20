@@ -61,4 +61,13 @@ func main() {
 ```
 
 ## Logging
-(TODO)
+### Principles
+- Structured log by [zap](https://github.com/uber-go/zap).
+
+### Example
+```go
+if err := srv.Run(); err != nil {
+    log.Error("fail to run server, err:%v", zap.Error(err))
+    return
+}
+```
