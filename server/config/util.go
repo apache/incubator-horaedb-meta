@@ -14,7 +14,7 @@ func parseUrls(s string) ([]url.URL, error) {
 	for _, item := range items {
 		u, err := url.Parse(item)
 		if err != nil {
-			return nil, err
+			return nil, ErrInvalidPeerUrl.Wrap(err)
 		}
 
 		urls = append(urls, *u)
