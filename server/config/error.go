@@ -1,9 +1,11 @@
 package config
 
-import "github.com/CeresDB/ceresmeta/coderr"
+import (
+	coderr2 "github.com/CeresDB/ceresmeta/pkg/coderr"
+)
 
 var (
-	ErrInvalidPeerURL     = coderr.NewCodeErrorWrapper(coderr.InvalidParams, "invalid peers url")
-	ErrInvalidCommandArgs = coderr.NewCodeErrorWrapper(coderr.InvalidParams, "invalid command arguments")
-	ErrRetrieveHostname   = coderr.NewCodeErrorWrapper(coderr.Internal, "fail to retrieve local hostname")
+	ErrInvalidPeerURL     = coderr2.NewCodeErrorWrapper(coderr2.InvalidParams, "invalid peers url")
+	ErrInvalidCommandArgs = coderr2.NewCodeErrorWrapper(coderr2.InvalidParams, "invalid command arguments")
+	ErrRetrieveHostname   = coderr2.NewCodeErrorWrapper(coderr2.Internal, "fail to retrieve local hostname")
 )
