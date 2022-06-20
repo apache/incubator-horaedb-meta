@@ -1,9 +1,9 @@
 package server
 
-import "github.com/CeresDB/ceresmeta/codeerr"
+import "github.com/CeresDB/ceresmeta/coderr"
 
 var (
-	ErrCreateEtcdClient = codeerr.NewCodeErrorWrapper(codeerr.Internal, "fail to create etcd client")
-	ErrStartEtcd        = codeerr.NewCodeErrorWrapper(codeerr.Internal, "fail to start embed etcd")
+	ErrCreateEtcdClient = coderr.NewCodeErrorWrapper(coderr.Internal, "fail to create etcd client")
+	ErrStartEtcd        = coderr.NewCodeErrorWrapper(coderr.Internal, "fail to start embed etcd")
 )
-var ErrStartEtcdTimeout = codeerr.NewNormalizedCodeError(codeerr.Internal, "fail to start etcd server in time")
+var ErrStartEtcdTimeout = coderr.NewNormalizedCodeError(coderr.Internal, "fail to start etcd server in time")

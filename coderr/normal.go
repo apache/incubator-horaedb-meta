@@ -1,7 +1,8 @@
-package codeerr
+package coderr
 
 import "fmt"
 
+// NormalCodeError is actually the leaf error in the error chain, that is to say, the error is generated in our codebase.
 type NormalCodeError struct {
 	code Code
 	msg  string
@@ -17,13 +18,6 @@ func (e *NormalCodeError) Code() Code {
 
 func NewNormalizedCodeError(code Code, msg string) CodeError {
 	return &NormalCodeError{
-		code,
-		msg,
-	}
-}
-
-func NewCodeErrorWrapper(code Code, msg string) CodeErrorWrapper {
-	return &codeErrorWrapperImpl{
 		code,
 		msg,
 	}
