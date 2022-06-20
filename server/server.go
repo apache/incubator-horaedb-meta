@@ -4,9 +4,9 @@ package server
 
 import (
 	"context"
-	"log"
 	"sync"
 
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/config"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
@@ -64,7 +64,7 @@ func (srv *Server) Close() {
 	srv.stopBgJobs()
 
 	if err := srv.client.Close(); err != nil {
-		log.Printf("fail to close client, err:%v", err)
+		log.Error("fail to close client", zap.Error(err))
 	}
 
 	// TODO: release other resources: httpclient, etcd server and so on.
