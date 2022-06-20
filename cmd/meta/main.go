@@ -65,7 +65,7 @@ func main() {
 	}()
 
 	if err := srv.Run(); err != nil {
-		log.Error("fail to run server, err:%v", zap.Error(err))
+		log.Error("fail to run server", zap.Error(err))
 		return
 	}
 
