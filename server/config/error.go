@@ -9,5 +9,5 @@ import (
 var (
 	ErrInvalidPeerURL     = coderr.NewCodeErrorWrapper(coderr.InvalidParams, "invalid peers url")
 	ErrInvalidCommandArgs = coderr.NewCodeErrorWrapper(coderr.InvalidParams, "invalid command arguments")
-	ErrRetrieveHostname   = coderr.NewCodeErrorWrapper(coderr.Internal, "fail to retrieve local hostname")
+	ErrRetrieveHostname   = coderr.NewCodeErrorWrapper(coderr.Internal, "retrieve local hostname")
 )
