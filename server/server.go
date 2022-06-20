@@ -8,13 +8,10 @@ import (
 	"sync"
 
 	"github.com/CeresDB/ceresmeta/server/config"
-	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 	"go.uber.org/zap"
 )
-
-var ErrStartEtcdTimeout = errors.New("Fail to start etcd server in time")
 
 type Server struct {
 	ctx         context.Context
@@ -76,7 +73,7 @@ func (srv *Server) Close() {
 func (srv *Server) startEtcd() error {
 	etcdSrv, err := embed.StartEtcd(srv.etcdCfg)
 	if err != nil {
-		return err
+		return ErrStartEtcd.Wrap(err)
 	}
 
 	newCtx, cancel := context.WithTimeout(srv.ctx, srv.cfg.EtcdStartTimeout())
@@ -97,7 +94,7 @@ func (srv *Server) startEtcd() error {
 		LogConfig:   &lgc,
 	})
 	if err != nil {
-		return err
+		return ErrCreateEtcdClient.Wrap(err)
 	}
 
 	srv.client = client

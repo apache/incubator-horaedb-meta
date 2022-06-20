@@ -8,15 +8,13 @@ const (
 	InvalidParams Code = http.StatusBadRequest
 	Internal           = http.StatusInternalServerError
 )
-const HttpCodeUpperBound int = 1000
+const HTTPCodeUpperBound int = 1000
 
-func (c Code) ToHttpCode() int {
-	if int(c) < HttpCodeUpperBound {
-		return c
+func (c Code) ToHTTPCode() int {
+	if i := int(c); i < HTTPCodeUpperBound {
+		return i
 	}
 
-	switch c {
-	default:
-		return http.StatusInternalServerError
-	}
+	// TODO: use switch to convert the code to http code.
+	return int(c)
 }
