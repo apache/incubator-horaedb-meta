@@ -46,7 +46,7 @@ func main() {
         log.Error("internal error")
     }
     if coderr.EqualsByValue(err, server.EtcdStartEtcdTimeout) {
-        log.Errorf("start etcd server timeout")
+        log.Error("start etcd server timeout")
     }
 	
     cerr, ok := err.(coderr.CodeError)
