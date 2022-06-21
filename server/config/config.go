@@ -132,7 +132,7 @@ type Parser struct {
 
 func (p *Parser) Parse(arguments []string) (*Config, error) {
 	if err := p.flagSet.Parse(arguments); err != nil {
-		return nil, ErrInvalidCommandArgs.Wrap(err)
+		return nil, ErrInvalidCommandArgs.WithCausef("original arguments:%v, parse err:%v", arguments, err)
 	}
 
 	// TODO: support loading config from file.
@@ -143,7 +143,7 @@ func (p *Parser) Parse(arguments []string) (*Config, error) {
 func makeDefaultNodeName() (string, error) {
 	host, err := os.Hostname()
 	if err != nil {
-		return "", ErrRetrieveHostname.Wrap(err)
+		return "", ErrRetrieveHostname.WithCause(err)
 	}
 
 	return fmt.Sprintf("%s-%s", defaultNodeNamePrefix, host), nil

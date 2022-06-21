@@ -73,7 +73,7 @@ func (srv *Server) Close() {
 func (srv *Server) startEtcd() error {
 	etcdSrv, err := embed.StartEtcd(srv.etcdCfg)
 	if err != nil {
-		return ErrStartEtcd.Wrap(err)
+		return ErrStartEtcd.WithCause(err)
 	}
 
 	newCtx, cancel := context.WithTimeout(srv.ctx, srv.cfg.EtcdStartTimeout())
@@ -82,7 +82,7 @@ func (srv *Server) startEtcd() error {
 	select {
 	case <-etcdSrv.Server.ReadyNotify():
 	case <-newCtx.Done():
-		return ErrStartEtcdTimeout
+		return ErrStartEtcdTimeout.WithCausef("timeout is:%v", srv.cfg.EtcdStartTimeout())
 	}
 
 	// TODO: build etcd client
@@ -94,7 +94,7 @@ func (srv *Server) startEtcd() error {
 		LogConfig:   &lgc,
 	})
 	if err != nil {
-		return ErrCreateEtcdClient.Wrap(err)
+		return ErrCreateEtcdClient.WithCause(err)
 	}
 
 	srv.client = client

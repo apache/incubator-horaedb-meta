@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrInvalidPeerURL     = coderr.NewCodeErrorWrapper(coderr.InvalidParams, "invalid peers url")
-	ErrInvalidCommandArgs = coderr.NewCodeErrorWrapper(coderr.InvalidParams, "invalid command arguments")
-	ErrRetrieveHostname   = coderr.NewCodeErrorWrapper(coderr.Internal, "retrieve local hostname")
+	ErrInvalidPeerURL     = coderr.NewCodeError(coderr.InvalidParams, "invalid peers url")
+	ErrInvalidCommandArgs = coderr.NewCodeError(coderr.InvalidParams, "invalid command arguments")
+	ErrRetrieveHostname   = coderr.NewCodeError(coderr.Internal, "retrieve local hostname")
 )

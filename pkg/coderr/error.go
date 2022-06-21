@@ -2,17 +2,27 @@
 
 package coderr
 
-import "github.com/pkg/errors"
+import (
+	"fmt"
 
-// CodeError is an error with an extra method Code().
+	"github.com/pkg/errors"
+)
+
+var _ CodeError = &codeError{}
+
+// CodeError is an error with code.
 type CodeError interface {
 	error
 	Code() Code
+	// WithCausef should generate a new CodeError instance with the provided cause details.
+	WithCausef(format string, a ...any) CodeError
+	// WithCause should generate a new CodeError instance with the provided cause details.
+	WithCause(cause error) CodeError
 }
 
-// EqualsByCode checks whether the cause of `err` is the kind of error specified by the expectCode.
+// Is checks whether the cause of `err` is the kind of error specified by the `expectCode`.
 // Returns false if the cause of `err` is not CodeError.
-func EqualsByCode(err error, expectCode Code) bool {
+func Is(err error, expectCode Code) bool {
 	cause := errors.Cause(err)
 	cerr, ok := cause.(CodeError)
 	if !ok {
@@ -21,8 +31,42 @@ func EqualsByCode(err error, expectCode Code) bool {
 	return expectCode == cerr.Code()
 }
 
-// EqualsByValue checks whether the cause of `err` is the expectErr.
-func EqualsByValue(err error, expectErr error) bool {
-	cause := errors.Cause(err)
-	return errors.Is(cause, expectErr)
+// NewCodeError creates a base CodeError definition.
+// The provided code should be defined in the code.go in this package.
+func NewCodeError(code Code, desc string) CodeError {
+	return &codeError{
+		code: code,
+		desc: desc,
+	}
+}
+
+// codeError is the default implementation of CodeError.
+type codeError struct {
+	code  Code
+	desc  string
+	cause string
+}
+
+func (e *codeError) Error() string {
+	return fmt.Sprintf("(#%d)%s, cause:%s", e.code, e.desc, e.cause)
+}
+
+func (e *codeError) Code() Code {
+	return e.code
+}
+
+func (e *codeError) WithCausef(format string, a ...any) CodeError {
+	return &codeError{
+		code:  e.code,
+		desc:  e.desc,
+		cause: fmt.Sprintf(format, a...),
+	}
+}
+
+func (e *codeError) WithCause(cause error) CodeError {
+	return &codeError{
+		code:  e.code,
+		desc:  e.desc,
+		cause: cause.Error(),
+	}
 }

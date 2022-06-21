@@ -5,8 +5,7 @@ package server
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
 var (
-	ErrCreateEtcdClient = coderr.NewCodeErrorWrapper(coderr.Internal, "create etcd client")
-	ErrStartEtcd        = coderr.NewCodeErrorWrapper(coderr.Internal, "start embed etcd")
+	ErrCreateEtcdClient = coderr.NewCodeError(coderr.Internal, "create etcd client")
+	ErrStartEtcd        = coderr.NewCodeError(coderr.Internal, "start embed etcd")
+	ErrStartEtcdTimeout = coderr.NewCodeError(coderr.Internal, "start etcd server timeout")
 )
-
-var ErrStartEtcdTimeout = coderr.NewNormalizedCodeError(coderr.Internal, "start etcd server timeout")

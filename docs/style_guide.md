@@ -13,15 +13,15 @@ Besides the [CodeReviewComments](https://github.com/golang/go/wiki/CodeReviewCom
   - The error codes are defined in the single global package [coderr](https://github.com/CeresDB/ceresmeta/tree/main/pkg/coderr).
 - Construct: define leaf errors on package level (often in a separate `error.go` file) by package [coderr](https://github.com/CeresDB/ceresmeta/tree/main/pkg/coderr).
 - Wrap: wrap errors by `errors.Wrap` or `errors.Wrapf`.
-- Check: test the error identity by calling `coderr.EqualsByCode` or `coderr.EqualsByValue`.
+- Check: test the error identity by calling `coderr.Is`.
 - Log: only log the error on the top level package.
 - Respond: respond the `CodeError`(defined in package [coderr](https://github.com/CeresDB/ceresmeta/tree/main/pkg/coderr)) unwrapped by `errors.Cause` to client on service level.
 
 ### Example
 `errors.go` in the package `server`:
 ```go
-var ErrStartEtcd        = coderr.NewCodeErrorWrapper(coderr.Internal, "start embed etcd")
-var ErrStartEtcdTimeout = coderr.NewNormalizedCodeError(coderr.Internal, "start etcd server timeout")
+var ErrStartEtcd        = coderr.NewCodeError(coderr.Internal, "start embed etcd")
+var ErrStartEtcdTimeout = coderr.NewCodeError(coderr.Internal, "start etcd server timeout")
 ```
 
 `server.go` in the package `server`:
@@ -29,8 +29,18 @@ var ErrStartEtcdTimeout = coderr.NewNormalizedCodeError(coderr.Internal, "start 
 func (srv *Server) startEtcd() error {
     etcdSrv, err := embed.StartEtcd(srv.etcdCfg)
     if err != nil {
-        return ErrStartEtcd.Wrap(err)
+        return ErrStartEtcd.WithCause(err)
     }
+
+    newCtx, cancel := context.WithTimeout(srv.ctx, srv.cfg.EtcdStartTimeout())
+    defer cancel()
+
+    select {
+    case <-etcdSrv.Server.ReadyNotify():
+    case <-newCtx.Done():
+        return ErrStartEtcdTimeout.WithCausef("timeout is:%v", srv.cfg.EtcdStartTimeout())
+    }
+	
     return nil
 }
 ```
@@ -42,11 +52,8 @@ func main() {
     if err != nil {
         return 
     }
-    if coderr.EqualsByCode(err, coderr.Internal) {
+    if coderr.Is(err, coderr.Internal) {
         log.Error("internal error")
-    }
-    if coderr.EqualsByValue(err, server.EtcdStartEtcdTimeout) {
-        log.Error("start etcd server timeout")
     }
 	
     cerr, ok := err.(coderr.CodeError)
