@@ -4,24 +4,24 @@ package coderr
 
 import "fmt"
 
-var _ CodeError = &NormalCodeError{}
+var _ CodeError = &normalCodeError{}
 
-// NormalCodeError is actually the leaf error in the error chain, that is to say, the error is generated in our codebase.
-type NormalCodeError struct {
+// normalCodeError is actually the leaf error in the error chain, that is to say, the error is generated in our codebase.
+type normalCodeError struct {
 	code Code
 	msg  string
 }
 
-func (e *NormalCodeError) Error() string {
+func (e *normalCodeError) Error() string {
 	return fmt.Sprintf("code:%d, msg:%s", e.code, e.msg)
 }
 
-func (e *NormalCodeError) Code() Code {
+func (e *normalCodeError) Code() Code {
 	return e.code
 }
 
 func NewNormalizedCodeError(code Code, msg string) CodeError {
-	return &NormalCodeError{
+	return &normalCodeError{
 		code,
 		msg,
 	}
