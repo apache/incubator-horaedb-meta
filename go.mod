@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/AlekSi/gocov-xml v1.0.0
+	github.com/CeresDB/ceresdbproto/go/ceresdbproto v0.0.0-20220531034131-a7db8811a949
 	github.com/axw/gocov v1.1.0
 	github.com/mgechev/revive v1.2.1
 	github.com/pkg/errors v0.9.1
@@ -13,6 +14,8 @@ require (
 	golang.org/x/tools v0.1.10
 	gotest.tools/gotestsum v1.8.1
 )
+
+replace github.com/CeresDB/ceresdbproto/go/ceresdbproto => ../ceresdbproto/go/ceresdbproto
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
@@ -83,8 +86,8 @@ require (
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
-	google.golang.org/grpc v1.38.0 // indirect
-	google.golang.org/protobuf v1.26.0 // indirect
+	google.golang.org/grpc v1.40.0 // indirect
+	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect

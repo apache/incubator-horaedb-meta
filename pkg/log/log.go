@@ -37,3 +37,11 @@ func InitGlobalLogger(cfg *Config) (*zap.Logger, error) {
 	globalLoggerCfg = &zapCfg
 	return logger, nil
 }
+
+func GetLogger() *zap.Logger {
+	return globalLogger
+}
+
+func GetLoggerConfig() *zap.Config {
+	return globalLoggerCfg
+}
