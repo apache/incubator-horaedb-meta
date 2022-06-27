@@ -48,6 +48,8 @@ func NewMember(rootPath string, id uint64, name string, clusterKV etcdutil.Clust
 	}
 }
 
+// GetLeader gets the leader of the cluster.
+// GetLeaderResp.Leader == nil if no leader found.
 func (m *Member) GetLeader(ctx context.Context) (*GetLeaderResp, error) {
 	ctx, cancel := context.WithTimeout(ctx, m.rpcTimeout)
 	defer cancel()
@@ -59,7 +61,7 @@ func (m *Member) GetLeader(ctx context.Context) (*GetLeaderResp, error) {
 		return nil, ErrMultipleLeader
 	}
 	if len(resp.Kvs) == 0 {
-		return nil, nil
+		return &GetLeaderResp{}, nil
 	}
 	leaderKv := resp.Kvs[0]
 	leader := &ceresdbproto.Member{}
@@ -67,7 +69,7 @@ func (m *Member) GetLeader(ctx context.Context) (*GetLeaderResp, error) {
 	if err != nil {
 		return nil, ErrInvalidLeaderValue.WithCause(err)
 	}
-	return &GetLeaderResp{Leader: leader, Version: leaderKv.Version}, nil
+	return &GetLeaderResp{Leader: leader, Revision: leaderKv.ModRevision}, nil
 }
 
 func (m *Member) ResetLeader(ctx context.Context) error {
@@ -122,13 +124,13 @@ func (m *Member) WaitForLeaderChange(ctx context.Context, watcher clientv3.Watch
 	}
 }
 
-func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaser clientv3.Lease, leaseTTLSec int64) error {
+func (m *Member) CampaignAndKeepLeader(ctx context.Context, rawLease clientv3.Lease, leaseTTLSec int64) error {
 	leaderVal, err := m.Marshal()
 	if err != nil {
 		return err
 	}
 
-	newLease := newLease(leaser, m.rpcTimeout, leaseTTLSec)
+	newLease := newLease(rawLease, m.rpcTimeout, leaseTTLSec)
 	if err := newLease.Grant(ctx); err != nil {
 		return err
 	}
@@ -199,6 +201,6 @@ func (m *Member) Marshal() (string, error) {
 }
 
 type GetLeaderResp struct {
-	Leader  *ceresdbproto.Member
-	Version int64
+	Leader   *ceresdbproto.Member
+	Revision int64
 }

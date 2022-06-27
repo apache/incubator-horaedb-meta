@@ -175,6 +175,6 @@ func (ctx *leaderWatchContext) NewWatcher() clientv3.Watcher {
 	return clientv3.NewWatcher(ctx.srv.etcdCli)
 }
 
-func (ctx *leaderWatchContext) NewLeaser() clientv3.Lease {
+func (ctx *leaderWatchContext) NewLease() clientv3.Lease {
 	return clientv3.NewLease(ctx.srv.etcdCli)
 }

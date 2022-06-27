@@ -23,7 +23,7 @@ const (
 type WatchContext interface {
 	EtcdLeaderID() uint64
 	ShouldStop() bool
-	NewLeaser() clientv3.Lease
+	NewLease() clientv3.Lease
 	NewWatcher() clientv3.Watcher
 }
 
@@ -71,8 +71,8 @@ func (l *LeaderWatcher) Watch(ctx context.Context) {
 			// A new leader should be elected and the etcd leader should be made the new leader.
 			if l.self.ID == etcdLeaderID {
 				// campaign the leader and block until leader changes.
-				leaser := l.watchCtx.NewLeaser()
-				if err := l.self.CampaignAndKeepLeader(ctx, leaser, l.leaseTTLSec); err != nil {
+				rawLease := l.watchCtx.NewLease()
+				if err := l.self.CampaignAndKeepLeader(ctx, rawLease, l.leaseTTLSec); err != nil {
 					logger.Error("fail to campaign and keep leader", zap.Error(err))
 					wait = waitReasonFailEtcd
 				} else {
@@ -90,7 +90,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context) {
 			if etcdLeaderID == leaderResp.Leader.Id {
 				// watch the leader and block until leader changes.
 				watcher := l.watchCtx.NewWatcher()
-				l.self.WaitForLeaderChange(ctx, watcher, leaderResp.Version)
+				l.self.WaitForLeaderChange(ctx, watcher, leaderResp.Revision)
 				logger.Warn("leader changes and stop watching")
 				continue
 			}

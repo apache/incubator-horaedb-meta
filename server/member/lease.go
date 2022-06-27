@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
-type Lease struct {
-	leaser     clientv3.Lease
+type lease struct {
+	rawLease   clientv3.Lease
 	rpcTimeout time.Duration
 	ttlSec     int64
 
@@ -23,18 +23,18 @@ type Lease struct {
 	expireTime  time.Time
 }
 
-func newLease(leaser clientv3.Lease, rpcTimeout time.Duration, ttlSec int64) *Lease {
-	return &Lease{
-		leaser:     leaser,
+func newLease(rawLease clientv3.Lease, rpcTimeout time.Duration, ttlSec int64) *lease {
+	return &lease{
+		rawLease:   rawLease,
 		rpcTimeout: rpcTimeout,
 		ttlSec:     ttlSec,
 	}
 }
 
-func (l *Lease) Grant(ctx context.Context) error {
+func (l *lease) Grant(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, l.rpcTimeout)
 	defer cancel()
-	leaseResp, err := l.leaser.Grant(ctx, l.ttlSec)
+	leaseResp, err := l.rawLease.Grant(ctx, l.ttlSec)
 	if err != nil {
 		return ErrGrantLease.WithCause(err)
 	}
@@ -46,15 +46,15 @@ func (l *Lease) Grant(ctx context.Context) error {
 	return nil
 }
 
-func (l *Lease) Close(ctx context.Context) error {
+func (l *lease) Close(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, l.rpcTimeout)
 	defer cancel()
-	_, err := l.leaser.Revoke(ctx, l.ID)
+	_, err := l.rawLease.Revoke(ctx, l.ID)
 	return ErrRevokeLease.WithCause(err)
 }
 
 // KeepAlive renews the lease.
-func (l *Lease) KeepAlive(ctx context.Context) {
+func (l *lease) KeepAlive(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	timeCh := l.keepAliveBg(ctx, l.rpcTimeout/3)
@@ -77,18 +77,18 @@ func (l *Lease) KeepAlive(ctx context.Context) {
 	}
 }
 
-func (l *Lease) IsLeader() bool {
+func (l *lease) IsLeader() bool {
 	return time.Now().After(l.getExpireTime())
 }
 
-func (l *Lease) setExpireTime(newExpireTime time.Time) {
+func (l *lease) setExpireTime(newExpireTime time.Time) {
 	l.expireTimeL.Lock()
 	defer l.expireTimeL.Unlock()
 
 	l.expireTime = newExpireTime
 }
 
-func (l *Lease) getExpireTime() time.Time {
+func (l *lease) getExpireTime() time.Time {
 	l.expireTimeL.RLock()
 	defer l.expireTimeL.RUnlock()
 
@@ -96,7 +96,7 @@ func (l *Lease) getExpireTime() time.Time {
 }
 
 // keepAliveBg keeps the lease alive by periodically call `lease.KeepAliveOnce` and posts back latest received expire time into the channel.
-func (l *Lease) keepAliveBg(ctx context.Context, interval time.Duration) <-chan time.Time {
+func (l *lease) keepAliveBg(ctx context.Context, interval time.Duration) <-chan time.Time {
 	ch := make(chan time.Time)
 
 	go func() {
@@ -111,7 +111,7 @@ func (l *Lease) keepAliveBg(ctx context.Context, interval time.Duration) <-chan 
 				start := time.Now()
 				ctx1, cancel := context.WithTimeout(ctx, l.rpcTimeout)
 				defer cancel()
-				resp, err := l.leaser.KeepAliveOnce(ctx1, l.ID)
+				resp, err := l.rawLease.KeepAliveOnce(ctx1, l.ID)
 				if err != nil {
 					l.logger.Error("lease keep alive failed", zap.Error(err))
 					return
