@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
 
@@ -22,21 +23,25 @@ const (
 type WatchContext interface {
 	EtcdLeaderID() uint64
 	ShouldStop() bool
+	NewLeaser() clientv3.Lease
+	NewWatcher() clientv3.Watcher
 }
 
 type LeaderWatcher struct {
-	watchCtx WatchContext
-	self     *Member
+	watchCtx    WatchContext
+	self        *Member
+	leaseTTLSec int64
 }
 
-func NewLeaderWatcher(ctx WatchContext, self *Member) *LeaderWatcher {
+func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64) *LeaderWatcher {
 	return &LeaderWatcher{
 		ctx,
 		self,
+		leaseTTLSec,
 	}
 }
 
-func (l *LeaderWatcher) Watch(_ context.Context) {
+func (l *LeaderWatcher) Watch(ctx context.Context) {
 	var wait string
 	logger := log.With(zap.String("self", l.self.Name))
 
@@ -53,7 +58,7 @@ func (l *LeaderWatcher) Watch(_ context.Context) {
 		}
 
 		// check whether leader exists.
-		leaderResp, err := l.self.GetLeader()
+		leaderResp, err := l.self.GetLeader(ctx)
 		if err != nil {
 			logger.Error("fail to get leader", zap.Error(err))
 			wait = waitReasonFailEtcd
@@ -66,7 +71,8 @@ func (l *LeaderWatcher) Watch(_ context.Context) {
 			// A new leader should be elected and the etcd leader should be made the new leader.
 			if l.self.ID == etcdLeaderID {
 				// campaign the leader and block until leader changes.
-				if err := l.self.CampaignAndKeepLeader(); err != nil {
+				leaser := l.watchCtx.NewLeaser()
+				if err := l.self.CampaignAndKeepLeader(ctx, leaser, l.leaseTTLSec); err != nil {
 					logger.Error("fail to campaign and keep leader", zap.Error(err))
 					wait = waitReasonFailEtcd
 				} else {
@@ -83,17 +89,15 @@ func (l *LeaderWatcher) Watch(_ context.Context) {
 			// not the etcd leader.
 			if etcdLeaderID == leaderResp.Leader.Id {
 				// watch the leader and block until leader changes.
-				if err := l.self.WaitForLeaderChange(); err != nil {
-					logger.Error("fail to wait for leader change", zap.Error(err))
-				} else {
-					logger.Info("leader changes")
-				}
+				watcher := l.watchCtx.NewWatcher()
+				l.self.WaitForLeaderChange(ctx, watcher, leaderResp.Version)
+				logger.Warn("leader changes and stop watching")
 				continue
 			}
 
 			// the leader is not etcd leader and this node is leader so reset it.
 			if leaderResp.Leader.Id == l.self.ID {
-				if err := l.self.ResetLeader(); err != nil {
+				if err := l.self.ResetLeader(ctx); err != nil {
 					logger.Error("fail to reset leader", zap.Error(err))
 					wait = waitReasonFailEtcd
 				}

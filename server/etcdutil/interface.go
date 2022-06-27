@@ -8,3 +8,7 @@ type ClusterKV interface {
 	clientv3.Cluster
 	clientv3.KV
 }
+
+type EtcdLeaderGetter interface {
+	GetLeader() uint64
+}

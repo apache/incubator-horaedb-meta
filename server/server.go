@@ -9,6 +9,7 @@ import (
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/config"
+	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/member"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
@@ -106,7 +107,7 @@ func (srv *Server) startEtcd() error {
 	lgc := log.GetLoggerConfig()
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   endpoints,
-		DialTimeout: srv.cfg.EtcdDialTimeout(),
+		DialTimeout: srv.cfg.EtcdCallTimeout(),
 		LogConfig:   lgc,
 	})
 	if err != nil {
@@ -114,7 +115,8 @@ func (srv *Server) startEtcd() error {
 	}
 
 	srv.etcdCli = client
-	srv.member = member.NewMember(uint64(etcdSrv.Server.ID()), client)
+	etcdLeaderGetter := &etcdutil.LeaderGetterWrapper{Server: etcdSrv.Server}
+	srv.member = member.NewMember("", uint64(etcdSrv.Server.ID()), "", client, etcdLeaderGetter, srv.cfg.EtcdCallTimeout())
 	srv.etcdSrv = etcdSrv
 	return nil
 }
@@ -147,7 +149,7 @@ func (srv *Server) watchLeader(_ context.Context) {
 	watchCtx := &leaderWatchContext{
 		srv,
 	}
-	watcher := member.NewLeaderWatcher(watchCtx, srv.member)
+	watcher := member.NewLeaderWatcher(watchCtx, srv.member, srv.cfg.LeaseTTLSec)
 
 	watcher.Watch(srv.ctx)
 }
@@ -167,4 +169,12 @@ func (ctx *leaderWatchContext) ShouldStop() bool {
 
 func (ctx *leaderWatchContext) EtcdLeaderID() uint64 {
 	return ctx.srv.etcdSrv.Server.Lead()
+}
+
+func (ctx *leaderWatchContext) NewWatcher() clientv3.Watcher {
+	return clientv3.NewWatcher(ctx.srv.etcdCli)
+}
+
+func (ctx *leaderWatchContext) NewLeaser() clientv3.Lease {
+	return clientv3.NewLease(ctx.srv.etcdCli)
 }
