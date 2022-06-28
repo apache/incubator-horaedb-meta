@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
@@ -21,7 +22,7 @@ const (
 )
 
 type WatchContext interface {
-	EtcdLeaderID() uint64
+	etcdutil.EtcdLeaderGetter
 	ShouldStop() bool
 	NewLease() clientv3.Lease
 	NewWatcher() clientv3.Watcher

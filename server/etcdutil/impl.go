@@ -10,6 +10,6 @@ type LeaderGetterWrapper struct {
 	Server *etcdserver.EtcdServer
 }
 
-func (w *LeaderGetterWrapper) GetLeader() uint64 {
+func (w *LeaderGetterWrapper) EtcdLeaderID() uint64 {
 	return w.Server.Lead()
 }

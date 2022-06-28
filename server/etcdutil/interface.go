@@ -10,5 +10,5 @@ type ClusterKV interface {
 }
 
 type EtcdLeaderGetter interface {
-	GetLeader() uint64
+	EtcdLeaderID() uint64
 }

@@ -175,7 +175,7 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, rawLease clientv3.Le
 				log.Info("no longer a leader because lease has expired")
 				return nil
 			}
-			etcdLeader := m.etcdLeaderGetter.GetLeader()
+			etcdLeader := m.etcdLeaderGetter.EtcdLeaderID()
 			if etcdLeader != m.ID {
 				log.Info("etcd leader changed and should re-assign the leadership", zap.String("old-leader", m.Name))
 				return nil
