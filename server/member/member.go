@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/go/ceresdbproto"
+	"github.com/CeresDB/ceresdbproto/pkg/metapb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -26,7 +26,7 @@ type Member struct {
 	leaderKey        string
 	clusterKV        etcdutil.ClusterKV
 	etcdLeaderGetter etcdutil.EtcdLeaderGetter
-	leader           *ceresdbproto.Member
+	leader           *metapb.Member
 	rpcTimeout       time.Duration
 }
 
@@ -64,7 +64,7 @@ func (m *Member) GetLeader(ctx context.Context) (*GetLeaderResp, error) {
 		return &GetLeaderResp{}, nil
 	}
 	leaderKv := resp.Kvs[0]
-	leader := &ceresdbproto.Member{}
+	leader := &metapb.Member{}
 	err = proto.Unmarshal(leaderKv.Value, leader)
 	if err != nil {
 		return nil, ErrInvalidLeaderValue.WithCause(err)
@@ -130,7 +130,7 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, rawLease clientv3.Le
 		return err
 	}
 
-	newLease := newLease(rawLease, m.rpcTimeout, leaseTTLSec)
+	newLease := newLease(rawLease, leaseTTLSec)
 	if err := newLease.Grant(ctx); err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, rawLease clientv3.Le
 }
 
 func (m *Member) Marshal() (string, error) {
-	memPb := &ceresdbproto.Member{
+	memPb := &metapb.Member{
 		Name: m.Name,
 		Id:   m.ID,
 	}
@@ -201,6 +201,6 @@ func (m *Member) Marshal() (string, error) {
 }
 
 type GetLeaderResp struct {
-	Leader   *ceresdbproto.Member
+	Leader   *metapb.Member
 	Revision int64
 }

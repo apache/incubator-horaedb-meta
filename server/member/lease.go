@@ -1,3 +1,5 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package member
 
 import (
@@ -11,9 +13,9 @@ import (
 )
 
 type lease struct {
-	rawLease   clientv3.Lease
-	rpcTimeout time.Duration
-	ttlSec     int64
+	rawLease clientv3.Lease
+	timeout  time.Duration
+	ttlSec   int64
 
 	// The fields below are initialized after Grant is called.
 	ID     clientv3.LeaseID
@@ -23,16 +25,16 @@ type lease struct {
 	expireTime  time.Time
 }
 
-func newLease(rawLease clientv3.Lease, rpcTimeout time.Duration, ttlSec int64) *lease {
+func newLease(rawLease clientv3.Lease, ttlSec int64) *lease {
 	return &lease{
-		rawLease:   rawLease,
-		rpcTimeout: rpcTimeout,
-		ttlSec:     ttlSec,
+		rawLease: rawLease,
+		timeout:  time.Duration(ttlSec) * time.Second,
+		ttlSec:   ttlSec,
 	}
 }
 
 func (l *lease) Grant(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, l.rpcTimeout)
+	ctx, cancel := context.WithTimeout(ctx, l.timeout)
 	defer cancel()
 	leaseResp, err := l.rawLease.Grant(ctx, l.ttlSec)
 	if err != nil {
@@ -47,7 +49,8 @@ func (l *lease) Grant(ctx context.Context) error {
 }
 
 func (l *lease) Close(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, l.rpcTimeout)
+	l.setExpireTime(time.Time{})
+	ctx, cancel := context.WithTimeout(ctx, l.timeout)
 	defer cancel()
 	_, err := l.rawLease.Revoke(ctx, l.ID)
 	return ErrRevokeLease.WithCause(err)
@@ -57,7 +60,7 @@ func (l *lease) Close(ctx context.Context) error {
 func (l *lease) KeepAlive(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	timeCh := l.keepAliveBg(ctx, l.rpcTimeout/3)
+	timeCh := l.keepAliveBg(ctx, l.timeout/3)
 
 	var maxExpireTime time.Time
 	for {
@@ -67,7 +70,7 @@ func (l *lease) KeepAlive(ctx context.Context) {
 				maxExpireTime = nextExpireTime
 				l.setExpireTime(maxExpireTime)
 			}
-		case <-time.After(l.rpcTimeout):
+		case <-time.After(l.timeout):
 			l.logger.Info("lease timeout")
 			return
 		case <-ctx.Done():
@@ -109,7 +112,7 @@ func (l *lease) keepAliveBg(ctx context.Context, interval time.Duration) <-chan 
 		for {
 			go func() {
 				start := time.Now()
-				ctx1, cancel := context.WithTimeout(ctx, l.rpcTimeout)
+				ctx1, cancel := context.WithTimeout(ctx, l.timeout)
 				defer cancel()
 				resp, err := l.rawLease.KeepAliveOnce(ctx1, l.ID)
 				if err != nil {
@@ -125,6 +128,7 @@ func (l *lease) keepAliveBg(ctx context.Context, interval time.Duration) <-chan 
 				}
 			}()
 
+			// wait for next keep alive action
 			select {
 			case <-ctx.Done():
 				return

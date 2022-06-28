@@ -51,6 +51,13 @@ func (l *LeaderWatcher) Watch(ctx context.Context) {
 			return
 		}
 
+		select {
+		case <-ctx.Done():
+			logger.Warn("stop watching leader because ctx is done")
+			return
+		default:
+		}
+
 		if wait != waitReasonNoWait {
 			logger.Warn("sleep a while during watch", zap.String("wait-reason", wait))
 			time.Sleep(WatchLeaderFailInterval)
