@@ -8,7 +8,6 @@ import (
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
 
@@ -24,8 +23,6 @@ const (
 type WatchContext interface {
 	etcdutil.EtcdLeaderGetter
 	ShouldStop() bool
-	NewLease() clientv3.Lease
-	NewWatcher() clientv3.Watcher
 }
 
 type LeaderWatcher struct {
@@ -104,8 +101,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context) {
 			// not the etcd leader.
 			if etcdLeaderID == leaderResp.Leader.Id {
 				// watch the leader and block until leader changes.
-				watcher := l.watchCtx.NewWatcher()
-				l.self.WaitForLeaderChange(ctx, watcher, leaderResp.Revision)
+				l.self.WaitForLeaderChange(ctx, leaderResp.Revision)
 				logger.Warn("leader changes and stop watching")
 				continue
 			}

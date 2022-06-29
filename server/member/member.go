@@ -19,7 +19,7 @@ import (
 
 const leaderCheckInterval = time.Duration(100) * time.Millisecond
 
-// Member manages the
+// Member manages the leadership and the role of the node in the ceresmeta cluster.
 type Member struct {
 	ID               uint64
 	Name             string
@@ -82,7 +82,8 @@ func (m *Member) ResetLeader(ctx context.Context) error {
 	return nil
 }
 
-func (m *Member) WaitForLeaderChange(ctx context.Context, watcher clientv3.Watcher, revision int64) {
+func (m *Member) WaitForLeaderChange(ctx context.Context, revision int64) {
+	watcher := clientv3.NewWatcher(m.etcdCli)
 	defer func() {
 		if err := watcher.Close(); err != nil {
 			log.Error("close watcher failed", zap.Error(err))

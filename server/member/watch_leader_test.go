@@ -28,14 +28,6 @@ func (ctx *mockWatchCtx) EtcdLeaderID() uint64 {
 	return ctx.srv.Lead()
 }
 
-func (ctx *mockWatchCtx) NewLease() clientv3.Lease {
-	return clientv3.NewLease(ctx.client)
-}
-
-func (ctx *mockWatchCtx) NewWatcher() clientv3.Watcher {
-	return clientv3.NewWatcher(ctx.client)
-}
-
 func TestWatchLeaderSingle(t *testing.T) {
 	cfg := etcdutil.NewTestSingleConfig()
 	etcd, err := embed.StartEtcd(cfg)

@@ -170,11 +170,3 @@ func (ctx *leaderWatchContext) ShouldStop() bool {
 func (ctx *leaderWatchContext) EtcdLeaderID() uint64 {
 	return ctx.srv.etcdSrv.Server.Lead()
 }
-
-func (ctx *leaderWatchContext) NewWatcher() clientv3.Watcher {
-	return clientv3.NewWatcher(ctx.srv.etcdCli)
-}
-
-func (ctx *leaderWatchContext) NewLease() clientv3.Lease {
-	return clientv3.NewLease(ctx.srv.etcdCli)
-}
