@@ -14,7 +14,8 @@ import (
 
 const (
 	defaultEtcdStartTimeoutMs int64 = 10 * 1000
-	defaultDailTimeoutMs            = 5 * 1000
+	defaultCallTimeoutMs            = 5 * 1000
+	defaultEtcdLeaseTTLSec          = 10
 
 	defaultNodeNamePrefix          = "ceresmeta"
 	defaultDataDir                 = "/tmp/ceresmeta/data"
@@ -166,10 +167,8 @@ func MakeConfigParser() (*Parser, error) {
 	fs.StringVar(&cfg.Log.File, "log-file", log.DefaultLogFile, "file for log output")
 
 	fs.Int64Var(&cfg.EtcdStartTimeoutMs, "etcd-start-timeout-ms", defaultEtcdStartTimeoutMs, "timeout for starting etcd server")
-	fs.Int64Var(&cfg.EtcdCallTimeoutMs, "etcd-dial-timeout-ms", defaultDailTimeoutMs, "timeout for dialing etcd server")
-
-	fs.Int64Var(&cfg.EtcdStartTimeoutMs, "etcd-start-timeout-ms", defaultEtcdStartTimeoutMs, "timeout for starting etcd server")
-	fs.Int64Var(&cfg.EtcdCallTimeoutMs, "etcd-dial-timeout-ms", defaultDailTimeoutMs, "timeout for dialing etcd server")
+	fs.Int64Var(&cfg.EtcdCallTimeoutMs, "etcd-dial-timeout-ms", defaultCallTimeoutMs, "timeout for dialing etcd server")
+	fs.Int64Var(&cfg.LeaseTTLSec, "lease-ttl-sec", defaultEtcdLeaseTTLSec, "ttl of etcd key lease (suggest 10s)")
 
 	defaultNodeName, err := makeDefaultNodeName()
 	if err != nil {

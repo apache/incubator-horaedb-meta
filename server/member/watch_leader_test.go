@@ -28,14 +28,11 @@ func (ctx *mockWatchCtx) EtcdLeaderID() uint64 {
 	return ctx.srv.Lead()
 }
 
-func TestWatchLeaderSingle(t *testing.T) {
+func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, func()) {
 	cfg := etcdutil.NewTestSingleConfig()
 	etcd, err := embed.StartEtcd(cfg)
-	defer func() {
-		etcd.Close()
-		etcdutil.CleanConfig(cfg)
-	}()
-	assert.NoError(t, err)
+
+	<-etcd.Server.ReadyNotify()
 
 	endpoint := cfg.LCUrls[0].String()
 	client, err := clientv3.New(clientv3.Config{
@@ -43,7 +40,17 @@ func TestWatchLeaderSingle(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	<-etcd.Server.ReadyNotify()
+	clean := func() {
+		etcd.Close()
+		etcdutil.CleanConfig(cfg)
+	}
+	assert.NoError(t, err)
+	return etcd, client, clean
+}
+
+func TestWatchLeaderSingle(t *testing.T) {
+	etcd, client, clean := prepareEtcdServerAndClient(t)
+	defer clean()
 
 	watchCtx := &mockWatchCtx{
 		stopped: false,

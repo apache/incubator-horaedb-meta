@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	WatchLeaderFailInterval = time.Duration(200) * time.Millisecond
+	watchLeaderFailInterval = time.Duration(200) * time.Millisecond
 
 	waitReasonFailEtcd    = "fail to access etcd"
 	waitReasonResetLeader = "leader is reset"
@@ -66,7 +66,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context) {
 
 		if wait != waitReasonNoWait {
 			logger.Warn("sleep a while during watch", zap.String("wait-reason", wait))
-			time.Sleep(WatchLeaderFailInterval)
+			time.Sleep(watchLeaderFailInterval)
 			wait = waitReasonNoWait
 		}
 
