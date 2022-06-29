@@ -31,6 +31,7 @@ func (ctx *mockWatchCtx) EtcdLeaderID() uint64 {
 func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, func()) {
 	cfg := etcdutil.NewTestSingleConfig()
 	etcd, err := embed.StartEtcd(cfg)
+	assert.NoError(t, err)
 
 	<-etcd.Server.ReadyNotify()
 
@@ -44,7 +45,6 @@ func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, fu
 		etcd.Close()
 		etcdutil.CleanConfig(cfg)
 	}
-	assert.NoError(t, err)
 	return etcd, client, clean
 }
 
