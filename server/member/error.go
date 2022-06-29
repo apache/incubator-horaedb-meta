@@ -13,4 +13,5 @@ var (
 	ErrMarshalMember      = coderr.NewCodeError(coderr.Internal, "marshal member information")
 	ErrGrantLease         = coderr.NewCodeError(coderr.Internal, "grant lease")
 	ErrRevokeLease        = coderr.NewCodeError(coderr.Internal, "revoke lease")
+	ErrCloseLease         = coderr.NewCodeError(coderr.Internal, "close lease")
 )

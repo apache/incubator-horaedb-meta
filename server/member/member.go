@@ -5,6 +5,7 @@ package member
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/metapb"
@@ -24,7 +25,7 @@ type Member struct {
 	Name             string
 	rootPath         string
 	leaderKey        string
-	clusterKV        etcdutil.ClusterKV
+	etcdCli          *clientv3.Client
 	etcdLeaderGetter etcdutil.EtcdLeaderGetter
 	leader           *metapb.Member
 	rpcTimeout       time.Duration
@@ -34,14 +35,14 @@ func formatLeaderKey(rootPath string) string {
 	return fmt.Sprintf("%s/members/leader", rootPath)
 }
 
-func NewMember(rootPath string, id uint64, name string, clusterKV etcdutil.ClusterKV, etcdLeaderGetter etcdutil.EtcdLeaderGetter, rpcTimeout time.Duration) *Member {
+func NewMember(rootPath string, id uint64, name string, etcdCli *clientv3.Client, etcdLeaderGetter etcdutil.EtcdLeaderGetter, rpcTimeout time.Duration) *Member {
 	leaderKey := formatLeaderKey(rootPath)
 	return &Member{
 		ID:               id,
 		Name:             name,
 		rootPath:         rootPath,
 		leaderKey:        leaderKey,
-		clusterKV:        clusterKV,
+		etcdCli:          etcdCli,
 		etcdLeaderGetter: etcdLeaderGetter,
 		leader:           nil,
 		rpcTimeout:       rpcTimeout,
@@ -53,7 +54,7 @@ func NewMember(rootPath string, id uint64, name string, clusterKV etcdutil.Clust
 func (m *Member) GetLeader(ctx context.Context) (*GetLeaderResp, error) {
 	ctx, cancel := context.WithTimeout(ctx, m.rpcTimeout)
 	defer cancel()
-	resp, err := m.clusterKV.Get(ctx, m.leaderKey)
+	resp, err := m.etcdCli.Get(ctx, m.leaderKey)
 	if err != nil {
 		return nil, ErrGetLeader.WithCause(err)
 	}
@@ -75,7 +76,7 @@ func (m *Member) GetLeader(ctx context.Context) (*GetLeaderResp, error) {
 func (m *Member) ResetLeader(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, m.rpcTimeout)
 	defer cancel()
-	if _, err := m.clusterKV.Delete(ctx, m.leaderKey); err != nil {
+	if _, err := m.etcdCli.Delete(ctx, m.leaderKey); err != nil {
 		return ErrResetLeader.WithCause(err)
 	}
 	return nil
@@ -124,45 +125,56 @@ func (m *Member) WaitForLeaderChange(ctx context.Context, watcher clientv3.Watch
 	}
 }
 
-func (m *Member) CampaignAndKeepLeader(ctx context.Context, rawLease clientv3.Lease, leaseTTLSec int64) error {
+func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64) error {
 	leaderVal, err := m.Marshal()
 	if err != nil {
 		return err
 	}
 
+	rawLease := clientv3.NewLease(m.etcdCli)
 	newLease := newLease(rawLease, leaseTTLSec)
-	if err := newLease.Grant(ctx); err != nil {
+	closeLeaseOnce := sync.Once{}
+	closeLeaseWg := sync.WaitGroup{}
+	closeLease := func() {
+		closeLeaseWg.Wait()
+		ctx1, cancel := context.WithTimeout(context.Background(), m.rpcTimeout)
+		defer cancel()
+		if err := newLease.Close(ctx1); err != nil {
+			log.Error("close lease failed", zap.Error(err))
+		}
+	}
+	defer closeLeaseOnce.Do(closeLease)
+
+	ctx1, cancel := context.WithTimeout(ctx, m.rpcTimeout)
+	defer cancel()
+	if err := newLease.Grant(ctx1); err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, m.rpcTimeout)
-	defer cancel()
 	// The leader key must not exist, so the CreateRevision is 0.
 	cmp := clientv3.Compare(clientv3.CreateRevision(m.leaderKey), "=", 0)
-	resp, err := m.clusterKV.
-		Txn(ctx).
+	ctx1, cancel = context.WithTimeout(ctx, m.rpcTimeout)
+	defer cancel()
+	resp, err := m.etcdCli.
+		Txn(ctx1).
 		If(cmp).
 		Then(clientv3.OpPut(m.leaderKey, leaderVal, clientv3.WithLease(newLease.ID))).
 		Commit()
 	if err != nil {
-		closeErr := newLease.Close(ctx)
-		if closeErr != nil {
-			log.Error("close lease failed after txn put leader", zap.Error(closeErr))
-		}
 		return ErrTxnPutLeader.WithCause(err)
-	}
-	if !resp.Succeeded {
-		closeErr := newLease.Close(ctx)
-		if closeErr != nil {
-			log.Error("close lease failed after txn put leader", zap.Error(closeErr))
-		}
+	} else if !resp.Succeeded {
 		return ErrTxnPutLeader.WithCausef("txn put leader failed, resp:%v", resp)
 	}
 
 	log.Info("succeed to set leader", zap.String("leader-key", m.leaderKey), zap.String("leader", m.Name))
 
 	// keep the leadership after success in campaigning leader.
-	go newLease.KeepAlive(ctx)
+	closeLeaseWg.Add(1)
+	go func() {
+		newLease.KeepAlive(ctx)
+		closeLeaseWg.Done()
+		closeLeaseOnce.Do(closeLease)
+	}()
 
 	// check the leadership periodically and exit if it changes.
 	leaderCheckTicker := time.NewTicker(leaderCheckInterval)

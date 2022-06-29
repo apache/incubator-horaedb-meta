@@ -2,13 +2,6 @@
 
 package etcdutil
 
-import clientv3 "go.etcd.io/etcd/client/v3"
-
-type ClusterKV interface {
-	clientv3.Cluster
-	clientv3.KV
-}
-
 type EtcdLeaderGetter interface {
 	EtcdLeaderID() uint64
 }

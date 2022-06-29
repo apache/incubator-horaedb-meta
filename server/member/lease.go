@@ -15,8 +15,9 @@ import (
 // lease helps use etcd lease by providing Grant, Close and auto renewing the lease.
 type lease struct {
 	rawLease clientv3.Lease
-	timeout  time.Duration
-	ttlSec   int64
+	// timeout is the rpc timeout and always equals to the ttlSec.
+	timeout time.Duration
+	ttlSec  int64
 	// logger will be updated after Grant is called.
 	logger *zap.Logger
 
@@ -56,37 +57,57 @@ func (l *lease) Grant(ctx context.Context) error {
 }
 
 func (l *lease) Close(ctx context.Context) error {
+	// check whether the lease was granted.
+	if l.ID == 0 {
+		return nil
+	}
+
+	// release and reset all the resources.
 	l.setExpireTime(time.Time{})
 	ctx, cancel := context.WithTimeout(ctx, l.timeout)
 	defer cancel()
-	_, err := l.rawLease.Revoke(ctx, l.ID)
-	return ErrRevokeLease.WithCause(err)
+	if _, err := l.rawLease.Revoke(ctx, l.ID); err != nil {
+		return ErrRevokeLease.WithCause(err)
+	}
+	if err := l.rawLease.Close(); err != nil {
+		return ErrCloseLease.WithCause(err)
+	}
+
+	return nil
 }
 
-// KeepAlive renews the lease.
+// KeepAlive renews the lease until timeout for renewing lease.
 func (l *lease) KeepAlive(ctx context.Context) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	timeCh := l.keepAliveBg(ctx, l.timeout/3)
+	// used to receive the renewed event.
+	renewed := make(chan struct{}, 1)
+	ctx1, cancelRenewBg := context.WithCancel(ctx)
+	// used to join with the renew goroutine in the background.
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		l.renewLeaseBg(ctx1, l.timeout/3, renewed)
+		wg.Done()
+	}()
 
-	var maxExpireTime time.Time
+L:
 	for {
 		select {
-		case nextExpireTime := <-timeCh:
-			if nextExpireTime.After(maxExpireTime) {
-				maxExpireTime = nextExpireTime
-				l.setExpireTime(maxExpireTime)
-			}
+		case <-renewed:
+			l.logger.Debug("received renewed notification")
 		case <-time.After(l.timeout):
-			l.logger.Info("lease timeout")
-			return
+			l.logger.Warn("lease timeout, stop keeping lease alive")
+			break L
 		case <-ctx.Done():
-			l.logger.Info("exit keepalive loop because ctx is done")
-			return
+			l.logger.Info("stop keeping lease alive because ctx is done")
+			break L
 		}
 	}
+
+	cancelRenewBg()
+	wg.Wait()
 }
 
+// IsExpired is goroutine safe.
 func (l *lease) IsExpired() bool {
 	expiredAt := l.getExpireTime()
 	return time.Now().After(expiredAt)
@@ -99,6 +120,20 @@ func (l *lease) setExpireTime(newExpireTime time.Time) {
 	l.expireTime = newExpireTime
 }
 
+// setExpireTimeIfNewer updates the l.expireTime only if the newExpireTime is after l.expireTime.
+// Returns true if l.expireTime is updated.
+func (l *lease) setExpireTimeIfNewer(newExpireTime time.Time) bool {
+	l.expireTimeL.Lock()
+	defer l.expireTimeL.Unlock()
+
+	if newExpireTime.After(l.expireTime) {
+		l.expireTime = newExpireTime
+		return true
+	}
+
+	return false
+}
+
 func (l *lease) getExpireTime() time.Time {
 	l.expireTimeL.RLock()
 	defer l.expireTimeL.RUnlock()
@@ -106,45 +141,47 @@ func (l *lease) getExpireTime() time.Time {
 	return l.expireTime
 }
 
-// keepAliveBg keeps the lease alive by periodically call `lease.KeepAliveOnce` and posts back latest received expire time into the channel.
-func (l *lease) keepAliveBg(ctx context.Context, interval time.Duration) <-chan time.Time {
-	ch := make(chan time.Time)
+// renewLeaseBg keeps the lease alive by periodically call `lease.KeepAliveOnce`.
+// The l.expireTime will be updated during renewing and the renewing action will be told to caller by `renewed` channel.
+func (l *lease) renewLeaseBg(ctx context.Context, interval time.Duration, renewed chan<- struct{}) {
+	l.logger.Info("start renewing lease background", zap.Duration("interval", interval))
+	defer l.logger.Info("stop renewing lease background", zap.Duration("interval", interval))
 
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-
-		l.logger.Info("start keep lease alive", zap.Duration("interval", interval))
-		defer l.logger.Info("stop keep lease alive", zap.Duration("interval", interval))
-
-		for {
-			go func() {
-				start := time.Now()
-				ctx1, cancel := context.WithTimeout(ctx, l.timeout)
-				defer cancel()
-				resp, err := l.rawLease.KeepAliveOnce(ctx1, l.ID)
-				if err != nil {
-					l.logger.Error("lease keep alive failed", zap.Error(err))
-					return
-				}
-				if resp.TTL > 0 {
-					expireAt := start.Add(time.Duration(resp.TTL) * time.Second)
-					select {
-					case ch <- expireAt:
-						l.logger.Debug("got next expired time", zap.Time("expired-at", expireAt))
-					case <-ctx1.Done():
-					}
-				}
-			}()
-
-			// wait for next keep alive action
-			select {
-			case <-ctx.Done():
+L:
+	for {
+		func() {
+			start := time.Now()
+			ctx1, cancel := context.WithTimeout(ctx, l.timeout)
+			defer cancel()
+			resp, err := l.rawLease.KeepAliveOnce(ctx1, l.ID)
+			if err != nil {
+				l.logger.Error("lease keep alive failed", zap.Error(err))
 				return
-			case <-ticker.C:
 			}
-		}
-	}()
+			if resp.TTL < 0 {
+				l.logger.Warn("lease is expired")
+				return
+			}
 
-	return ch
+			expireAt := start.Add(time.Duration(resp.TTL) * time.Second)
+			updated := l.setExpireTimeIfNewer(expireAt)
+			l.logger.Debug("got next expired time", zap.Time("expired-at", expireAt), zap.Bool("updated", updated))
+		}()
+
+		// init the timer for next keep alive action.
+		t := time.After(interval)
+
+		// notify success of the renewed event.
+		select {
+		case renewed <- struct{}{}:
+		case <-ctx.Done():
+			break L
+		}
+		// wait for next keep alive action.
+		select {
+		case <-t:
+		case <-ctx.Done():
+			break L
+		}
+	}
 }

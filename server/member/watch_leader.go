@@ -42,6 +42,14 @@ func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64) *Leader
 	}
 }
 
+// Watch watches the leader changes:
+//  - Check whether the leader is valid (same as the etcd leader) if leader exists.
+//   - Leader is valid: wait for the leader changes.
+//   - Leader is not valid: reset the leader by the current leader.
+//  - Campaign the leadership if leader does not exist.
+//   - Elect the etcd leader as the ceresmeta leader.
+//	 - The leader keeps the leadership lease alive.
+//   - The other members keeps waiting for the leader changes.
 func (l *LeaderWatcher) Watch(ctx context.Context) {
 	var wait string
 	logger := log.With(zap.String("self", l.self.Name))
@@ -76,11 +84,10 @@ func (l *LeaderWatcher) Watch(ctx context.Context) {
 		etcdLeaderID := l.watchCtx.EtcdLeaderID()
 		if leaderResp.Leader == nil {
 			// Leader does not exist.
-			// A new leader should be elected and the etcd leader should be made the new leader.
+			// A new leader should be elected and the etcd leader should be elected as the new leader.
 			if l.self.ID == etcdLeaderID {
 				// campaign the leader and block until leader changes.
-				rawLease := l.watchCtx.NewLease()
-				if err := l.self.CampaignAndKeepLeader(ctx, rawLease, l.leaseTTLSec); err != nil {
+				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec); err != nil {
 					logger.Error("fail to campaign and keep leader", zap.Error(err))
 					wait = waitReasonFailEtcd
 				} else {
