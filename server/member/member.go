@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const leaderCheckInterval = time.Duration(50) * time.Millisecond
+const leaderCheckInterval = time.Duration(100) * time.Millisecond
 
 // Member manages the
 type Member struct {
@@ -171,7 +171,7 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, rawLease clientv3.Le
 	for {
 		select {
 		case <-leaderCheckTicker.C:
-			if !newLease.IsLeader() {
+			if newLease.IsExpired() {
 				log.Info("no longer a leader because lease has expired")
 				return nil
 			}

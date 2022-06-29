@@ -12,17 +12,20 @@ import (
 	"go.uber.org/zap"
 )
 
+// lease helps use etcd lease by providing Grant, Close and auto renewing the lease.
 type lease struct {
 	rawLease clientv3.Lease
 	timeout  time.Duration
 	ttlSec   int64
-
-	// The fields below are initialized after Grant is called.
-	ID     clientv3.LeaseID
+	// logger will be updated after Grant is called.
 	logger *zap.Logger
 
+	// The fields below are initialized after Grant is called.
+	ID clientv3.LeaseID
+
 	expireTimeL sync.RWMutex
-	expireTime  time.Time
+	// expireTime helps determine the lease whether is expired.
+	expireTime time.Time
 }
 
 func newLease(rawLease clientv3.Lease, ttlSec int64) *lease {
@@ -30,6 +33,7 @@ func newLease(rawLease clientv3.Lease, ttlSec int64) *lease {
 		rawLease: rawLease,
 		timeout:  time.Duration(ttlSec) * time.Second,
 		ttlSec:   ttlSec,
+		logger:   log.GetLogger(),
 	}
 }
 
@@ -43,8 +47,11 @@ func (l *lease) Grant(ctx context.Context) error {
 
 	l.ID = leaseResp.ID
 	l.logger = log.With(zap.Int64("lease-id", int64(leaseResp.ID)))
+
 	expiredAt := time.Now().Add(time.Second * time.Duration(leaseResp.TTL))
 	l.setExpireTime(expiredAt)
+
+	l.logger.Debug("lease is granted", zap.Time("expired-at", expiredAt))
 	return nil
 }
 
@@ -80,8 +87,9 @@ func (l *lease) KeepAlive(ctx context.Context) {
 	}
 }
 
-func (l *lease) IsLeader() bool {
-	return time.Now().After(l.getExpireTime())
+func (l *lease) IsExpired() bool {
+	expiredAt := l.getExpireTime()
+	return time.Now().After(expiredAt)
 }
 
 func (l *lease) setExpireTime(newExpireTime time.Time) {
@@ -120,9 +128,10 @@ func (l *lease) keepAliveBg(ctx context.Context, interval time.Duration) <-chan 
 					return
 				}
 				if resp.TTL > 0 {
-					expire := start.Add(time.Duration(resp.TTL) * time.Second)
+					expireAt := start.Add(time.Duration(resp.TTL) * time.Second)
 					select {
-					case ch <- expire:
+					case ch <- expireAt:
+						l.logger.Debug("got next expired time", zap.Time("expired-at", expireAt))
 					case <-ctx1.Done():
 					}
 				}

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/stretchr/testify/assert"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -94,8 +95,10 @@ func TestWatchLeaderSingle(t *testing.T) {
 	assert.NotNil(t, resp)
 	assert.Equal(t, resp.Leader.Id, mem.ID)
 
-	// wait for the expiration of leader lease.
-	time.Sleep(time.Duration(leaseTTLSec) * time.Second * 2)
+	// wait for the expiration of leader lease and note that the leaseTTLSec is just a hint for etcd cluster
+	// so here we try wait at least double leaseTTLSec to ensure the lease expired.
+	time.Sleep(time.Duration(leaseTTLSec)*time.Second*2 + time.Duration(300)*time.Millisecond)
+	log.Info("finish waiting and check the leader")
 
 	// the leader should not be the `mem`
 	ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
