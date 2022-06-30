@@ -5,22 +5,28 @@ package storage
 import (
 	"path"
 	"strings"
+	"time"
 
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/pingcap/log"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
+	"golang.org/x/net/context"
 )
 
-const delimiter = "/"
+const (
+	DefaultRequestTimeout = 10 * time.Second
+
+	delimiter = "/"
+)
 
 type etcdKVBase struct {
 	client   *clientv3.Client
 	rootPath string
 }
 
-// nolint:golint
 // NewEtcdKVBase creates a new etcd kv.
+//nolint
 func NewEtcdKVBase(client *clientv3.Client, rootPath string) *etcdKVBase {
 	return &etcdKVBase{
 		client:   client,
@@ -31,9 +37,12 @@ func NewEtcdKVBase(client *clientv3.Client, rootPath string) *etcdKVBase {
 func (kv *etcdKVBase) Load(key string) (string, error) {
 	key = path.Join(kv.rootPath, key)
 
-	resp, err := etcdutil.EtcdKVGet(kv.client, key)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
+	defer cancel()
+
+	resp, err := kv.client.Get(ctx, key)
 	if err != nil {
-		return "", err
+		return "", etcdutil.ErrEtcdKVGet.WithCause(err)
 	}
 	if n := len(resp.Kvs); n == 0 {
 		return "", nil
@@ -47,11 +56,14 @@ func (kv *etcdKVBase) LoadRange(key, endKey string, limit int) ([]string, []stri
 	key = strings.Join([]string{kv.rootPath, key}, delimiter)
 	endKey = strings.Join([]string{kv.rootPath, endKey}, delimiter)
 
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
+	defer cancel()
+
 	withRange := clientv3.WithRange(endKey)
 	withLimit := clientv3.WithLimit(int64(limit))
-	resp, err := etcdutil.EtcdKVGet(kv.client, key, withRange, withLimit)
+	resp, err := kv.client.Get(ctx, key, withRange, withLimit)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, etcdutil.ErrEtcdKVGet.WithCause(err)
 	}
 	keys := make([]string, 0, len(resp.Kvs))
 	values := make([]string, 0, len(resp.Kvs))
@@ -63,32 +75,29 @@ func (kv *etcdKVBase) LoadRange(key, endKey string, limit int) ([]string, []stri
 }
 
 func (kv *etcdKVBase) Save(key, value string) error {
-	key = path.Join(kv.rootPath, key)
-	txn := etcdutil.NewSlowLogTxn(kv.client)
-	resp, err := txn.Then(clientv3.OpPut(key, value)).Commit()
+	key = strings.Join([]string{kv.rootPath, key}, delimiter)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
+	defer cancel()
+	_, err := kv.client.Put(ctx, key, value)
 	if err != nil {
 		e := etcdutil.ErrEtcdKVPut.WithCause(err)
 		log.Error("save to etcd meet error", zap.String("key", key), zap.String("value", value), zap.Error(e))
 		return e
 	}
-	if !resp.Succeeded {
-		return etcdutil.ErrEtcdTxnConflict
-	}
+
 	return nil
 }
 
 func (kv *etcdKVBase) Remove(key string) error {
-	key = path.Join(kv.rootPath, key)
-
-	txn := etcdutil.NewSlowLogTxn(kv.client)
-	resp, err := txn.Then(clientv3.OpDelete(key)).Commit()
+	key = strings.Join([]string{kv.rootPath, key}, delimiter)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
+	defer cancel()
+	_, err := kv.client.Delete(ctx, key)
 	if err != nil {
 		err = etcdutil.ErrEtcdKVDelete.WithCause(err)
 		log.Error("remove from etcd meet error", zap.String("key", key), zap.Error(err))
 		return err
 	}
-	if !resp.Succeeded {
-		return etcdutil.ErrEtcdTxnConflict
-	}
+
 	return nil
 }
