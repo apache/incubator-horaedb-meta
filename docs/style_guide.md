@@ -70,11 +70,11 @@ func main() {
 ## Logging
 ### Principles
 - Structured log by [zap](https://github.com/uber-go/zap).
-- Use the package `github.com/ceresmeta/pkg/log` which is based on zap.
+- Use the package `github.com/ceresmeta/pkg/log` which is based on [zap](https://github.com/uber-go/zap).
 - Create local logger with common fields if necessary.
 
 ### Example
-A normal usage:
+Normal usage:
 ```go
 import "github.com/ceresmeta/pkg/log"
 
@@ -91,22 +91,22 @@ Local logger:
 import "github.com/ceresmeta/pkg/log"
 
 type lease struct {
-	ID int64
-	logger *zap.Logger
+    ID int64
+    logger *zap.Logger
 }
 
 func NewLease(ID int64) *lease {
     logger := log.With(zap.Int64("lease-id", ID))
 	
-	return &lease {
-		ID,
-		logger,
+    return &lease {
+        ID,
+        logger,
     }
 }
 
 func (l *lease) Close() {
-	l.logger.Info("lease is closed")
-	l.ID = 0
+    l.logger.Info("lease is closed")
+    l.ID = 0
 }
 ```
 
