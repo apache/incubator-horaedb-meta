@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tikv/pd/pkg/tempurl"
@@ -45,37 +46,37 @@ func TestEtcd(t *testing.T) {
 	re.NoError(err)
 	rootPath := path.Join("/pd", strconv.FormatUint(100, 10))
 
-	kv := NewEtcdKVBase(client, rootPath)
+	kv := NewEtcdKV(client, rootPath, time.Second*10)
 	testReadWrite(re, kv)
 	testRange(re, kv)
 }
 
-func testReadWrite(re *require.Assertions, kv Base) {
-	v, err := kv.Load("key")
+func testReadWrite(re *require.Assertions, kv KV) {
+	v, err := kv.Get("key")
 	re.NoError(err)
 	re.Equal("", v)
-	err = kv.Save("key", "value")
+	err = kv.Put("key", "value")
 	re.NoError(err)
-	v, err = kv.Load("key")
+	v, err = kv.Get("key")
 	re.NoError(err)
 	re.Equal("value", v)
-	err = kv.Remove("key")
+	err = kv.Delete("key")
 	re.NoError(err)
-	v, err = kv.Load("key")
+	v, err = kv.Get("key")
 	re.NoError(err)
 	re.Equal("", v)
-	err = kv.Remove("key")
+	err = kv.Delete("key")
 	re.NoError(err)
 }
 
-func testRange(re *require.Assertions, kv Base) {
+func testRange(re *require.Assertions, kv KV) {
 	keys := []string{
 		"test-a", "test-a/a", "test-a/ab",
 		"test", "test/a", "test/ab",
 		"testa", "testa/a", "testa/ab",
 	}
 	for _, k := range keys {
-		err := kv.Save(k, k)
+		err := kv.Put(k, k)
 		re.NoError(err)
 	}
 	sortedKeys := keys
@@ -96,7 +97,7 @@ func testRange(re *require.Assertions, kv Base) {
 	}
 
 	for _, tc := range testCases {
-		ks, vs, err := kv.LoadRange(tc.start, tc.end, tc.limit)
+		ks, vs, err := kv.Scan(tc.start, tc.end, tc.limit)
 		re.NoError(err)
 		re.Equal(tc.expect, ks)
 		re.Equal(tc.expect, vs)

@@ -30,29 +30,30 @@ import (
 )
 
 const (
-	DefaultRequestTimeout = 10 * time.Second
-
 	delimiter = "/"
 )
 
-type etcdKVBase struct {
+type etcdKV struct {
 	client   *clientv3.Client
 	rootPath string
+
+	requestTimeout time.Duration
 }
 
-// NewEtcdKVBase creates a new etcd kv.
+// NewEtcdKV creates a new etcd kv.
 //nolint
-func NewEtcdKVBase(client *clientv3.Client, rootPath string) *etcdKVBase {
-	return &etcdKVBase{
-		client:   client,
-		rootPath: rootPath,
+func NewEtcdKV(client *clientv3.Client, rootPath string, requestTimeout time.Duration) *etcdKV {
+	return &etcdKV{
+		client:         client,
+		rootPath:       rootPath,
+		requestTimeout: requestTimeout,
 	}
 }
 
-func (kv *etcdKVBase) Load(key string) (string, error) {
+func (kv *etcdKV) Get(key string) (string, error) {
 	key = path.Join(kv.rootPath, key)
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), kv.requestTimeout)
 	defer cancel()
 
 	resp, err := kv.client.Get(ctx, key)
@@ -67,11 +68,11 @@ func (kv *etcdKVBase) Load(key string) (string, error) {
 	return string(resp.Kvs[0].Value), nil
 }
 
-func (kv *etcdKVBase) LoadRange(key, endKey string, limit int) ([]string, []string, error) {
+func (kv *etcdKV) Scan(key, endKey string, limit int) ([]string, []string, error) {
 	key = strings.Join([]string{kv.rootPath, key}, delimiter)
 	endKey = strings.Join([]string{kv.rootPath, endKey}, delimiter)
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), kv.requestTimeout)
 	defer cancel()
 
 	withRange := clientv3.WithRange(endKey)
@@ -89,9 +90,9 @@ func (kv *etcdKVBase) LoadRange(key, endKey string, limit int) ([]string, []stri
 	return keys, values, nil
 }
 
-func (kv *etcdKVBase) Save(key, value string) error {
+func (kv *etcdKV) Put(key, value string) error {
 	key = strings.Join([]string{kv.rootPath, key}, delimiter)
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), kv.requestTimeout)
 	defer cancel()
 	_, err := kv.client.Put(ctx, key, value)
 	if err != nil {
@@ -99,13 +100,12 @@ func (kv *etcdKVBase) Save(key, value string) error {
 		log.Error("save to etcd meet error", zap.String("key", key), zap.String("value", value), zap.Error(e))
 		return e
 	}
-
 	return nil
 }
 
-func (kv *etcdKVBase) Remove(key string) error {
+func (kv *etcdKV) Delete(key string) error {
 	key = strings.Join([]string{kv.rootPath, key}, delimiter)
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), kv.requestTimeout)
 	defer cancel()
 	_, err := kv.client.Delete(ctx, key)
 	if err != nil {
@@ -113,6 +113,5 @@ func (kv *etcdKVBase) Remove(key string) error {
 		log.Error("remove from etcd meet error", zap.String("key", key), zap.Error(err))
 		return err
 	}
-
 	return nil
 }

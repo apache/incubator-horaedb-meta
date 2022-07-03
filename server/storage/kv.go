@@ -17,10 +17,10 @@
 
 package storage
 
-// Base is an abstract interface for kv storage
-type Base interface {
-	Load(key string) (string, error)
-	LoadRange(key, endKey string, limit int) (keys []string, values []string, err error)
-	Save(key, value string) error
-	Remove(key string) error
+// KV is an abstract interface for kv storage
+type KV interface {
+	Get(key string) (string, error)
+	Scan(key, endKey string, limit int) (keys []string, values []string, err error)
+	Put(key, value string) error
+	Delete(key string) error
 }
