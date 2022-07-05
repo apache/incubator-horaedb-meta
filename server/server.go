@@ -176,7 +176,7 @@ func (ctx *leaderWatchContext) EtcdLeaderID() uint64 {
 	return ctx.srv.etcdSrv.Server.Lead()
 }
 
-func (*Server) RegisterHeartbeatSender(_ context.Context, _ grpcservice.HeartbeatSender) error {
+func (*Server) BindHeartbeatStream(_ context.Context, _ string, _ grpcservice.HeartbeatSender) error {
 	return nil
 }
 

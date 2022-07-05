@@ -12,15 +12,15 @@ import (
 	"go.uber.org/zap"
 )
 
-type Server struct {
+type Service struct {
 	metapb.UnimplementedCeresmetaRpcServiceServer
 
 	opTimeout time.Duration
 	h         Handler
 }
 
-func NewService(opTimeout time.Duration, h Handler) *Server {
-	return &Server{
+func NewService(opTimeout time.Duration, h Handler) *Service {
+	return &Service{
 		opTimeout: opTimeout,
 		h:         h,
 	}
@@ -30,18 +30,31 @@ type HeartbeatSender interface {
 	Send(response *metapb.NodeHeartbeatResponse) error
 }
 type Handler interface {
-	RegisterHeartbeatSender(ctx context.Context, sender HeartbeatSender) error
+	BindHeartbeatStream(ctx context.Context, node string, sender HeartbeatSender) error
 	HandleHeartbeat(ctx context.Context, req *metapb.NodeHeartbeatRequest) error
 }
 
-func (s *Server) NodeHeartbeat(heartbeatSrv metapb.CeresmetaRpcService_NodeHeartbeatServer) error {
+func (s *Service) NodeHeartbeat(heartbeatSrv metapb.CeresmetaRpcService_NodeHeartbeatServer) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := s.h.RegisterHeartbeatSender(ctx, heartbeatSrv); err != nil {
-		return ErrRegisterHeartbeatSender.WithCause(err)
+	isStreamBound := false
+	bindStreamIfNot := func(ctx context.Context, node string) {
+		if isStreamBound {
+			return
+		}
+
+		ctx1, cancel := context.WithTimeout(ctx, s.opTimeout)
+		defer cancel()
+
+		if err := s.h.BindHeartbeatStream(ctx1, node, heartbeatSrv); err != nil {
+			log.Error("fail to bind node stream", zap.String("node", node), zap.Error(err))
+		} else {
+			isStreamBound = true
+		}
 	}
 
+	// Process the message from the stream sequentially.
 	for {
 		req, err := heartbeatSrv.Recv()
 		if err == io.EOF {
@@ -52,16 +65,16 @@ func (s *Server) NodeHeartbeat(heartbeatSrv metapb.CeresmetaRpcService_NodeHeart
 			return ErrRecvHeartbeat.WithCause(err)
 		}
 
-		// TODO: It is better to process this request background.
+		bindStreamIfNot(ctx, req.Info.Node)
 		func() {
 			ctx1, cancel := context.WithTimeout(ctx, s.opTimeout)
 			defer cancel()
 			err := s.h.HandleHeartbeat(ctx1, req)
 			if err != nil {
 				log.Error("fail to handle heartbeat", zap.Any("heartbeat", req), zap.Error(err))
+			} else {
+				log.Debug("succeed in handling heartbeat", zap.Any("heartbeat", req))
 			}
-
-			log.Debug("succeed in handling heartbeat", zap.Any("heartbeat", req))
 		}()
 	}
 }
