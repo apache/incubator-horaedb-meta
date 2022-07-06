@@ -26,12 +26,13 @@ func NewService(opTimeout time.Duration, h Handler) *Service {
 	}
 }
 
-type HeartbeatSender interface {
+type HeartbeatStreamSender interface {
 	Send(response *metapb.NodeHeartbeatResponse) error
 }
 
 type Handler interface {
-	BindHeartbeatStream(ctx context.Context, node string, sender HeartbeatSender) error
+	UnbindHeartbeatStream(ctx context.Context, node string) error
+	BindHeartbeatStream(ctx context.Context, node string, sender HeartbeatStreamSender) error
 	ProcessHeartbeat(ctx context.Context, req *metapb.NodeHeartbeatRequest) error
 }
 
@@ -40,6 +41,15 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metapb.CeresmetaRpcService_NodeHear
 	defer cancel()
 
 	isStreamBound := false
+	boundNode := ""
+	defer func() {
+		if !isStreamBound {
+			return
+		}
+		if err := s.h.UnbindHeartbeatStream(ctx, boundNode); err != nil {
+			log.Error("fail to unbind stream", zap.String("node", boundNode), zap.Error(err))
+		}
+	}()
 	bindStreamIfNot := func(ctx context.Context, node string) {
 		if isStreamBound {
 			return
@@ -52,6 +62,7 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metapb.CeresmetaRpcService_NodeHear
 			log.Error("fail to bind node stream", zap.String("node", node), zap.Error(err))
 		} else {
 			isStreamBound = true
+			boundNode = node
 		}
 	}
 
