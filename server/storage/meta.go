@@ -25,24 +25,19 @@ import (
 type MetaStorage interface {
 	GetCluster(clusterId uint32, meta *metapb.Cluster) (bool, error)
 	PutCluster(clusterId uint32, meta *metapb.Cluster) error
-	DeleteCluster(clusterId uint32) (bool, error)
 
-	GetClusterMetaData(clusterId uint32, clusterMetaData *metapb.ClusterMetaData) (bool, error)
-	PutClusterMetaData(clusterId uint32, clusterMetaData *metapb.ClusterMetaData) error
-
-	GetShards(clusterId uint32, shards []*metapb.Shard) (bool, error)
-	PutShards(clusterId uint32, shards []*metapb.Shard) error
+	GetClusterTopology(clusterId uint32, clusterMetaData *metapb.ClusterTopology) (bool, error)
+	PutClusterTopology(clusterId uint32, clusterMetaData *metapb.ClusterTopology) error
 
 	GetSchemas(clusterId uint32, schemas []*metapb.Schema) (bool, error)
 	PutSchemas(clusterId uint32, schemas []*metapb.Schema) error
-	DeleteSchemas(clusterId uint32, schemaIds []uint32) (bool, error)
 
 	GetTables(clusterId uint32, schemaId uint32, tableId []uint64, table []*metapb.Table) (bool, error)
 	PutTables(clusterId uint32, schemaId uint32, tables []*metapb.Table) error
 	DeleteTables(clusterId uint32, schemaId uint32, tableIDs []uint64) (bool, error)
 
-	GetShardTableInfos(clusterId uint32, shardId []uint32, shardTableInfo []*metapb.ShardTableInfo) (bool, error)
-	PutShardTableInfos(clusterId uint32, shardId []uint32, shardTableInfo []*metapb.ShardTableInfo) error
+	GetShardTopologies(clusterId uint32, shardId []uint32, shardTableInfo []*metapb.ShardTopology) (bool, error)
+	PutShardTopologies(clusterId uint32, shardId []uint32, shardTableInfo []*metapb.ShardTopology) error
 
 	GetNodes(clusterId uint32, node []*metapb.Node) (bool, error)
 	PutNodes(clusterId uint32, node []*metapb.Node) error
