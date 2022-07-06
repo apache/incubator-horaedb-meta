@@ -180,6 +180,6 @@ func (*Server) BindHeartbeatStream(_ context.Context, _ string, _ grpcservice.He
 	return nil
 }
 
-func (*Server) HandleHeartbeat(_ context.Context, _ *metapb.NodeHeartbeatRequest) error {
+func (*Server) ProcessHeartbeat(_ context.Context, _ *metapb.NodeHeartbeatRequest) error {
 	return nil
 }

@@ -29,9 +29,10 @@ func NewService(opTimeout time.Duration, h Handler) *Service {
 type HeartbeatSender interface {
 	Send(response *metapb.NodeHeartbeatResponse) error
 }
+
 type Handler interface {
 	BindHeartbeatStream(ctx context.Context, node string, sender HeartbeatSender) error
-	HandleHeartbeat(ctx context.Context, req *metapb.NodeHeartbeatRequest) error
+	ProcessHeartbeat(ctx context.Context, req *metapb.NodeHeartbeatRequest) error
 }
 
 func (s *Service) NodeHeartbeat(heartbeatSrv metapb.CeresmetaRpcService_NodeHeartbeatServer) error {
@@ -69,7 +70,7 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metapb.CeresmetaRpcService_NodeHear
 		func() {
 			ctx1, cancel := context.WithTimeout(ctx, s.opTimeout)
 			defer cancel()
-			err := s.h.HandleHeartbeat(ctx1, req)
+			err := s.h.ProcessHeartbeat(ctx1, req)
 			if err != nil {
 				log.Error("fail to handle heartbeat", zap.Any("heartbeat", req), zap.Error(err))
 			} else {
