@@ -23,7 +23,7 @@ type Options struct {
 
 // MetaStorageImpl is the base underlying storage endpoint for all other upper
 // specific storage backends. It should define some common storage interfaces and operations,
-// which provides the default implementations for all kinds of storages.
+// which provIDes the default implementations for all kinds of storages.
 type MetaStorageImpl struct {
 	KV
 
@@ -32,7 +32,7 @@ type MetaStorageImpl struct {
 }
 
 // NewMetaStorageImpl creates a new base storage endpoint with the given KV and encryption key manager.
-// It should be embedded inside a storage backend.
+// It should be embedded insIDe a storage backend.
 func NewMetaStorageImpl(
 	kv KV,
 	opts Options,
@@ -49,27 +49,27 @@ func newEtcdStorage(client *clientv3.Client, rootPath string, opts Options) *Met
 	return NewMetaStorageImpl(
 		NewEtcdKV(client, rootPath, opts.requestTimeout), opts)
 }
-func (s *MetaStorageImpl) GetCluster(clusterId uint32, meta *metapb.Cluster) (bool, error) {
+func (s *MetaStorageImpl) GetCluster(clusterID uint32, meta *metapb.Cluster) (bool, error) {
 	return false, nil
 }
-func (s *MetaStorageImpl) PutCluster(clusterId uint32, meta *metapb.Cluster) error {
+func (s *MetaStorageImpl) PutCluster(clusterID uint32, meta *metapb.Cluster) error {
 	return nil
 }
 
-func (s *MetaStorageImpl) GetClusterTopology(clusterId uint32, clusterMetaData *metapb.ClusterTopology) (bool, error) {
+func (s *MetaStorageImpl) GetClusterTopology(clusterID uint32, clusterMetaData *metapb.ClusterTopology) (bool, error) {
 	return false, nil
 }
-func (s *MetaStorageImpl) PutClusterTopology(clusterId uint32, clusterMetaData *metapb.ClusterTopology) error {
+func (s *MetaStorageImpl) PutClusterTopology(clusterID uint32, clusterMetaData *metapb.ClusterTopology) error {
 	return nil
 }
 
-func (s *MetaStorageImpl) GetSchemas(ctx context.Context, clusterId uint32, schemas []*metapb.Schema) error {
+func (s *MetaStorageImpl) GetSchemas(ctx context.Context, clusterID uint32, schemas []*metapb.Schema) error {
 	nextID := uint32(0)
-	endKey := schemaPath(clusterId, math.MaxUint32)
+	endKey := schemaPath(clusterID, math.MaxUint32)
 
 	rangeLimit := s.maxScanLimit
 	for {
-		startKey := schemaPath(clusterId, nextID)
+		startKey := schemaPath(clusterID, nextID)
 		_, res, err := s.Scan(startKey, endKey, rangeLimit)
 		if err != nil {
 			if rangeLimit /= 2; rangeLimit >= s.minScanLimit {
@@ -89,7 +89,7 @@ func (s *MetaStorageImpl) GetSchemas(ctx context.Context, clusterId uint32, sche
 				return ErrMetaGetSchemas.WithCausef("proto parse err:%v", err)
 			}
 
-			nextID = schema.GetId() + 1
+			nextID = schema.GetID() + 1
 		}
 
 		if len(res) < rangeLimit {
@@ -98,34 +98,34 @@ func (s *MetaStorageImpl) GetSchemas(ctx context.Context, clusterId uint32, sche
 	}
 }
 
-func (s *MetaStorageImpl) PutSchemas(ctx context.Context, clusterId uint32, schemas []*metapb.Schema) error {
+func (s *MetaStorageImpl) PutSchemas(ctx context.Context, clusterID uint32, schemas []*metapb.Schema) error {
 	return nil
 }
 
-func (s *MetaStorageImpl) GetTables(clusterId uint32, schemaId uint32, tableId []uint64, table []*metapb.Table) (bool, error) {
+func (s *MetaStorageImpl) GetTables(clusterID uint32, schemaID uint32, tableID []uint64, table []*metapb.Table) (bool, error) {
 	return false, nil
 }
 
-func (s *MetaStorageImpl) PutTables(clusterId uint32, schemaId uint32, tables []*metapb.Table) error {
+func (s *MetaStorageImpl) PutTables(clusterID uint32, schemaID uint32, tables []*metapb.Table) error {
 	return nil
 }
 
-func (s *MetaStorageImpl) DeleteTables(clusterId uint32, schemaId uint32, tableIds []uint64) (bool, error) {
+func (s *MetaStorageImpl) DeleteTables(clusterID uint32, schemaID uint32, tableIDs []uint64) (bool, error) {
 	return false, nil
 }
 
-func (s *MetaStorageImpl) GetShardTopologies(clusterId uint32, shardId []uint32, shardTableInfo []*metapb.ShardTopology) (bool, error) {
+func (s *MetaStorageImpl) GetShardTopologies(clusterID uint32, shardID []uint32, shardTableInfo []*metapb.ShardTopology) (bool, error) {
 	return false, nil
 }
 
-func (s *MetaStorageImpl) PutShardTopologies(clusterId uint32, shardId []uint32, shardTableInfo []*metapb.ShardTopology) error {
+func (s *MetaStorageImpl) PutShardTopologies(clusterID uint32, shardID []uint32, shardTableInfo []*metapb.ShardTopology) error {
 	return nil
 }
 
-func (s *MetaStorageImpl) GetNodes(clusterId uint32, node []*metapb.Node) (bool, error) {
+func (s *MetaStorageImpl) GetNodes(clusterID uint32, node []*metapb.Node) (bool, error) {
 	return false, nil
 }
 
-func (s *MetaStorageImpl) PutNodes(clusterId uint32, node []*metapb.Node) error {
+func (s *MetaStorageImpl) PutNodes(clusterID uint32, node []*metapb.Node) error {
 	return nil
 }
