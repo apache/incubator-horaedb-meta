@@ -88,7 +88,7 @@ func (s *MetaStorageImpl) ListSchemas(ctx context.Context, clusterID uint32) ([]
 			}
 			schemas = append(schemas, schema)
 			if schema.GetId() == math.MaxUint32 {
-				log.Warn("list schemas schema_id has reached max value", zap.Uint32("schema-id", math.MaxUint32))
+				log.Warn("list schemas schema_id has reached max value", zap.Uint32("schema-id", schema.GetId()))
 				return schemas, nil
 			}
 			nextID = schema.GetId() + 1
