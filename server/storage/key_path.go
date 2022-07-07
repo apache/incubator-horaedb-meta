@@ -17,6 +17,6 @@ const (
 // cluster 1: v1/cluster/1/schema/1 -> ceresmeta.Schema
 //            v1/cluster/1/schema/2 -> ceresmeta.Schema
 //            v1/cluster/1/schema/3 -> ceresmeta.Schema
-func makeSchemaKey(clusterID uint32, schemaId uint32) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), schema, fmt.Sprintf("%020d", schemaId))
+func makeSchemaKey(clusterID uint32, schemaID uint32) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), schema, fmt.Sprintf("%020d", schemaID))
 }

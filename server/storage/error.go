@@ -4,6 +4,4 @@ package storage
 
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
-var (
-	ErrMetaGetSchemas = coderr.NewCodeError(coderr.Internal, "meta storage get schemas")
-)
+var ErrMetaGetSchemas = coderr.NewCodeError(coderr.Internal, "meta storage get schemas")
