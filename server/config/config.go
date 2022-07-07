@@ -177,10 +177,10 @@ func MakeConfigParser() (*Parser, error) {
 		cfg:     cfg,
 	}
 
-	fs.StringVar(&cfg.Log.Level, "log-level", log.DefaultLogLevel, "level of the log")
+	fs.StringVar(&cfg.Log.Level, "log-level", log.DefaultLogLevel, "log level")
 	fs.StringVar(&cfg.Log.File, "log-file", log.DefaultLogFile, "file for log output")
-	fs.StringVar(&cfg.EtcdLog.Level, "etcd-log-level", log.DefaultLogLevel, "level of the log")
-	fs.StringVar(&cfg.EtcdLog.File, "etcd-log-file", log.DefaultLogFile, "file for log output")
+	fs.StringVar(&cfg.EtcdLog.Level, "etcd-log-level", log.DefaultLogLevel, "log level of etcd")
+	fs.StringVar(&cfg.EtcdLog.File, "etcd-log-file", log.DefaultLogFile, "file for log output of etcd")
 
 	fs.Int64Var(&cfg.GrpcHandleTimeoutMs, "grpc-handle-timeout-ms", defaultGrpcHandleTimeoutMs, "timeout for handling grpc requests")
 	fs.Int64Var(&cfg.EtcdStartTimeoutMs, "etcd-start-timeout-ms", defaultEtcdStartTimeoutMs, "timeout for starting etcd server")

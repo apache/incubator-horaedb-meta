@@ -29,4 +29,3 @@ test: install-tools
 
 build: check
 	@ go build -o ceresmeta ./cmd/meta/...
-
