@@ -28,7 +28,9 @@ type HeartbeatStreams struct {
 	bgJobWg *sync.WaitGroup
 
 	reqCh chan *sendReq
-	mu    *sync.RWMutex
+
+	// mu protects nodeStreams
+	mu *sync.RWMutex
 	// TODO: now these streams only can be removed by Unbind method and it is better add a active way to clear the dead
 	//  streams in background.
 	nodeStreams map[string]HeartbeatStreamSender
