@@ -141,7 +141,11 @@ type Parser struct {
 
 func (p *Parser) Parse(arguments []string) (*Config, error) {
 	if err := p.flagSet.Parse(arguments); err != nil {
-		return nil, ErrInvalidCommandArgs.WithCausef("original arguments:%v, parse err:%v", arguments, err)
+		if err == flag.ErrHelp {
+			return nil, ErrHelpRequested.WithCause(err)
+		}
+
+		return nil, ErrInvalidCommandArgs.WithCausef("fail to parse flag arguments:%v, err:%v", arguments, err)
 	}
 
 	// TODO: support loading config from file.
