@@ -1,8 +1,8 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package storage
 
 import (
-	"time"
-
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -13,6 +13,6 @@ type Storage interface {
 }
 
 // NewStorageWithEtcdBackend creates a new storage with etcd backend.
-func NewStorageWithEtcdBackend(client *clientv3.Client, rootPath string, requestTimeout time.Duration) Storage {
-	return newEtcdStorage(client, rootPath, requestTimeout)
+func NewStorageWithEtcdBackend(client *clientv3.Client, rootPath string, opts Options) Storage {
+	return newEtcdStorage(client, rootPath, opts)
 }
