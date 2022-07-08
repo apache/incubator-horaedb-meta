@@ -10,6 +10,9 @@ import (
 const (
 	cluster = "v1/cluster"
 	schema  = "schema"
+	node    = "node"
+	table   = "table"
+	shard   = "shard"
 )
 
 // makeSchemaKey returns the schema meta info key path with the given region ID.
@@ -19,4 +22,20 @@ const (
 //            v1/cluster/1/schema/3 -> ceresmeta.Schema
 func makeSchemaKey(clusterID uint32, schemaID uint32) string {
 	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), schema, fmt.Sprintf("%020d", schemaID))
+}
+
+func makeNodeKey(clusterID uint32, nodeID uint32) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), node, fmt.Sprintf("%020d", nodeID))
+}
+
+func makeClusterKey(clusterID uint32) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID))
+}
+
+func makeTableKey(clusterID uint32, schemaID uint32, tableID uint64) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), schema, fmt.Sprintf("%020d", schemaID), table, fmt.Sprintf("%020d", tableID))
+}
+
+func makeShardKey(clusterID uint32, shardID uint32) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), shard, fmt.Sprintf("%020d", shardID))
 }
