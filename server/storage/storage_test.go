@@ -68,7 +68,7 @@ func testCluster(re *require.Assertions, s Storage) {
 func testClusterTopology(re *require.Assertions, s Storage) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
-	clusterMetaData := &metapb.ClusterTopology{ClusterId: 1}
+	clusterMetaData := &metapb.ClusterTopology{}
 	err := s.PutClusterTopology(ctx, 1, clusterMetaData)
 	re.NoError(err)
 	value, err := s.GetClusterTopology(ctx, 1)
