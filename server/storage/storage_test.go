@@ -57,23 +57,30 @@ func TestStorage(t *testing.T) {
 func testCluster(re *require.Assertions, s Storage) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
-	meta := &metapb.Cluster{}
+	meta := &metapb.Cluster{Id: 0, Name: "name", MinNodeCount: 0, ReplicationFactor: 0, ShardTotal: 0}
 	err := s.PutCluster(ctx, 0, meta)
 	re.NoError(err)
 	value, err := s.GetCluster(ctx, 0)
 	re.NoError(err)
-	re.Equal(meta, value)
+	re.Equal(meta.Id, value.Id)
+	re.Equal(meta.Name, value.Name)
+	re.Equal(meta.MinNodeCount, value.MinNodeCount)
+	re.Equal(meta.ReplicationFactor, value.ReplicationFactor)
+	re.Equal(meta.ShardTotal, value.ShardTotal)
 }
 
 func testClusterTopology(re *require.Assertions, s Storage) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
-	clusterMetaData := &metapb.ClusterTopology{}
+	clusterMetaData := &metapb.ClusterTopology{ClusterId: 1, DataVersion: 1, Cause: "cause", CreatedAt: 1}
 	err := s.PutClusterTopology(ctx, 1, clusterMetaData)
 	re.NoError(err)
 	value, err := s.GetClusterTopology(ctx, 1)
 	re.NoError(err)
-	re.Equal(clusterMetaData, value)
+	re.Equal(clusterMetaData.ClusterId, value.ClusterId)
+	re.Equal(clusterMetaData.DataVersion, value.DataVersion)
+	re.Equal(clusterMetaData.Cause, value.Cause)
+	re.Equal(clusterMetaData.CreatedAt, value.CreatedAt)
 }
 
 func testSchemes(re *require.Assertions, s Storage) {
@@ -81,14 +88,18 @@ func testSchemes(re *require.Assertions, s Storage) {
 	defer cancel()
 	schemas := make([]*metapb.Schema, 0)
 	for i := 0; i < 10; i++ {
-		schema := &metapb.Schema{Id: uint32(i)}
+		schema := &metapb.Schema{Id: uint32(i), ClusterId: uint32(i), Name: "name"}
 		schemas = append(schemas, schema)
 	}
 	err := s.PutSchemas(ctx, 0, schemas)
 	re.NoError(err)
 	value, err := s.ListSchemas(ctx, 0)
 	re.NoError(err)
-	re.Equal(schemas, value)
+	for i := 0; i < 10; i++ {
+		re.Equal(schemas[i].Id, value[i].Id)
+		re.Equal(schemas[i].ClusterId, value[i].ClusterId)
+		re.Equal(schemas[i].Name, value[i].Name)
+	}
 }
 
 func testTables(re *require.Assertions, s Storage) {
@@ -96,7 +107,7 @@ func testTables(re *require.Assertions, s Storage) {
 	defer cancel()
 	tables := make([]*metapb.Table, 0)
 	for i := 0; i < 10; i++ {
-		table := &metapb.Table{Id: uint64(i)}
+		table := &metapb.Table{Id: uint64(i), Name: "name", SchemaId: uint32(i), ShardId: uint32(i), Desc: "desc"}
 		tables = append(tables, table)
 	}
 	err := s.PutTables(ctx, 0, 0, tables)
@@ -107,7 +118,13 @@ func testTables(re *require.Assertions, s Storage) {
 	}
 	value, err := s.ListTables(ctx, 0, 0, tableID)
 	re.NoError(err)
-	re.Equal(tables, value)
+	for i := 0; i < 10; i++ {
+		re.Equal(tables[i].Id, value[i].Id)
+		re.Equal(tables[i].SchemaId, value[i].SchemaId)
+		re.Equal(tables[i].Name, value[i].Name)
+		re.Equal(tables[i].ShardId, value[i].ShardId)
+		re.Equal(tables[i].Desc, value[i].Desc)
+	}
 	err = s.DeleteTables(ctx, 0, 0, tableID)
 	re.NoError(err)
 }
@@ -118,7 +135,7 @@ func testShardTopologies(re *require.Assertions, s Storage) {
 	shardTableInfo := make([]*metapb.ShardTopology, 0)
 	shardID := make([]uint32, 0)
 	for i := 0; i < 10; i++ {
-		shardTableData := &metapb.ShardTopology{}
+		shardTableData := &metapb.ShardTopology{Version: uint64(i)}
 		shardTableInfo = append(shardTableInfo, shardTableData)
 		shardID = append(shardID, uint32(i))
 	}
@@ -126,7 +143,9 @@ func testShardTopologies(re *require.Assertions, s Storage) {
 	re.NoError(err)
 	value, err := s.ListShardTopologies(ctx, 0, shardID)
 	re.NoError(err)
-	re.Equal(shardTableInfo, value)
+	for i := 0; i < 10; i++ {
+		re.Equal(shardTableInfo[i].Version, value[i].Version)
+	}
 }
 
 func testNodes(re *require.Assertions, s Storage) {
@@ -134,12 +153,16 @@ func testNodes(re *require.Assertions, s Storage) {
 	defer cancel()
 	nodes := make([]*metapb.Node, 0)
 	for i := 0; i < 10; i++ {
-		node := &metapb.Node{Id: uint32(i)}
+		node := &metapb.Node{Id: uint32(i), CreateTime: uint64(i), LastTouchTime: uint64(i)}
 		nodes = append(nodes, node)
 	}
 	err := s.PutNodes(ctx, 0, nodes)
 	re.NoError(err)
 	value, err := s.ListNodes(ctx, 0)
 	re.NoError(err)
-	re.Equal(nodes, value)
+	for i := 0; i < 10; i++ {
+		re.Equal(nodes[i].Id, value[i].Id)
+		re.Equal(nodes[i].CreateTime, value[i].CreateTime)
+		re.Equal(nodes[i].LastTouchTime, value[i].LastTouchTime)
+	}
 }
