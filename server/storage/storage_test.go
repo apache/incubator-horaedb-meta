@@ -57,7 +57,7 @@ func TestStorage(t *testing.T) {
 func testCluster(re *require.Assertions, s Storage) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
-	meta := &metapb.Cluster{Id: 0}
+	meta := &metapb.Cluster{}
 	err := s.PutCluster(ctx, 0, meta)
 	re.NoError(err)
 	value, err := s.GetCluster(ctx, 0)

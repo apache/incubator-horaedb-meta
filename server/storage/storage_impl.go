@@ -47,12 +47,12 @@ func newEtcdStorage(client *clientv3.Client, rootPath string, opts Options) *Met
 func (s *MetaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*metapb.Cluster, error) {
 	key := makeClusterKey(clusterID)
 	value, err := s.Get(ctx, key)
-	if err != nil || value == "" {
+	if err != nil {
 		return nil, err
 	}
-	var meta *metapb.Cluster
+	meta := &metapb.Cluster{}
 	if err = proto.Unmarshal([]byte(value), meta); err != nil {
-		return nil, ErrMetaGetCluster.WithCausef("proto parse err:%v", err)
+		return nil, ErrMetaGetCluster.WithCausef("proto parse err: %v", err)
 	}
 	return meta, nil
 }
@@ -60,7 +60,7 @@ func (s *MetaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*me
 func (s *MetaStorageImpl) PutCluster(ctx context.Context, clusterID uint32, meta *metapb.Cluster) error {
 	value, err := proto.Marshal(meta)
 	if err != nil {
-		return ErrMetaPutCluster.WithCausef("proto parse err:%v", err)
+		return ErrMetaPutCluster.WithCausef("proto parse err: %v", err)
 	}
 	return s.Put(ctx, makeClusterKey(clusterID), string(value))
 }
@@ -68,12 +68,12 @@ func (s *MetaStorageImpl) PutCluster(ctx context.Context, clusterID uint32, meta
 func (s *MetaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint32) (*metapb.ClusterTopology, error) {
 	key := makeClusterKey(clusterID)
 	value, err := s.Get(ctx, key)
-	if err != nil || value == "" {
+	if err != nil {
 		return nil, err
 	}
-	var clusterMetaData *metapb.ClusterTopology
+	clusterMetaData := &metapb.ClusterTopology{}
 	if err = proto.Unmarshal([]byte(value), clusterMetaData); err != nil {
-		return nil, ErrMetaGetClusterTopology.WithCausef("proto parse err:%v", err)
+		return nil, ErrMetaGetClusterTopology.WithCausef("proto parse err: %v", err)
 	}
 	return clusterMetaData, nil
 }
@@ -81,7 +81,7 @@ func (s *MetaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint
 func (s *MetaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, clusterMetaData *metapb.ClusterTopology) error {
 	value, err := proto.Marshal(clusterMetaData)
 	if err != nil {
-		return ErrMetaPutClusterTopology.WithCausef("proto parse err:%v", err)
+		return ErrMetaPutClusterTopology.WithCausef("proto parse err: %v", err)
 	}
 	return s.Put(ctx, makeClusterKey(clusterID), string(value))
 }
@@ -110,7 +110,7 @@ func (s *MetaStorageImpl) ListSchemas(ctx context.Context, clusterID uint32) ([]
 		for _, r := range res {
 			schema := &metapb.Schema{}
 			if err := proto.Unmarshal([]byte(r), schema); err != nil {
-				return nil, ErrMetaGetSchemas.WithCausef("proto parse err:%v", err)
+				return nil, ErrMetaGetSchemas.WithCausef("proto parse err: %v", err)
 			}
 			schemas = append(schemas, schema)
 			if schema.GetId() == math.MaxUint32 {
@@ -131,7 +131,7 @@ func (s *MetaStorageImpl) PutSchemas(ctx context.Context, clusterID uint32, sche
 		key := makeSchemaKey(clusterID, item.Id)
 		value, err := proto.Marshal(item)
 		if err != nil {
-			return ErrMetaPutSchemas.WithCausef("proto parse err:%v", err)
+			return ErrMetaPutSchemas.WithCausef("proto parse err: %v", err)
 		}
 		if err = s.Put(ctx, key, string(value)); err != nil {
 			return err
@@ -145,12 +145,12 @@ func (s *MetaStorageImpl) ListTables(ctx context.Context, clusterID uint32, sche
 	for _, item := range tableID {
 		key := makeTableKey(clusterID, schemaID, item)
 		value, err := s.Get(ctx, key)
-		if err != nil || value == "" {
+		if err != nil {
 			return nil, err
 		}
-		var tableData *metapb.Table
+		tableData := &metapb.Table{}
 		if err = proto.Unmarshal([]byte(value), tableData); err != nil {
-			return nil, ErrMetaGetTables.WithCausef("proto parse err:%v", err)
+			return nil, ErrMetaGetTables.WithCausef("proto parse err: %v", err)
 		}
 		tables = append(tables, tableData)
 	}
@@ -162,7 +162,7 @@ func (s *MetaStorageImpl) PutTables(ctx context.Context, clusterID uint32, schem
 		key := makeTableKey(clusterID, schemaID, item.Id)
 		value, err := proto.Marshal(item)
 		if err != nil {
-			return ErrMetaPutTables.WithCausef("proto parse err:%v", err)
+			return ErrMetaPutTables.WithCausef("proto parse err: %v", err)
 		}
 		if err = s.Put(ctx, key, string(value)); err != nil {
 			return err
@@ -186,24 +186,24 @@ func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 	for _, item := range shardID {
 		key := makeShardKey(clusterID, item)
 		value, err := s.Get(ctx, key)
-		if err != nil || value == "" {
+		if err != nil {
 			return nil, err
 		}
-		var shardTableData *metapb.ShardTopology
-		if err = proto.Unmarshal([]byte(value), shardTableData); err != nil {
-			return nil, ErrMetaGetShardTopology.WithCausef("proto parse err:%v", err)
+		shardTopology := &metapb.ShardTopology{}
+		if err = proto.Unmarshal([]byte(value), shardTopology); err != nil {
+			return nil, ErrMetaGetShardTopology.WithCausef("proto parse err: %v", err)
 		}
-		shardTableInfo = append(shardTableInfo, shardTableData)
+		shardTableInfo = append(shardTableInfo, shardTopology)
 	}
 	return shardTableInfo, nil
 }
 
 func (s *MetaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32, shardTableInfo []*metapb.ShardTopology) error {
 	for index, item := range shardID {
-		key := makeSchemaKey(clusterID, item)
+		key := makeShardKey(clusterID, item)
 		value, err := proto.Marshal(shardTableInfo[index])
 		if err != nil {
-			return ErrMetaPutShardTopology.WithCausef("proto parse err:%v", err)
+			return ErrMetaPutShardTopology.WithCausef("proto parse err: %v", err)
 		}
 		if err = s.Put(ctx, key, string(value)); err != nil {
 			return err
@@ -236,7 +236,7 @@ func (s *MetaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*m
 		for _, r := range res {
 			node := &metapb.Node{}
 			if err := proto.Unmarshal([]byte(r), node); err != nil {
-				return nil, ErrMetaGetNodes.WithCausef("proto parse err:%v", err)
+				return nil, ErrMetaGetNodes.WithCausef("proto parse err: %v", err)
 			}
 			nodes = append(nodes, node)
 			if node.GetId() == math.MaxUint32 {
@@ -254,10 +254,10 @@ func (s *MetaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*m
 
 func (s *MetaStorageImpl) PutNodes(ctx context.Context, clusterID uint32, node []*metapb.Node) error {
 	for _, item := range node {
-		key := makeSchemaKey(clusterID, item.Id)
+		key := makeNodeKey(clusterID, item.Id)
 		value, err := proto.Marshal(item)
 		if err != nil {
-			return ErrMetaPutNodes.WithCausef("proto parse err:%v", err)
+			return ErrMetaPutNodes.WithCausef("proto parse err: %v", err)
 		}
 		if err = s.Put(ctx, key, string(value)); err != nil {
 			return err
