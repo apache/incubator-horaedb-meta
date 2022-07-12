@@ -2,8 +2,10 @@
 
 package id
 
+import "context"
+
 //Allocator defines the id allocator on the ceresdb cluster meta info.
 type Allocator interface {
-	Alloc() (uint64, error)
-	Rebase() error
+	Alloc(ctx context.Context) (uint64, error)
+	Rebase(ctx context.Context) error
 }

@@ -4,6 +4,7 @@ package id
 
 import (
 	"context"
+	"encoding/binary"
 	"path"
 	"sync"
 
@@ -21,11 +22,10 @@ type AllocatorImpl struct {
 
 	client   *clientv3.Client
 	rootPath string
-	member   string
 }
 
-func NewAllocatorImpl(client *clientv3.Client, rootPath string, member string) *AllocatorImpl {
-	return &AllocatorImpl{client: client, rootPath: rootPath, member: member}
+func NewAllocatorImpl(client *clientv3.Client, rootPath string) *AllocatorImpl {
+	return &AllocatorImpl{client: client, rootPath: rootPath}
 }
 
 func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
@@ -56,40 +56,25 @@ func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	value := resp.Kvs[0].Value
-	var (
-		cmp clientv3.Cmp
-		end uint64
-	)
 
-	if value == nil {
-		// create the key
-		cmp = clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
+	var end uint64
+
+	if len(resp.Kvs) == 0 {
+		end = 0
 	} else {
-		// update the key
-		end, err = uint64(value[])
-		if err != nil {
-			return err
-		}
-
-		cmp = clientv3.Compare(clientv3.Value(key), "=", string(value))
+		end = binary.BigEndian.Uint64(resp.Kvs[0].Value)
 	}
 
 	end += allocStep
-	value = typeutil.Uint64ToBytes(end)
-	txn := kv.NewSlowLogTxn(alloc.client)
-	leaderPath := path.Join(alloc.rootPath, "leader")
-	t := txn.If(append([]clientv3.Cmp{cmp}, clientv3.Compare(clientv3.Value(leaderPath), "=", alloc.member))...)
-	resp, err := t.Then(clientv3.OpPut(key, string(value))).Commit()
+
+	value := make([]byte, 8)
+	binary.BigEndian.PutUint64(value, end)
+	_, err = alloc.client.Put(ctx, key, string(value))
 	if err != nil {
-		return errs.ErrEtcdTxnInternal.Wrap(err).GenWithStackByArgs()
-	}
-	if !resp.Succeeded {
-		return errs.ErrEtcdTxnConflict.FastGenByArgs()
+		return err
 	}
 
 	log.Info("idAllocator allocates a new id", zap.Uint64("alloc-id", end))
-	idallocGauge.Set(float64(end))
 	alloc.end = end
 	alloc.base = end - allocStep
 	return nil
