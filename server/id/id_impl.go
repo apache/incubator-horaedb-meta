@@ -53,12 +53,13 @@ func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
 		return etcdutil.ErrEtcdKVGet.WithCause(err)
 	}
 	var end uint64
-	if len(resp.Kvs) == 0 {
+	switch {
+	case len(resp.Kvs) == 0:
 		end = 0
-	} else if len(resp.Kvs) > 1 {
-		return etcdutil.ErrEtcdKVGetResponse.WithCausef("%v", resp.Kvs)
-	} else {
+	case len(resp.Kvs) == 1:
 		end = binary.BigEndian.Uint64(resp.Kvs[0].Value)
+	default:
+		return etcdutil.ErrEtcdKVGetResponse.WithCausef("%v", resp.Kvs)
 	}
 	end += allocStep
 	value := make([]byte, 8)
