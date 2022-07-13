@@ -13,6 +13,8 @@ const (
 	node    = "node"
 	table   = "table"
 	shard   = "shard"
+	topo    = "topo"
+	lv      = "latest_version"
 )
 
 // makeSchemaKey returns the schema meta info key path with the given region ID.
@@ -36,6 +38,18 @@ func makeTableKey(clusterID uint32, schemaID uint32, tableID uint64) string {
 	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), schema, fmt.Sprintf("%020d", schemaID), table, fmt.Sprintf("%020d", tableID))
 }
 
-func makeShardKey(clusterID uint32, shardID uint32) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), shard, fmt.Sprintf("%020d", shardID))
+func makeShardKey(clusterID uint32, shardID uint32, latest_version string) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), shard, fmt.Sprintf("%020d", shardID), latest_version)
+}
+
+func makeClusterTopologyKey(clusterID uint32, latest_version string) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), topo, latest_version)
+}
+
+func makeLatestVersion(clusterID uint32) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), topo, lv)
+}
+
+func makeShardLatestVersion(clusterID uint32, shardID uint32) string {
+	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), shard, fmt.Sprintf("%020d", shardID), lv)
 }

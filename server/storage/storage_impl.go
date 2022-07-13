@@ -66,7 +66,12 @@ func (s *MetaStorageImpl) PutCluster(ctx context.Context, clusterID uint32, meta
 }
 
 func (s *MetaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint32) (*metapb.ClusterTopology, error) {
-	key := makeClusterKey(clusterID)
+	key := makeLatestVersion(clusterID)
+	version, err := s.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	key = makeClusterTopologyKey(clusterID, version)
 	value, err := s.Get(ctx, key)
 	if err != nil {
 		return nil, err
@@ -79,11 +84,16 @@ func (s *MetaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint
 }
 
 func (s *MetaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, clusterMetaData *metapb.ClusterTopology) error {
+	key := makeLatestVersion(clusterID)
+	version, err := s.Get(ctx, key)
+	if err != nil {
+		return err
+	}
 	value, err := proto.Marshal(clusterMetaData)
 	if err != nil {
 		return ErrMetaPutClusterTopology.WithCausef("proto parse err: %v", err)
 	}
-	return s.Put(ctx, makeClusterKey(clusterID), string(value))
+	return s.Put(ctx, makeClusterTopologyKey(clusterID, version), string(value))
 }
 
 func (s *MetaStorageImpl) ListSchemas(ctx context.Context, clusterID uint32) ([]*metapb.Schema, error) {
@@ -184,7 +194,12 @@ func (s *MetaStorageImpl) DeleteTables(ctx context.Context, clusterID uint32, sc
 func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32) ([]*metapb.ShardTopology, error) {
 	shardTableInfo := make([]*metapb.ShardTopology, 0)
 	for _, item := range shardID {
-		key := makeShardKey(clusterID, item)
+		key := makeShardLatestVersion(clusterID, item)
+		version, err := s.Get(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		key = makeShardKey(clusterID, item, version)
 		value, err := s.Get(ctx, key)
 		if err != nil {
 			return nil, err
@@ -200,7 +215,12 @@ func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 
 func (s *MetaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32, shardTableInfo []*metapb.ShardTopology) error {
 	for index, item := range shardID {
-		key := makeShardKey(clusterID, item)
+		key := makeShardLatestVersion(clusterID, item)
+		version, err := s.Get(ctx, key)
+		if err != nil {
+			return err
+		}
+		key = makeShardKey(clusterID, item, version)
 		value, err := proto.Marshal(shardTableInfo[index])
 		if err != nil {
 			return ErrMetaPutShardTopology.WithCausef("proto parse err: %v", err)
