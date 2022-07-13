@@ -4,28 +4,28 @@ package id
 
 import (
 	"context"
-	"encoding/binary"
-	"path"
+	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
-	"github.com/CeresDB/ceresmeta/server/etcdutil"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
 
-const allocStep = uint64(1000)
+const defaultallocStep = uint64(1000)
+const defaultkey = "alloc_id"
 
 type AllocatorImpl struct {
-	mu       sync.Mutex
-	base     uint64
-	end      uint64
-	client   *clientv3.Client
-	rootPath string
+	mu   sync.Mutex
+	base uint64
+	end  uint64
+	kv   storage.KV
 }
 
 func NewAllocatorImpl(client *clientv3.Client, rootPath string) *AllocatorImpl {
-	return &AllocatorImpl{client: client, rootPath: rootPath}
+	return &AllocatorImpl{kv: storage.NewEtcdKV(client, rootPath)}
 }
 
 func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
@@ -47,29 +47,27 @@ func (alloc *AllocatorImpl) Rebase(ctx context.Context) error {
 }
 
 func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
-	key := path.Join(alloc.rootPath, "alloc_id")
-	resp, err := alloc.client.Get(ctx, key)
+	value, err := alloc.kv.Get(ctx, defaultkey)
 	if err != nil {
-		return etcdutil.ErrEtcdKVGet.WithCause(err)
+		return err
 	}
 	var end uint64
-	switch {
-	case len(resp.Kvs) == 0:
+	if value == "" {
 		end = 0
-	case len(resp.Kvs) == 1:
-		end = binary.BigEndian.Uint64(resp.Kvs[0].Value)
-	default:
-		return etcdutil.ErrEtcdKVGetResponse.WithCausef("%v", resp.Kvs)
+	} else {
+		value, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return err
+		}
+		end = uint64(value)
 	}
-	end += allocStep
-	value := make([]byte, 8)
-	binary.BigEndian.PutUint64(value, end)
-	_, err = alloc.client.Put(ctx, key, string(value))
+	end += defaultallocStep
+	err = alloc.kv.Put(ctx, defaultkey, fmt.Sprintf("%020d", end))
 	if err != nil {
-		return etcdutil.ErrEtcdKVPut.WithCause(err)
+		return err
 	}
 	log.Info("Allocator allocates a new id", zap.Uint64("alloc-id", end))
 	alloc.end = end
-	alloc.base = end - allocStep
+	alloc.base = end - defaultallocStep
 	return nil
 }
