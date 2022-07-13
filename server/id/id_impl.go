@@ -14,8 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const defaultallocStep = uint64(1000)
-const defaultkey = "alloc_id"
+const (
+	defaultallocStep = uint64(1000)
+	defaultkey       = "alloc_id"
+)
 
 type AllocatorImpl struct {
 	mu   sync.Mutex
