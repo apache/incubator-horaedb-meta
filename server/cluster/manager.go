@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 
+	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
@@ -54,28 +55,47 @@ func (m *ManagerImpl) Load(ctx context.Context, storage storage.Storage) error {
 	return nil
 }
 
-func (m *ManagerImpl) AllocSchemaID(ctx context.Context, schemaName string) (uint32, error) {
-	return 0, nil
+func (m *ManagerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName string) (uint32, error) {
+	cluster, err := m.getCluster(ctx, clusterName)
+	if err != nil {
+		return 0, errors.Wrap(err, "AllocSchemaID")
+	}
+
+	schema, err := cluster.getSchema(ctx, schemaName)
+	if err != nil {
+		if coderr.Is(err, coderr.NotFound) {
+			// create new schema
+			schemaID := m.allocSchemaID()
+			if _, err1 := cluster.CreateSchema(ctx, schemaName, schemaID); err1 != nil {
+				return 0, errors.Wrap(err, "AllocSchemaID")
+			}
+			// add to cache
+
+			return schemaID, nil
+		}
+		return 0, errors.Wrap(err, "AllocSchemaID")
+	}
+
+	return schema.ID(), nil
 }
 
-func (m *ManagerImpl) AllocTableID(ctx context.Context, tableName string) (uint64, error) {
+func (m *ManagerImpl) AllocTableID(ctx context.Context, clusterName, schemaName, tableName string) (uint64, error) {
 	return 0, nil
 }
 
 func (m *ManagerImpl) GetTables(ctx context.Context, clusterName, node string, shardIDs []uint32) (map[uint32]*ShardTables, error) {
-	cluster, ok := m.cluster[clusterName]
-	if !ok {
-		return nil, ErrClusterNotFound.WithCausef("cluster_name", clusterName)
+	cluster, err := m.getCluster(ctx, clusterName)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetTables")
 	}
 
 	shardTablesWithRole, err := cluster.GetTables(ctx, shardIDs, node)
 	if err != nil {
-		return nil, errors.Wrap(err, "get_tables")
+		return nil, errors.Wrap(err, "GetTables")
 	}
 
 	ret := make(map[uint32]*ShardTables, len(shardIDs))
 	for shardID, shardTables := range shardTablesWithRole {
-
 		tableInfos := make([]*TableInfo, len(shardTables.tables))
 
 		for _, t := range shardTables.tables {
@@ -88,4 +108,16 @@ func (m *ManagerImpl) GetTables(ctx context.Context, clusterName, node string, s
 
 func (m *ManagerImpl) DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error {
 	return nil
+}
+
+func (m *ManagerImpl) getCluster(ctx context.Context, clusterName string) (*Cluster, error) {
+	cluster, ok := m.cluster[clusterName]
+	if !ok {
+		return nil, ErrClusterNotFound.WithCausef("getCluster", clusterName)
+	}
+	return cluster, nil
+}
+
+func (m *ManagerImpl) allocSchemaID() uint32 {
+	return 0
 }

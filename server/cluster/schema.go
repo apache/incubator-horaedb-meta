@@ -7,3 +7,7 @@ type Schema struct {
 
 	tableMap map[string]*Table
 }
+
+func (s *Schema) ID() uint32 {
+	return s.meta.GetId()
+}
