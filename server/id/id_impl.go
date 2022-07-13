@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
@@ -46,14 +47,16 @@ func (alloc *AllocatorImpl) Rebase(ctx context.Context) error {
 }
 
 func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
-	key := alloc.getAllocIDPath()
+	key := path.Join(alloc.rootPath, "alloc_id")
 	resp, err := alloc.client.Get(ctx, key)
 	if err != nil {
-		return err
+		return etcdutil.ErrEtcdKVGet.WithCause(err)
 	}
 	var end uint64
 	if len(resp.Kvs) == 0 {
 		end = 0
+	} else if len(resp.Kvs) > 1 {
+		return etcdutil.ErrEtcdKVGetResponse.WithCausef("%v", resp.Kvs)
 	} else {
 		end = binary.BigEndian.Uint64(resp.Kvs[0].Value)
 	}
@@ -62,14 +65,10 @@ func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
 	binary.BigEndian.PutUint64(value, end)
 	_, err = alloc.client.Put(ctx, key, string(value))
 	if err != nil {
-		return err
+		return etcdutil.ErrEtcdKVPut.WithCause(err)
 	}
 	log.Info("Allocator allocates a new id", zap.Uint64("alloc-id", end))
 	alloc.end = end
 	alloc.base = end - allocStep
 	return nil
-}
-
-func (alloc *AllocatorImpl) getAllocIDPath() string {
-	return path.Join(alloc.rootPath, "alloc_id")
 }
