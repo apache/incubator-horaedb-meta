@@ -19,7 +19,7 @@ import (
 
 const defaultRequestTimeout = time.Second * 10
 
-func TestEtcd(t *testing.T) {
+func TestAlloc(t *testing.T) {
 	re := require.New(t)
 	cfg := newTestSingleConfig(t)
 	etcd, err := embed.StartEtcd(cfg)
@@ -34,23 +34,20 @@ func TestEtcd(t *testing.T) {
 	rootPath := path.Join("/pd", strconv.FormatUint(100, 10))
 
 	allo := NewAllocatorImpl(client, rootPath)
-	testAlloc(re, allo)
-}
-
-func testAlloc(re *require.Assertions, ai *AllocatorImpl) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 	for i := 0; i < 2010; i++ {
-		println(i)
-		value, err := ai.Alloc(ctx)
+		value, err := allo.Alloc(ctx)
 		re.NoError(err)
 		re.Equal(uint64(i+1), value)
 	}
-	err := ai.Rebase(ctx)
+	err = allo.Rebase(ctx)
 	re.NoError(err)
-	value, err := ai.Alloc(ctx)
-	re.NoError(err)
-	re.Equal(uint64(3001), value)
+	for i := 0; i < 2010; i++ {
+		value, err := allo.Alloc(ctx)
+		re.NoError(err)
+		re.Equal(uint64(i+3001), value)
+	}
 }
 
 func newTestSingleConfig(t *testing.T) *embed.Config {
