@@ -10,9 +10,11 @@ import (
 
 // MetaStorage defines the storage operations on the ceresdb cluster meta info.
 type MetaStorage interface {
+	CreateCluster(ctx context.Context, cluster *metapb.Cluster) error
 	GetCluster(ctx context.Context, clusterID uint32) (*metapb.Cluster, error)
 	PutCluster(ctx context.Context, clusterID uint32, meta *metapb.Cluster) error
 
+	CreateClusterTopology(ctx context.Context, clusterTopology *metapb.ClusterTopology) error
 	GetClusterTopology(ctx context.Context, clusterID uint32) (*metapb.ClusterTopology, error)
 	PutClusterTopology(ctx context.Context, clusterID uint32, clusterMetaData *metapb.ClusterTopology) error
 
@@ -22,7 +24,7 @@ type MetaStorage interface {
 
 	CreateTable(ctx context.Context, clusterID uint32, schemaID uint32, table *metapb.Table) error
 	GetTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) (*metapb.Table, bool, error)
-	ListTables(ctx context.Context, clusterID uint32, schemaID uint32, tableID []uint64) ([]*metapb.Table, error)
+	ListTables(ctx context.Context, clusterID uint32, schemaID uint32) ([]*metapb.Table, error)
 	PutTables(ctx context.Context, clusterID uint32, schemaID uint32, tables []*metapb.Table) error
 	DeleteTables(ctx context.Context, clusterID uint32, schemaID uint32, tableIDs []uint64) error
 
@@ -31,4 +33,5 @@ type MetaStorage interface {
 
 	ListNodes(ctx context.Context, clusterID uint32) ([]*metapb.Node, error)
 	PutNodes(ctx context.Context, clusterID uint32, node []*metapb.Node) error
+	CreateOrUpdateNode(ctx context.Context, clusterID uint32, node *metapb.Node) (*metapb.Node, error)
 }

@@ -5,9 +5,12 @@ package cluster
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
 var (
-	ErrLoad            = coderr.NewCodeError(coderr.Internal, "cluster load")
-	ErrClusterNotFound = coderr.NewCodeError(coderr.NotFound, "cluster not found")
-	ErrSchemaNotFound  = coderr.NewCodeError(coderr.NotFound, "schema not found")
-	ErrTableNotFound   = coderr.NewCodeError(coderr.NotFound, "table not found")
-	ErrShardNotFound   = coderr.NewCodeError(coderr.NotFound, "shard not found")
+	ErrLoad                    = coderr.NewCodeError(coderr.Internal, "cluster load")
+	ErrClusterAlreadyExists    = coderr.NewCodeError(coderr.Internal, "cluster already exists")
+	ErrClusterNotFound         = coderr.NewCodeError(coderr.NotFound, "cluster not found")
+	ErrClusterTopologyNotFound = coderr.NewCodeError(coderr.NotFound, "cluster not found")
+	ErrSchemaNotFound          = coderr.NewCodeError(coderr.NotFound, "schemas not found")
+	ErrTableNotFound           = coderr.NewCodeError(coderr.NotFound, "table not found")
+	ErrShardNotFound           = coderr.NewCodeError(coderr.NotFound, "shard not found")
+	ErrNodeNotFound            = coderr.NewCodeError(coderr.NotFound, "node not found")
 )

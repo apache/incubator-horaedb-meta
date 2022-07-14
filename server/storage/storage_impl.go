@@ -44,6 +44,10 @@ func newEtcdStorage(client *clientv3.Client, rootPath string, opts Options) *Met
 		NewEtcdKV(client, rootPath), opts)
 }
 
+func (s *MetaStorageImpl) CreateCluster(ctx context.Context, cluster *metapb.Cluster) error {
+	return nil
+}
+
 func (s *MetaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*metapb.Cluster, error) {
 	return nil, nil
 }
@@ -52,11 +56,19 @@ func (s *MetaStorageImpl) PutCluster(ctx context.Context, clusterID uint32, meta
 	return nil
 }
 
+func (s *MetaStorageImpl) CreateClusterTopology(ctx context.Context, clusterTopology *metapb.ClusterTopology) error {
+	return nil
+}
+
 func (s *MetaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint32) (*metapb.ClusterTopology, error) {
 	return nil, nil
 }
 
 func (s *MetaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, clusterMetaData *metapb.ClusterTopology) error {
+	return nil
+}
+
+func (s *MetaStorageImpl) CreateSchema(ctx context.Context, clusterID uint32, schema *metapb.Schema) error {
 	return nil
 }
 
@@ -104,7 +116,15 @@ func (s *MetaStorageImpl) PutSchemas(ctx context.Context, clusterID uint32, sche
 	return nil
 }
 
-func (s *MetaStorageImpl) ListTables(ctx context.Context, clusterID uint32, schemaID uint32, tableID []uint64) ([]*metapb.Table, error) {
+func (s *MetaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, schemaID uint32, table *metapb.Table) error {
+	return nil
+}
+
+func (s *MetaStorageImpl) GetTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) (*metapb.Table, bool, error) {
+	return nil, false, nil
+}
+
+func (s *MetaStorageImpl) ListTables(ctx context.Context, clusterID uint32, schemaID uint32) ([]*metapb.Table, error) {
 	return nil, nil
 }
 
@@ -130,4 +150,8 @@ func (s *MetaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*m
 
 func (s *MetaStorageImpl) PutNodes(ctx context.Context, clusterID uint32, node []*metapb.Node) error {
 	return nil
+}
+
+func (s *MetaStorageImpl) CreateOrUpdateNode(ctx context.Context, clusterID uint32, node *metapb.Node) (*metapb.Node, error) {
+	return nil, nil
 }

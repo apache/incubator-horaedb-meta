@@ -4,7 +4,7 @@ import "github.com/CeresDB/ceresdbproto/pkg/metapb"
 
 type Shard struct {
 	meta    []*metapb.Shard
-	node    []*metapb.Node
+	nodes   []*metapb.Node
 	tables  []*Table
 	version uint64
 }
