@@ -8,5 +8,6 @@ var (
 	ErrLoad            = coderr.NewCodeError(coderr.Internal, "cluster load")
 	ErrClusterNotFound = coderr.NewCodeError(coderr.NotFound, "cluster not found")
 	ErrSchemaNotFound  = coderr.NewCodeError(coderr.NotFound, "schema not found")
+	ErrTableNotFound   = coderr.NewCodeError(coderr.NotFound, "table not found")
 	ErrShardNotFound   = coderr.NewCodeError(coderr.NotFound, "shard not found")
 )

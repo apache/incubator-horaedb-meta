@@ -8,6 +8,11 @@ type Schema struct {
 	tableMap map[string]*Table
 }
 
-func (s *Schema) ID() uint32 {
+func (s *Schema) GetID() uint32 {
 	return s.meta.GetId()
+}
+
+func (s *Schema) getTable(tableName string) (*Table, bool) {
+	table, ok := s.tableMap[tableName]
+	return table, ok
 }

@@ -7,3 +7,7 @@ type Table struct {
 
 	meta *metapb.Table
 }
+
+func (t *Table) getID() uint64 {
+	return t.meta.GetId()
+}
