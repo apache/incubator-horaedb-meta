@@ -5,35 +5,33 @@ package id
 import (
 	"context"
 	"fmt"
+	"path"
 	"strconv"
 	"sync"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
 
-const (
-	defaultallocStep = uint64(1000)
-	defaultkey       = "alloc_id"
-)
+const defaultallocStep = uint64(1000)
 
 type AllocatorImpl struct {
-	mu   sync.Mutex
-	base uint64
-	end  uint64
-	kv   storage.KV
+	sync.Mutex
+	base     uint64
+	end      uint64
+	kv       storage.KV
+	rootPath string
 }
 
-func NewAllocatorImpl(client *clientv3.Client, rootPath string) *AllocatorImpl {
-	return &AllocatorImpl{kv: storage.NewEtcdKV(client, rootPath)}
+func NewAllocatorImpl(kv storage.KV, rootPath string) *AllocatorImpl {
+	return &AllocatorImpl{kv: kv, rootPath: rootPath}
 }
 
 func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
-	alloc.mu.Lock()
-	defer alloc.mu.Unlock()
+	alloc.Lock()
+	defer alloc.Unlock()
 	if alloc.base == alloc.end {
 		if err := alloc.rebaseLocked(ctx); err != nil {
 			return 0, err
@@ -44,15 +42,16 @@ func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
 }
 
 func (alloc *AllocatorImpl) Rebase(ctx context.Context) error {
-	alloc.mu.Lock()
-	defer alloc.mu.Unlock()
+	alloc.Lock()
+	defer alloc.Unlock()
 	return alloc.rebaseLocked(ctx)
 }
 
 func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
-	value, err := alloc.kv.Get(ctx, defaultkey)
+	key := path.Join(alloc.rootPath, "alloc_id")
+	value, err := alloc.kv.Get(ctx, key)
 	if err != nil {
-		return errors.Wrapf(err, "get base id err")
+		return errors.Wrapf(err, "get base id err, key: %v", key)
 	}
 	var end uint64
 	if value == "" {
@@ -65,9 +64,9 @@ func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
 		end = uint64(value)
 	}
 	end += defaultallocStep
-	err = alloc.kv.Put(ctx, defaultkey, fmt.Sprintf("%020d", end))
+	err = alloc.kv.Put(ctx, key, fmt.Sprintf("%020d", end))
 	if err != nil {
-		return errors.Wrapf(err, "put base id err")
+		return errors.Wrapf(err, "put base id err, key: %v", key)
 	}
 	log.Info("Allocator allocates a new id", zap.Uint64("alloc-id", end))
 	alloc.end = end

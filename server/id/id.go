@@ -6,6 +6,8 @@ import "context"
 
 // Allocator defines the id allocator on the ceresdb cluster meta info.
 type Allocator interface {
+	// Alloc allocs a unique id.
 	Alloc(ctx context.Context) (uint64, error)
+	// Rebase resets the base for the allocator from the persistent window boundary.
 	Rebase(ctx context.Context) error
 }
