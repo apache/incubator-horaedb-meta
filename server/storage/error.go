@@ -7,29 +7,19 @@ import "github.com/CeresDB/ceresmeta/pkg/coderr"
 var (
 	ErrMetaGetSchemas = coderr.NewCodeError(coderr.Internal, "meta storage get schemas")
 	ErrMetaPutSchemas = coderr.NewCodeError(coderr.Internal, "meta storage put schemas")
-)
 
-var (
 	ErrMetaGetCluster = coderr.NewCodeError(coderr.Internal, "meta storage get cluster")
 	ErrMetaPutCluster = coderr.NewCodeError(coderr.Internal, "meta storage put cluster")
-)
 
-var (
 	ErrMetaGetClusterTopology = coderr.NewCodeError(coderr.Internal, "meta storage get cluster topology")
 	ErrMetaPutClusterTopology = coderr.NewCodeError(coderr.Internal, "meta storage put cluster topology")
-)
 
-var (
 	ErrMetaGetTables = coderr.NewCodeError(coderr.Internal, "meta storage get tables")
 	ErrMetaPutTables = coderr.NewCodeError(coderr.Internal, "meta storage put tables")
-)
 
-var (
 	ErrMetaGetShardTopology = coderr.NewCodeError(coderr.Internal, "meta storage get shard topology")
 	ErrMetaPutShardTopology = coderr.NewCodeError(coderr.Internal, "meta storage put shard topology")
-)
 
-var (
 	ErrMetaGetNodes = coderr.NewCodeError(coderr.Internal, "meta storage get nodes")
 	ErrMetaPutNodes = coderr.NewCodeError(coderr.Internal, "meta storage put nodes")
 )
