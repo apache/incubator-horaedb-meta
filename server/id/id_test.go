@@ -31,7 +31,7 @@ func TestAlloc(t *testing.T) {
 		Endpoints: []string{ep},
 	})
 	re.NoError(err)
-	rootPath := path.Join("/pd", strconv.FormatUint(100, 10))
+	rootPath := path.Join("/ceresmeta", strconv.FormatUint(100, 10))
 
 	allo := NewAllocatorImpl(client, rootPath)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)

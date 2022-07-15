@@ -10,6 +10,7 @@ import (
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/storage"
+	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
@@ -51,7 +52,7 @@ func (alloc *AllocatorImpl) Rebase(ctx context.Context) error {
 func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
 	value, err := alloc.kv.Get(ctx, defaultkey)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "get base id err")
 	}
 	var end uint64
 	if value == "" {
@@ -59,14 +60,14 @@ func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
 	} else {
 		value, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "convert string to int err")
 		}
 		end = uint64(value)
 	}
 	end += defaultallocStep
 	err = alloc.kv.Put(ctx, defaultkey, fmt.Sprintf("%020d", end))
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "put base id err")
 	}
 	log.Info("Allocator allocates a new id", zap.Uint64("alloc-id", end))
 	alloc.end = end
