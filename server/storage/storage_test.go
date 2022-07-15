@@ -154,7 +154,7 @@ func NewStorage(t *testing.T) Storage {
 	})
 	assert.NoError(t, err)
 
-	rootPath := path.Join("/pd", strconv.FormatUint(100, 10))
+	rootPath := path.Join("/ceresmeta", strconv.FormatUint(100, 10))
 	ops := Options{MaxScanLimit: 100, MinScanLimit: 10}
 
 	return newEtcdStorage(client, rootPath, ops)
