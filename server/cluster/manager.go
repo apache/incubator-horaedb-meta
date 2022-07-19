@@ -173,6 +173,15 @@ func (m *ManagerImpl) GetTables(ctx context.Context, node, clusterName string, s
 }
 
 func (m *ManagerImpl) DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error {
+	cluster, err := m.getCluster(ctx, clusterName)
+	if err != nil {
+		return errors.Wrap(err, "DropTable")
+	}
+
+	if err := cluster.DropTable(ctx, schemaName, tableName, tableID); err != nil {
+		return errors.Wrap(err, "DropTable")
+	}
+
 	return nil
 }
 

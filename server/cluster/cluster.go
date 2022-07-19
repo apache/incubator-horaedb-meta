@@ -84,15 +84,16 @@ func (c *Cluster) updateCacheLocked(ctx context.Context) error {
 	}
 
 	for shardID, shardTopology := range c.metaData.shardTopologyMap {
-		var tables []*Table
+		var tables map[uint64]*Table
+
 		for _, tableID := range shardTopology.TableIds {
 			for schemaName, tableMap := range c.metaData.tableMap {
 				table, ok := tableMap[tableID]
 				if ok {
-					tables = append(tables, &Table{
+					tables[tableID] = &Table{
 						schema: c.metaData.schemaMap[schemaName],
 						meta:   table,
-					})
+					}
 				}
 			}
 		}
@@ -133,7 +134,7 @@ func (c *Cluster) updateSchemaCacheLocked(schemaPb *clusterpb.Schema) *Schema {
 func (c *Cluster) updateTableCacheLocked(schema *Schema, tablePb *clusterpb.Table) *Table {
 	table := &Table{meta: tablePb, schema: schema.meta}
 	schema.tableMap[tablePb.GetName()] = table
-	c.shards[tablePb.GetShardId()].tables = append(c.shards[tablePb.GetShardId()].tables, table)
+	c.shards[tablePb.GetShardId()].tables[table.getID()] = table
 	return table
 }
 
@@ -156,13 +157,30 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, node string)
 				break
 			}
 		}
-		shardTables[shardID] = &ShardTablesWithRole{shardRole: shardRole, tables: shardTable.tables, version: shardTable.version}
+		tables := make([]*Table, len(shardTable.tables))
+		for _, table := range shardTable.tables {
+			tables = append(tables, table)
+		}
+		shardTables[shardID] = &ShardTablesWithRole{shardRole: shardRole, tables: tables, version: shardTable.version}
 	}
 
 	return shardTables, nil
 }
 
 func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, tableID uint64) error {
+	schema, exists := c.getSchema(schemaName)
+	if exists {
+		return ErrSchemaNotFound
+	}
+	if err := c.storage.DeleteTables(ctx, c.clusterID, schema.GetID(), []uint64{tableID}); err != nil {
+		return errors.Wrapf(err, "cluster DropTable, cluster_id:%d, schema:%v, table_id:%d", c.clusterID, schema, tableID)
+	}
+	c.Lock()
+	defer c.Unlock()
+	schema.dropTableLocked(tableName)
+	for _, shard := range c.shards {
+		shard.dropTableLocked(tableID)
+	}
 	return nil
 }
 

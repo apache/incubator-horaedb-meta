@@ -16,3 +16,7 @@ func (s *Schema) getTable(tableName string) (*Table, bool) {
 	table, ok := s.tableMap[tableName]
 	return table, ok
 }
+
+func (s *Schema) dropTableLocked(tableName string) {
+	delete(s.tableMap, tableName)
+}

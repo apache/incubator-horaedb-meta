@@ -5,8 +5,12 @@ import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 type Shard struct {
 	meta    []*clusterpb.Shard
 	nodes   []*clusterpb.Node
-	tables  []*Table
+	tables  map[uint64]*Table // table_id => table
 	version uint64
+}
+
+func (s *Shard) dropTableLocked(tableID uint64) {
+	delete(s.tables, tableID)
 }
 
 type ShardTablesWithRole struct {
