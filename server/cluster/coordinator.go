@@ -24,7 +24,8 @@ func (c *coordinator) Run(ctx context.Context) error {
 
 // todo: consider ReplicationFactor
 func (c *coordinator) scatterShard(ctx context.Context) error {
-	if !(int(c.cluster.metaData.cluster.MinNodeCount) >= len(c.cluster.metaData.nodeMap) && c.cluster.metaData.clusterTopology.State == clusterpb.ClusterTopology_EMPTY) {
+	if !(int(c.cluster.metaData.cluster.MinNodeCount) >= len(c.cluster.metaData.nodeMap) &&
+		c.cluster.metaData.clusterTopology.State == clusterpb.ClusterTopology_EMPTY) {
 		return nil
 	}
 
@@ -46,7 +47,8 @@ func (c *coordinator) scatterShard(ctx context.Context) error {
 			if i*perNodeShardCount+j < shardTotal {
 				for ; nodeIndex < len(nodeList); nodeIndex++ {
 					// todo: consider nodes state
-					shards = append(shards, &clusterpb.Shard{Id: uint32(i * j), ShardRole: clusterpb.ShardRole_LEADER, Node: nodeList[nodeIndex].GetName()})
+					shards = append(shards, &clusterpb.Shard{Id: uint32(i * j),
+						ShardRole: clusterpb.ShardRole_LEADER, Node: nodeList[nodeIndex].GetName()})
 				}
 			}
 		}

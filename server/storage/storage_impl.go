@@ -44,8 +44,12 @@ func newEtcdStorage(client *clientv3.Client, rootPath string, opts Options) *Met
 		NewEtcdKV(client, rootPath), opts)
 }
 
-func (s *MetaStorageImpl) CreateCluster(ctx context.Context, cluster *clusterpb.Cluster) error {
-	return nil
+func (s *MetaStorageImpl) ListClusters(ctx context.Context) ([]*clusterpb.Cluster, error) {
+	return nil, nil
+}
+
+func (s *MetaStorageImpl) CreateCluster(ctx context.Context, cluster *clusterpb.Cluster) (*clusterpb.Cluster, error) {
+	return nil, nil
 }
 
 func (s *MetaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*clusterpb.Cluster, error) {

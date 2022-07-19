@@ -10,7 +10,8 @@ import (
 
 // MetaStorage defines the storage operations on the ceresdb cluster meta info.
 type MetaStorage interface {
-	CreateCluster(ctx context.Context, cluster *clusterpb.Cluster) error
+	ListClusters(ctx context.Context) ([]*clusterpb.Cluster, error)
+	CreateCluster(ctx context.Context, cluster *clusterpb.Cluster) (*clusterpb.Cluster, error)
 	GetCluster(ctx context.Context, clusterID uint32) (*clusterpb.Cluster, error)
 	PutCluster(ctx context.Context, clusterID uint32, meta *clusterpb.Cluster) error
 

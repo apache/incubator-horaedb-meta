@@ -5,7 +5,6 @@ package cluster
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
 var (
-	ErrLoad                    = coderr.NewCodeError(coderr.Internal, "cluster load")
 	ErrClusterAlreadyExists    = coderr.NewCodeError(coderr.Internal, "cluster already exists")
 	ErrClusterNotFound         = coderr.NewCodeError(coderr.NotFound, "cluster not found")
 	ErrClusterTopologyNotFound = coderr.NewCodeError(coderr.NotFound, "cluster not found")

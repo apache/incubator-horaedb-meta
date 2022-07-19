@@ -17,15 +17,16 @@ type Cluster struct {
 
 	metaData *MetaData
 
-	shards  map[uint32]*Shard
-	schemas map[string]*Schema
-	nodes   map[string][]uint32
+	shards  map[uint32]*Shard   // shard_id -> shard
+	schemas map[string]*Schema  // schema_name -> schema
+	nodes   map[string][]uint32 // node_name -> shard_ids
 
 	coordinator *coordinator
 }
 
-func NewCluster(clusterID uint32, storage storage.Storage) *Cluster {
-	return &Cluster{clusterID: clusterID, storage: storage, metaData: &MetaData{}, shards: make(map[uint32]*Shard), schemas: make(map[string]*Schema), nodes: make(map[string][]uint32)}
+func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage) *Cluster {
+	return &Cluster{clusterID: cluster.GetId(), storage: storage, metaData: &MetaData{cluster: cluster},
+		shards: make(map[uint32]*Shard), schemas: make(map[string]*Schema), nodes: make(map[string][]uint32)}
 }
 
 func (c *Cluster) Name() string {
@@ -35,10 +36,6 @@ func (c *Cluster) Name() string {
 func (c *Cluster) Load(ctx context.Context) error {
 	c.Lock()
 	defer c.Unlock()
-
-	if err := c.loadClusterLocked(ctx); err != nil {
-		return errors.Wrap(err, "cluster Load")
-	}
 
 	if err := c.loadClusterTopologyLocked(ctx); err != nil {
 		return errors.Wrap(err, "cluster Load")
@@ -143,7 +140,7 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, node string)
 	for _, shardID := range shardIDs {
 		shardTable, ok := c.shards[shardID]
 		if !ok {
-			return nil, ErrShardNotFound.WithCausef("shard_id", shardID)
+			return nil, ErrShardNotFound.WithCausef("shardID", shardID)
 		}
 
 		shardRole := FOLLOWER
@@ -170,10 +167,11 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, node string)
 func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, tableID uint64) error {
 	schema, exists := c.getSchema(schemaName)
 	if exists {
-		return ErrSchemaNotFound
+		return ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 	}
 	if err := c.storage.DeleteTables(ctx, c.clusterID, schema.GetID(), []uint64{tableID}); err != nil {
-		return errors.Wrapf(err, "cluster DropTable, cluster_id:%d, schema:%v, table_id:%d", c.clusterID, schema, tableID)
+		return errors.Wrapf(err, "cluster DropTable, "+
+			"clusterID:%d, schema:%v, tableID:%d", c.clusterID, schema, tableID)
 	}
 	c.Lock()
 	defer c.Unlock()
@@ -199,7 +197,7 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string, schemaID 
 	schemaPb := &clusterpb.Schema{Id: schemaID, Name: schemaName, ClusterId: c.clusterID}
 	err := c.storage.CreateSchema(ctx, c.clusterID, schemaPb)
 	if err != nil {
-		return nil, errors.Wrap(err, "CreateSchema")
+		return nil, errors.Wrap(err, "cluster CreateSchema")
 	}
 
 	// cache
@@ -207,20 +205,21 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string, schemaID 
 	return schema, nil
 }
 
-func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32, tableName string, tableID uint64) (*Table, error) {
+func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32,
+	tableName string, tableID uint64) (*Table, error) {
 	c.Lock()
 	defer c.Unlock()
 	// check if exists
 	schema, exists := c.getSchema(schemaName)
 	if !exists {
-		return nil, ErrSchemaNotFound.WithCausef("schema_name", schemaName)
+		return nil, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
 	}
 
 	// persist
 	tablePb := &clusterpb.Table{Id: tableID, Name: tableName, SchemaId: schema.GetID(), ShardId: shardID}
 	err1 := c.storage.CreateTable(ctx, c.clusterID, schema.GetID(), tablePb)
 	if err1 != nil {
-		return nil, errors.Wrap(err1, "CreateTable")
+		return nil, errors.Wrap(err1, "cluster CreateTable")
 	}
 
 	// update cache
@@ -228,24 +227,15 @@ func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID ui
 	return table, nil
 }
 
-func (c *Cluster) loadClusterLocked(ctx context.Context) error {
-	cluster, err := c.storage.GetCluster(ctx, c.clusterID)
-	if err != nil {
-		return err
-	}
-	c.metaData.cluster = cluster
-	return nil
-}
-
 func (c *Cluster) loadClusterTopologyLocked(ctx context.Context) error {
 	clusterTopology, err := c.storage.GetClusterTopology(ctx, c.clusterID)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "cluster loadClusterTopologyLocked")
 	}
 	c.metaData.clusterTopology = clusterTopology
 
 	if c.metaData.clusterTopology == nil {
-		return ErrClusterTopologyNotFound
+		return ErrClusterTopologyNotFound.WithCausef("cluster:%v", c)
 	}
 	shardIDs := make([]uint32, len(c.metaData.clusterTopology.ShardView))
 	shardMap := make(map[uint32][]*clusterpb.Shard)
@@ -262,7 +252,7 @@ func (c *Cluster) loadClusterTopologyLocked(ctx context.Context) error {
 func (c *Cluster) loadShardTopologyLocked(ctx context.Context) error {
 	topologies, err := c.storage.ListShardTopologies(ctx, c.clusterID, c.metaData.shardIDs)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "cluster loadShardTopologyLocked")
 	}
 	shardTopologyMap := make(map[uint32]*clusterpb.ShardTopology, len(c.metaData.shardIDs))
 	for i, topology := range topologies {
@@ -310,7 +300,7 @@ func (c *Cluster) getSchema(schemaName string) (*Schema, bool) {
 func (c *Cluster) getTable(ctx context.Context, schemaName, tableName string) (*Table, bool, error) {
 	schema, ok := c.schemas[schemaName]
 	if !ok {
-		return nil, false, ErrSchemaNotFound.WithCausef("schema_name", schemaName)
+		return nil, false, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
 	}
 	table, exists := schema.getTable(tableName)
 	if exists {
@@ -319,7 +309,7 @@ func (c *Cluster) getTable(ctx context.Context, schemaName, tableName string) (*
 	// find in storage
 	tablePb, exists, err := c.storage.GetTable(ctx, c.clusterID, schema.GetID(), tableName)
 	if err != nil {
-		return nil, false, errors.Wrap(err, "getTable")
+		return nil, false, errors.Wrap(err, "cluster getTable")
 	}
 	if exists {
 		c.Lock()
@@ -335,9 +325,9 @@ type MetaData struct {
 	cluster          *clusterpb.Cluster
 	clusterTopology  *clusterpb.ClusterTopology
 	shardIDs         []uint32
-	shardMap         map[uint32][]*clusterpb.Shard
-	shardTopologyMap map[uint32]*clusterpb.ShardTopology
-	schemaMap        map[string]*clusterpb.Schema
-	tableMap         map[string]map[uint64]*clusterpb.Table // schemas-> ( table_id -> table )
-	nodeMap          map[string]*clusterpb.Node
+	shardMap         map[uint32][]*clusterpb.Shard          // shard_id -> shard
+	shardTopologyMap map[uint32]*clusterpb.ShardTopology    // shard_id -> shardTopology
+	schemaMap        map[string]*clusterpb.Schema           // schema_name -> schema
+	tableMap         map[string]map[uint64]*clusterpb.Table // schema_name-> ( table_id -> table )
+	nodeMap          map[string]*clusterpb.Node             // node_name -> node
 }
