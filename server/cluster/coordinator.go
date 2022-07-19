@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/CeresDB/ceresdbproto/pkg/metapb"
+	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/pkg/errors"
 )
 
@@ -24,7 +24,7 @@ func (c *coordinator) Run(ctx context.Context) error {
 
 // todo: consider ReplicationFactor
 func (c *coordinator) scatterShard(ctx context.Context) error {
-	if !(int(c.cluster.metaData.cluster.MinNodeCount) >= len(c.cluster.metaData.nodeMap) && c.cluster.metaData.clusterTopology.State == metapb.ClusterTopology_EMPTY) {
+	if !(int(c.cluster.metaData.cluster.MinNodeCount) >= len(c.cluster.metaData.nodeMap) && c.cluster.metaData.clusterTopology.State == clusterpb.ClusterTopology_EMPTY) {
 		return nil
 	}
 
@@ -34,9 +34,9 @@ func (c *coordinator) scatterShard(ctx context.Context) error {
 	shardTotal := int(c.cluster.metaData.cluster.ShardTotal)
 	minNodeCount := int(c.cluster.metaData.cluster.MinNodeCount)
 	perNodeShardCount := shardTotal / minNodeCount
-	shards := make([]*metapb.Shard, shardTotal)
+	shards := make([]*clusterpb.Shard, shardTotal)
 	nodeIndex := 0
-	var nodeList []*metapb.Node
+	var nodeList []*clusterpb.Node
 	for _, v := range c.cluster.metaData.nodeMap {
 		nodeList = append(nodeList, v)
 	}
@@ -46,7 +46,7 @@ func (c *coordinator) scatterShard(ctx context.Context) error {
 			if i*perNodeShardCount+j < shardTotal {
 				for ; nodeIndex < len(nodeList); nodeIndex++ {
 					// todo: consider nodes state
-					shards = append(shards, &metapb.Shard{Id: uint32(i * j), ShardRole: metapb.ShardRole_LEADER, Node: nodeList[nodeIndex].Node})
+					shards = append(shards, &clusterpb.Shard{Id: uint32(i * j), ShardRole: clusterpb.ShardRole_LEADER, Node: nodeList[nodeIndex].GetName()})
 				}
 			}
 		}

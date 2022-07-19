@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/CeresDB/ceresdbproto/pkg/metapb"
+	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
@@ -99,7 +99,7 @@ func (c *Cluster) updateCacheLocked(ctx context.Context) error {
 		// todo: assert shardID
 		// todo: check shard not found by shardID
 		shardMetaList := c.metaData.shardMap[shardID]
-		var nodes []*metapb.Node
+		var nodes []*clusterpb.Node
 		for _, shardMeta := range shardMetaList {
 			nodes = append(nodes, c.metaData.nodeMap[shardMeta.Node])
 		}
@@ -124,13 +124,13 @@ func (c *Cluster) updateCacheLocked(ctx context.Context) error {
 	return nil
 }
 
-func (c *Cluster) updateSchemaCacheLocked(schemaPb *metapb.Schema) *Schema {
+func (c *Cluster) updateSchemaCacheLocked(schemaPb *clusterpb.Schema) *Schema {
 	schema := &Schema{meta: schemaPb}
 	c.schemas[schemaPb.GetName()] = schema
 	return schema
 }
 
-func (c *Cluster) updateTableCacheLocked(schema *Schema, tablePb *metapb.Table) *Table {
+func (c *Cluster) updateTableCacheLocked(schema *Schema, tablePb *clusterpb.Table) *Table {
 	table := &Table{meta: tablePb, schema: schema.meta}
 	schema.tableMap[tablePb.GetName()] = table
 	c.shards[tablePb.GetShardId()].tables = append(c.shards[tablePb.GetShardId()].tables, table)
@@ -147,8 +147,8 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, node string)
 
 		shardRole := FOLLOWER
 		for i, n := range shardTable.nodes {
-			if node == n.GetNode() {
-				if shardTable.meta[i].ShardRole == metapb.ShardRole_LEADER {
+			if node == n.GetName() {
+				if shardTable.meta[i].ShardRole == clusterpb.ShardRole_LEADER {
 					shardRole = LEADER
 				} else {
 					shardRole = FOLLOWER
@@ -171,14 +171,14 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string, schemaID 
 	defer c.Unlock()
 	// check if exists
 	{
-		schema, exists := c.getSchema(ctx, schemaName)
+		schema, exists := c.getSchema(schemaName)
 		if exists {
 			return schema, nil
 		}
 	}
 
 	// persist
-	schemaPb := &metapb.Schema{Id: schemaID, Name: schemaName, ClusterId: c.clusterID}
+	schemaPb := &clusterpb.Schema{Id: schemaID, Name: schemaName, ClusterId: c.clusterID}
 	err := c.storage.CreateSchema(ctx, c.clusterID, schemaPb)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateSchema")
@@ -199,7 +199,7 @@ func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID ui
 	}
 
 	// persist
-	tablePb := &metapb.Table{Id: tableID, Name: tableName, SchemaId: schema.GetID(), ShardId: shardID}
+	tablePb := &clusterpb.Table{Id: tableID, Name: tableName, SchemaId: schema.GetID(), ShardId: shardID}
 	err1 := c.storage.CreateTable(ctx, c.clusterID, schema.GetID(), tablePb)
 	if err1 != nil {
 		return nil, errors.Wrap(err1, "CreateTable")
@@ -230,7 +230,7 @@ func (c *Cluster) loadClusterTopologyLocked(ctx context.Context) error {
 		return ErrClusterTopologyNotFound
 	}
 	shardIDs := make([]uint32, len(c.metaData.clusterTopology.ShardView))
-	shardMap := make(map[uint32][]*metapb.Shard)
+	shardMap := make(map[uint32][]*clusterpb.Shard)
 
 	for _, shard := range c.metaData.clusterTopology.ShardView {
 		shardMap[shard.Id] = append(shardMap[shard.Id], shard)
@@ -246,7 +246,7 @@ func (c *Cluster) loadShardTopologyLocked(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	shardTopologyMap := make(map[uint32]*metapb.ShardTopology, len(c.metaData.shardIDs))
+	shardTopologyMap := make(map[uint32]*clusterpb.ShardTopology, len(c.metaData.shardIDs))
 	for i, topology := range topologies {
 		shardTopologyMap[c.metaData.shardIDs[i]] = topology
 	}
@@ -259,7 +259,7 @@ func (c *Cluster) loadSchemaLocked(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "cluster loadSchemaLocked")
 	}
-	schemaMap := make(map[string]*metapb.Schema, len(schemas))
+	schemaMap := make(map[string]*clusterpb.Schema, len(schemas))
 	for _, schema := range schemas {
 		schemaMap[schema.Name] = schema
 	}
@@ -277,7 +277,7 @@ func (c *Cluster) loadTableLocked(ctx context.Context) error {
 			if t, ok := c.metaData.tableMap[schema.GetName()]; ok {
 				t[table.GetId()] = table
 			} else {
-				c.metaData.tableMap[schema.GetName()] = map[uint64]*metapb.Table{table.GetId(): table}
+				c.metaData.tableMap[schema.GetName()] = map[uint64]*clusterpb.Table{table.GetId(): table}
 			}
 		}
 	}
@@ -314,12 +314,12 @@ func (c *Cluster) getTable(ctx context.Context, schemaName, tableName string) (*
 }
 
 type MetaData struct {
-	cluster          *metapb.Cluster
-	clusterTopology  *metapb.ClusterTopology
+	cluster          *clusterpb.Cluster
+	clusterTopology  *clusterpb.ClusterTopology
 	shardIDs         []uint32
-	shardMap         map[uint32][]*metapb.Shard
-	shardTopologyMap map[uint32]*metapb.ShardTopology
-	schemaMap        map[string]*metapb.Schema
-	tableMap         map[string]map[uint64]*metapb.Table // schemas-> ( table_id -> table )
-	nodeMap          map[string]*metapb.Node
+	shardMap         map[uint32][]*clusterpb.Shard
+	shardTopologyMap map[uint32]*clusterpb.ShardTopology
+	schemaMap        map[string]*clusterpb.Schema
+	tableMap         map[string]map[uint64]*clusterpb.Table // schemas-> ( table_id -> table )
+	nodeMap          map[string]*clusterpb.Node
 }

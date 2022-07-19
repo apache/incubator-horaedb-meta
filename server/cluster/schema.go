@@ -1,9 +1,9 @@
 package cluster
 
-import "github.com/CeresDB/ceresdbproto/pkg/metapb"
+import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 
 type Schema struct {
-	meta *metapb.Schema
+	meta *clusterpb.Schema
 
 	tableMap map[string]*Table
 }

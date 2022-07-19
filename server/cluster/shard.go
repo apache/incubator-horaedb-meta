@@ -1,10 +1,10 @@
 package cluster
 
-import "github.com/CeresDB/ceresdbproto/pkg/metapb"
+import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 
 type Shard struct {
-	meta    []*metapb.Shard
-	nodes   []*metapb.Node
+	meta    []*clusterpb.Shard
+	nodes   []*clusterpb.Node
 	tables  []*Table
 	version uint64
 }

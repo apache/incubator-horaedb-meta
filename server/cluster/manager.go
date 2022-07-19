@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/pkg/metapb"
+	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
@@ -77,13 +77,13 @@ func (m *ManagerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, errors.Wrap(err, "CreateCluster")
 	}
 
-	clusterPb := &metapb.Cluster{Id: clusterID, Name: clusterName, MinNodeCount: nodeCount, ReplicationFactor: replicationFactor, ShardTotal: shardTotal}
+	clusterPb := &clusterpb.Cluster{Id: clusterID, Name: clusterName, MinNodeCount: nodeCount, ReplicationFactor: replicationFactor, ShardTotal: shardTotal}
 	if err := m.storage.CreateCluster(ctx, clusterPb); err != nil {
 		return nil, errors.Wrap(err, "CreateCluster")
 	}
 
 	// todo: add schedule
-	clusterTopologyPb := &metapb.ClusterTopology{ClusterId: clusterID, DataVersion: 0, State: metapb.ClusterTopology_STABLE, CreatedAt: uint64(time.Now().UnixMilli())}
+	clusterTopologyPb := &clusterpb.ClusterTopology{ClusterId: clusterID, DataVersion: 0, State: clusterpb.ClusterTopology_STABLE, CreatedAt: uint64(time.Now().UnixMilli())}
 	if err := m.storage.CreateClusterTopology(ctx, clusterTopologyPb); err != nil {
 		return nil, errors.Wrap(err, "CreateCluster")
 	}
@@ -103,7 +103,7 @@ func (m *ManagerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 		return 0, errors.Wrap(err, "AllocSchemaID")
 	}
 
-	schema, exists := cluster.getSchema(ctx, schemaName)
+	schema, exists := cluster.getSchema(schemaName)
 	if exists {
 		return schema.GetID(), nil
 
@@ -177,7 +177,7 @@ func (m *ManagerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 }
 
 func (m *ManagerImpl) RegisterNode(ctx context.Context, clusterName, node string, lease uint32) error {
-	nodePb := &metapb.Node{NodeStats: &metapb.NodeStats{Lease: lease}, Node: node}
+	nodePb := &clusterpb.Node{NodeStats: &clusterpb.NodeStats{Lease: lease}, Name: node}
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
 		return errors.Wrap(err, "RegisterNode")

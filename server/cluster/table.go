@@ -1,11 +1,11 @@
 package cluster
 
-import "github.com/CeresDB/ceresdbproto/pkg/metapb"
+import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 
 type Table struct {
-	schema *metapb.Schema
+	schema *clusterpb.Schema
 
-	meta *metapb.Table
+	meta *clusterpb.Table
 }
 
 func (t *Table) getID() uint64 {
