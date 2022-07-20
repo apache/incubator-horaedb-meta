@@ -25,8 +25,10 @@ type Cluster struct {
 }
 
 func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage) *Cluster {
-	return &Cluster{clusterID: cluster.GetId(), storage: storage, metaData: &MetaData{cluster: cluster},
-		shards: make(map[uint32]*Shard), schemas: make(map[string]*Schema), nodes: make(map[string][]uint32)}
+	return &Cluster{
+		clusterID: cluster.GetId(), storage: storage, metaData: &MetaData{cluster: cluster},
+		shards: make(map[uint32]*Shard), schemas: make(map[string]*Schema), nodes: make(map[string][]uint32),
+	}
 }
 
 func (c *Cluster) Name() string {
@@ -81,7 +83,7 @@ func (c *Cluster) updateCacheLocked(ctx context.Context) error {
 	}
 
 	for shardID, shardTopology := range c.metaData.shardTopologyMap {
-		var tables map[uint64]*Table
+		tables := make(map[uint64]*Table, len(shardTopology.TableIds))
 
 		for _, tableID := range shardTopology.TableIds {
 			for schemaName, tableMap := range c.metaData.tableMap {
@@ -206,7 +208,8 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string, schemaID 
 }
 
 func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32,
-	tableName string, tableID uint64) (*Table, error) {
+	tableName string, tableID uint64,
+) (*Table, error) {
 	c.Lock()
 	defer c.Unlock()
 	// check if exists

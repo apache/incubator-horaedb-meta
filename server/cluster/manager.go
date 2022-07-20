@@ -66,7 +66,8 @@ func (m *ManagerImpl) Load(ctx context.Context) error {
 }
 
 func (m *ManagerImpl) CreateCluster(ctx context.Context, clusterName string, nodeCount,
-	replicationFactor, shardTotal uint32) (*Cluster, error) {
+	replicationFactor, shardTotal uint32,
+) (*Cluster, error) {
 	m.Lock()
 	defer m.Unlock()
 	_, ok := m.cluster[clusterName]
@@ -79,16 +80,20 @@ func (m *ManagerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, errors.Wrapf(err, "cluster manager CreateCluster, clusterName:%s", clusterName)
 	}
 
-	clusterPb := &clusterpb.Cluster{Id: clusterID, Name: clusterName, MinNodeCount: nodeCount,
-		ReplicationFactor: replicationFactor, ShardTotal: shardTotal}
+	clusterPb := &clusterpb.Cluster{
+		Id: clusterID, Name: clusterName, MinNodeCount: nodeCount,
+		ReplicationFactor: replicationFactor, ShardTotal: shardTotal,
+	}
 	clusterPb, err = m.storage.CreateCluster(ctx, clusterPb)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cluster manager CreateCluster, cluster:%v", clusterPb)
 	}
 
 	// todo: add scheduler
-	clusterTopologyPb := &clusterpb.ClusterTopology{ClusterId: clusterID, DataVersion: 0,
-		State: clusterpb.ClusterTopology_STABLE}
+	clusterTopologyPb := &clusterpb.ClusterTopology{
+		ClusterId: clusterID, DataVersion: 0,
+		State: clusterpb.ClusterTopology_STABLE,
+	}
 	if err := m.storage.CreateClusterTopology(ctx, clusterTopologyPb); err != nil {
 		return nil, errors.Wrapf(err, "cluster manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
@@ -111,7 +116,6 @@ func (m *ManagerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 	schema, exists := cluster.getSchema(schemaName)
 	if exists {
 		return schema.GetID(), nil
-
 	}
 	// create new schema
 	schemaID, err := m.allocSchemaID(clusterName)
@@ -124,7 +128,6 @@ func (m *ManagerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 			"clusterName:%s, schemaName:%s", clusterName, schemaName)
 	}
 	return schemaID, nil
-
 }
 
 func (m *ManagerImpl) AllocTableID(ctx context.Context, clusterName, schemaName, tableName, node string) (uint64, error) {
@@ -177,8 +180,10 @@ func (m *ManagerImpl) GetTables(ctx context.Context, clusterName, node string, s
 		tableInfos := make([]*TableInfo, len(shardTables.tables))
 
 		for _, t := range shardTables.tables {
-			tableInfos = append(tableInfos, &TableInfo{id: t.meta.GetId(), name: t.meta.GetName(),
-				schemaID: t.schema.GetId(), schemaName: t.schema.GetName()})
+			tableInfos = append(tableInfos, &TableInfo{
+				id: t.meta.GetId(), name: t.meta.GetName(),
+				schemaID: t.schema.GetId(), schemaName: t.schema.GetName(),
+			})
 		}
 		ret[shardID] = &ShardTables{shardRole: shardTables.shardRole, tables: tableInfos, version: shardTables.version}
 	}

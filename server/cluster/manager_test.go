@@ -88,21 +88,23 @@ func testCreateCluster(ctx context.Context, re *require.Assertions, manager Mana
 }
 
 func testRegisterNode(ctx context.Context, re *require.Assertions, manager Manager,
-	cluster, node string, lease uint32) {
+	cluster, node string, lease uint32,
+) {
 	err := manager.RegisterNode(ctx, cluster, node, lease)
 	re.NoError(err)
-
 }
 
 func testAllocSchemaID(ctx context.Context, re *require.Assertions, manager Manager,
-	cluster, schema string, schemaID uint32) {
-	schemaID, err := manager.AllocSchemaID(ctx, cluster, schema)
+	cluster, schema string, schemaID uint32,
+) {
+	id, err := manager.AllocSchemaID(ctx, cluster, schema)
 	re.NoError(err)
-	re.Equal(schemaID, schemaID)
+	re.Equal(schemaID, id)
 }
 
 func testAllocTableID(ctx context.Context, re *require.Assertions, manager Manager,
-	node, cluster, schema, table string, tableID uint64) {
+	node, cluster, schema, table string, tableID uint64,
+) {
 	id, err := manager.AllocTableID(ctx, node, cluster, schema, table)
 	re.NoError(err)
 	re.Equal(tableID, id)
