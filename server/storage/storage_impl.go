@@ -101,12 +101,16 @@ func (s *MetaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 		if err != nil {
 			log.Debug("get cluster topology latest version failed")
 		}
+		if value == "" {
+			return "0"
+		}
 		return value
 	}()), "=", latestVersion)
-	_, err = s.Txn(ctx).If(cmp).Then(clientv3.OpPut(key, string(value))).Commit()
-
+	resp, err := s.Txn(ctx).If(cmp).Then(clientv3.OpPut(key, string(value))).Commit()
 	if err != nil {
 		return errors.Wrapf(err, "put cluster topology failed, key:%v", key)
+	} else if !resp.Succeeded {
+		return ErrParsePutClusterTopology.WithCausef("txn put leader failed, resp:%v", resp)
 	}
 	err = s.Put(ctx, makeClusterTopologyLatestVersion(clusterID), fmt.Sprintf("%020d", clusterMetaData.DataVersion))
 	if err != nil {

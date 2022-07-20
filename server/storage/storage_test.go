@@ -39,7 +39,7 @@ func TestClusterTopology(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 	clusterMetaData := &metapb.ClusterTopology{ClusterId: 1, DataVersion: 1, Cause: "cause", CreatedAt: 1}
-	err := s.PutClusterTopology(ctx, 1, "1", clusterMetaData)
+	err := s.PutClusterTopology(ctx, 1, "0", clusterMetaData)
 	re.NoError(err)
 	value, err := s.GetClusterTopology(ctx, 1)
 	re.NoError(err)
