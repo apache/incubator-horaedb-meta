@@ -155,6 +155,7 @@ func (s *MetaStorageImpl) ListSchemas(ctx context.Context, clusterID uint32) ([]
 	}
 }
 
+// TODO(shuangxiao): operator in a batch
 func (s *MetaStorageImpl) PutSchemas(ctx context.Context, clusterID uint32, schemas []*metapb.Schema) error {
 	for _, item := range schemas {
 		key := makeSchemaKey(clusterID, item.Id)
@@ -169,6 +170,7 @@ func (s *MetaStorageImpl) PutSchemas(ctx context.Context, clusterID uint32, sche
 	return nil
 }
 
+// TODO(shuangxiao): operator in a batch
 func (s *MetaStorageImpl) ListTables(ctx context.Context, clusterID uint32, schemaID uint32, tableID []uint64) ([]*metapb.Table, error) {
 	tables := make([]*metapb.Table, 0)
 	for _, item := range tableID {
@@ -186,6 +188,7 @@ func (s *MetaStorageImpl) ListTables(ctx context.Context, clusterID uint32, sche
 	return tables, nil
 }
 
+// TODO(shuangxiao): operator in a batch
 func (s *MetaStorageImpl) PutTables(ctx context.Context, clusterID uint32, schemaID uint32, tables []*metapb.Table) error {
 	for _, item := range tables {
 		key := makeTableKey(clusterID, schemaID, item.Id)
@@ -200,6 +203,7 @@ func (s *MetaStorageImpl) PutTables(ctx context.Context, clusterID uint32, schem
 	return nil
 }
 
+// TODO(shuangxiao): operator in a batch
 func (s *MetaStorageImpl) DeleteTables(ctx context.Context, clusterID uint32, schemaID uint32, tableIDs []uint64) error {
 	for _, item := range tableIDs {
 		key := makeTableKey(clusterID, schemaID, item)
@@ -210,6 +214,7 @@ func (s *MetaStorageImpl) DeleteTables(ctx context.Context, clusterID uint32, sc
 	return nil
 }
 
+// TODO(shuangxiao): operator in a batch
 func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32) ([]*metapb.ShardTopology, error) {
 	shardTableInfo := make([]*metapb.ShardTopology, 0)
 	for _, item := range shardID {
@@ -232,6 +237,7 @@ func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 	return shardTableInfo, nil
 }
 
+// TODO(shuangxiao): operator in a batch
 func (s *MetaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32, latestVersion string, shardTableInfo []*metapb.ShardTopology) error {
 	for index, item := range shardID {
 		value, err := proto.Marshal(shardTableInfo[index])
@@ -299,6 +305,7 @@ func (s *MetaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*m
 	}
 }
 
+// TODO(shuangxiao): operator in a batch
 func (s *MetaStorageImpl) PutNodes(ctx context.Context, clusterID uint32, node []*metapb.Node) error {
 	for _, item := range node {
 		key := makeNodeKey(clusterID, item.Id)
