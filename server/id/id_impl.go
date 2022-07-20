@@ -36,11 +36,9 @@ func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
 
 	if alloc.base == alloc.end {
 		if err := alloc.fastRebaseLocked(ctx); err != nil {
-
 			if err := alloc.rebaseLocked(ctx); err != nil {
 				return 0, err
 			}
-
 		}
 	}
 
@@ -81,7 +79,7 @@ func (alloc *AllocatorImpl) idAllocBase(ctx context.Context, value uint64) error
 	if err != nil {
 		return errors.Wrapf(err, "put base id failed, key:%v", alloc.key)
 	} else if !resp.Succeeded {
-		return ErrTxnPutBaseId.WithCausef("txn put base id failed, resp:%v", resp)
+		return ErrTxnPutBaseID.WithCausef("txn put base id failed, resp:%v", resp)
 	}
 
 	log.Info("Allocator allocates a new id", zap.Uint64("alloc-id", end))
