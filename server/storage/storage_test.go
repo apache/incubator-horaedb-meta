@@ -21,7 +21,7 @@ func TestCluster(t *testing.T) {
 	s := NewStorage(t)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
-	meta := &metapb.Cluster{Id: 0, Name: "name", MinNodeCount: 0, ReplicationFactor: 0, ShardTotal: 0}
+	meta := &metapb.Cluster{Id: 1, Name: "name", MinNodeCount: 1, ReplicationFactor: 1, ShardTotal: 1}
 	err := s.PutCluster(ctx, 0, meta)
 	re.NoError(err)
 	value, err := s.GetCluster(ctx, 0)
@@ -39,7 +39,7 @@ func TestClusterTopology(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 	clusterMetaData := &metapb.ClusterTopology{ClusterId: 1, DataVersion: 1, Cause: "cause", CreatedAt: 1}
-	err := s.PutClusterTopology(ctx, 1, clusterMetaData)
+	err := s.PutClusterTopology(ctx, 1, "1", clusterMetaData)
 	re.NoError(err)
 	value, err := s.GetClusterTopology(ctx, 1)
 	re.NoError(err)
@@ -111,7 +111,7 @@ func TestShardTopologies(t *testing.T) {
 		shardTableInfo = append(shardTableInfo, shardTableData)
 		shardID = append(shardID, uint32(i))
 	}
-	err := s.PutShardTopologies(ctx, 0, shardID, shardTableInfo)
+	err := s.PutShardTopologies(ctx, 0, shardID, "1", shardTableInfo)
 	re.NoError(err)
 	value, err := s.ListShardTopologies(ctx, 0, shardID)
 	re.NoError(err)

@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	cluster = "v1/cluster"
-	schema  = "schema"
-	node    = "node"
-	table   = "table"
-	shard   = "shard"
-	topo    = "topo"
-	lv      = "latest_version"
+	cluster       = "v1/cluster"
+	schema        = "schema"
+	node          = "node"
+	table         = "table"
+	shard         = "shard"
+	topology      = "topo"
+	latestVersion = "latest_version"
 )
 
 // makeSchemaKey returns the schema meta info key path with the given region ID.
@@ -23,33 +23,37 @@ const (
 //            v1/cluster/1/schema/2 -> ceresmeta.Schema
 //            v1/cluster/1/schema/3 -> ceresmeta.Schema
 func makeSchemaKey(clusterID uint32, schemaID uint32) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), schema, fmt.Sprintf("%020d", schemaID))
+	return path.Join(cluster, fmtID(uint64(clusterID)), schema, fmtID(uint64(schemaID)))
 }
 
 func makeNodeKey(clusterID uint32, nodeID uint32) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), node, fmt.Sprintf("%020d", nodeID))
+	return path.Join(cluster, fmtID(uint64(clusterID)), node, fmtID(uint64(nodeID)))
 }
 
 func makeClusterKey(clusterID uint32) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID))
+	return path.Join(cluster, fmtID(uint64(clusterID)))
 }
 
 func makeTableKey(clusterID uint32, schemaID uint32, tableID uint64) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), schema, fmt.Sprintf("%020d", schemaID), table, fmt.Sprintf("%020d", tableID))
+	return path.Join(cluster, fmtID(uint64(clusterID)), schema, fmtID(uint64(schemaID)), table, fmtID(tableID))
 }
 
 func makeShardKey(clusterID uint32, shardID uint32, latestVersion string) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), shard, fmt.Sprintf("%020d", shardID), latestVersion)
+	return path.Join(cluster, fmtID(uint64(clusterID)), shard, fmtID(uint64(shardID)), latestVersion)
 }
 
 func makeClusterTopologyKey(clusterID uint32, latestVersion string) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), topo, latestVersion)
+	return path.Join(cluster, fmtID(uint64(clusterID)), topology, latestVersion)
 }
 
-func makeLatestVersion(clusterID uint32) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), topo, lv)
+func makeClusterTopologyLatestVersion(clusterID uint32) string {
+	return path.Join(cluster, fmtID(uint64(clusterID)), topology, latestVersion)
 }
 
 func makeShardLatestVersion(clusterID uint32, shardID uint32) string {
-	return path.Join(cluster, fmt.Sprintf("%020d", clusterID), shard, fmt.Sprintf("%020d", shardID), lv)
+	return path.Join(cluster, fmtID(uint64(clusterID)), shard, fmtID(uint64(shardID)), latestVersion)
+}
+
+func fmtID(id uint64) string {
+	return fmt.Sprintf("%020d", id)
 }
