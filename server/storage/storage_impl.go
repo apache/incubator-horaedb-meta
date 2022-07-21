@@ -107,7 +107,7 @@ func (s *MetaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 	}
 	resp, err := s.Txn(ctx).
 		If(cmp).
-		Then(clientv3.OpPut(key, string(value)), clientv3.OpPut(latestVersionKey, fmtID(uint64(clusterMetaData.DataVersion)))).
+		Then(clientv3.OpPut(key, string(value)), clientv3.OpPut(latestVersionKey, fmtID(clusterMetaData.DataVersion))).
 		Commit()
 	if err != nil {
 		return errors.Wrapf(err, "put cluster topology failed, key:%v", key)
@@ -259,7 +259,7 @@ func (s *MetaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 		}
 		resp, err := s.Txn(ctx).
 			If(cmp).
-			Then(clientv3.OpPut(key, string(value)), clientv3.OpPut(latestVersionKey, fmtID(uint64(shardTableInfo[index].Version)))).
+			Then(clientv3.OpPut(key, string(value)), clientv3.OpPut(latestVersionKey, fmtID(shardTableInfo[index].Version))).
 			Commit()
 
 		if err != nil {
