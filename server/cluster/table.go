@@ -6,10 +6,9 @@ import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 
 type Table struct {
 	schema *clusterpb.Schema
-
-	meta *clusterpb.Table
+	meta   *clusterpb.Table
 }
 
-func (t *Table) getID() uint64 {
+func (t *Table) GetID() uint64 {
 	return t.meta.GetId()
 }

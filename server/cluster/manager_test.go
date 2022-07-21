@@ -6,6 +6,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/assert"
@@ -121,7 +123,7 @@ func testGetTables(ctx context.Context, re *require.Assertions, manager Manager,
 
 	tableNum := 0
 	for _, tables := range shardTables {
-		re.Equal(LEADER, tables.shardRole)
+		re.Equal(clusterpb.ShardRole_LEADER, tables.shardRole)
 		tableNum += len(tables.tables)
 	}
 	re.Equal(2, tableNum)
