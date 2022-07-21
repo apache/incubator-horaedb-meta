@@ -46,11 +46,11 @@ func makeClusterTopologyKey(clusterID uint32, latestVersion string) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), topology, latestVersion)
 }
 
-func makeClusterTopologyLatestVersion(clusterID uint32) string {
+func makeClusterTopologyLatestVersionKey(clusterID uint32) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), topology, latestVersion)
 }
 
-func makeShardLatestVersion(clusterID uint32, shardID uint32) string {
+func makeShardLatestVersionKey(clusterID uint32, shardID uint32) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), shard, fmtID(uint64(shardID)), latestVersion)
 }
 

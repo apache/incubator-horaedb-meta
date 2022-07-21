@@ -4,7 +4,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"math"
 
 	"github.com/CeresDB/ceresdbproto/pkg/metapb"
@@ -73,7 +72,7 @@ func (s *MetaStorageImpl) PutCluster(ctx context.Context, clusterID uint32, meta
 }
 
 func (s *MetaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint32) (*metapb.ClusterTopology, error) {
-	key := makeClusterTopologyLatestVersion(clusterID)
+	key := makeClusterTopologyLatestVersionKey(clusterID)
 	version, err := s.Get(ctx, key)
 	if err != nil {
 		return nil, errors.Wrapf(err, "get cluster topology latest version failed, key:%v", key)
@@ -90,32 +89,32 @@ func (s *MetaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint
 	return clusterMetaData, nil
 }
 
-func (s *MetaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, latestVersion string, clusterMetaData *metapb.ClusterTopology) error {
+// TODO(shuangxiao): exist bug when execute Txn
+func (s *MetaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, latestVersion uint32, clusterMetaData *metapb.ClusterTopology) error {
 	value, err := proto.Marshal(clusterMetaData)
 	if err != nil {
 		return ErrParsePutClusterTopology.WithCausef("proto parse failed, err:%v", err)
 	}
-	key := makeClusterTopologyKey(clusterID, latestVersion)
-	cmp := clientv3.Compare(clientv3.Value(func() string {
-		value, err := s.Get(ctx, makeClusterTopologyLatestVersion(clusterID))
-		if err != nil {
-			log.Debug("get cluster topology latest version failed")
-		}
-		if value == "" {
-			return "0"
-		}
-		return value
-	}()), "=", latestVersion)
-	resp, err := s.Txn(ctx).If(cmp).Then(clientv3.OpPut(key, string(value))).Commit()
+	key := makeClusterTopologyKey(clusterID, fmtID(uint64(latestVersion)))
+
+	latestVersionKey := makeClusterTopologyLatestVersionKey(clusterID)
+
+	var cmp clientv3.Cmp
+	if latestVersion == 0 {
+		cmp = clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
+	} else {
+		cmp = clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(uint64(latestVersion)))
+	}
+	resp, err := s.Txn(ctx).
+		If(cmp).
+		Then(clientv3.OpPut(key, string(value)), clientv3.OpPut(latestVersionKey, fmtID(uint64(clusterMetaData.DataVersion)))).
+		Commit()
 	if err != nil {
 		return errors.Wrapf(err, "put cluster topology failed, key:%v", key)
 	} else if !resp.Succeeded {
-		return ErrParsePutClusterTopology.WithCausef("txn put leader failed, resp:%v", resp)
+		return ErrParsePutClusterTopology.WithCausef("resp:%v", resp)
 	}
-	err = s.Put(ctx, makeClusterTopologyLatestVersion(clusterID), fmt.Sprintf("%020d", clusterMetaData.DataVersion))
-	if err != nil {
-		return errors.Wrapf(err, "put cluster topology latest version failed")
-	}
+
 	return nil
 }
 
@@ -132,7 +131,7 @@ func (s *MetaStorageImpl) ListSchemas(ctx context.Context, clusterID uint32) ([]
 			if rangeLimit /= 2; rangeLimit >= s.opts.MinScanLimit {
 				continue
 			}
-			return nil, errors.Wrapf(err, "get schemas err, start key:%v, end key:%v, range limit:%v", startKey, endKey, rangeLimit)
+			return nil, errors.Wrapf(err, "get schemas failed, start key:%v, end key:%v, range limit:%v", startKey, endKey, rangeLimit)
 		}
 		select {
 		case <-ctx.Done():
@@ -219,15 +218,15 @@ func (s *MetaStorageImpl) DeleteTables(ctx context.Context, clusterID uint32, sc
 }
 
 // TODO(shuangxiao): operator in a batch
-func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32) ([]*metapb.ShardTopology, error) {
+func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32) ([]*metapb.ShardTopology, error) {
 	shardTableInfo := make([]*metapb.ShardTopology, 0)
-	for _, item := range shardID {
-		key := makeShardLatestVersion(clusterID, item)
+	for _, shardID := range shardIDs {
+		key := makeShardLatestVersionKey(clusterID, shardID)
 		version, err := s.Get(ctx, key)
 		if err != nil {
 			return nil, errors.Wrapf(err, "get shard topology latest version failed, key:%v", key)
 		}
-		key = makeShardKey(clusterID, item, version)
+		key = makeShardKey(clusterID, shardID, version)
 		value, err := s.Get(ctx, key)
 		if err != nil {
 			return nil, errors.Wrapf(err, "get shard topology failed, key:%v", key)
@@ -241,30 +240,34 @@ func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 	return shardTableInfo, nil
 }
 
-// TODO(shuangxiao): operator in a batch
-func (s *MetaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32, latestVersion string, shardTableInfo []*metapb.ShardTopology) error {
-	for index, item := range shardID {
+// TODO(shuangxiao): operator in a batch, exist bug when execute Txn
+func (s *MetaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32, latestVersion uint32, shardTableInfo []*metapb.ShardTopology) error {
+	for index, shardID := range shardIDs {
 		value, err := proto.Marshal(shardTableInfo[index])
 		if err != nil {
 			return ErrParsePutShardTopology.WithCausef("proto parse failed, err:%v", err)
 		}
-		key := makeShardKey(clusterID, item, latestVersion)
-		cmp := clientv3.Compare(clientv3.Value(func() string {
-			value, err := s.Get(ctx, makeShardLatestVersion(clusterID, item))
-			if err != nil {
-				log.Debug("get shard latest version failed")
-			}
-			return value
-		}()), "=", latestVersion)
-		_, err = s.Txn(ctx).If(cmp).Then(clientv3.OpPut(key, string(value))).Commit()
+		key := makeShardKey(clusterID, shardID, fmtID(uint64(latestVersion)))
+
+		latestVersionKey := makeShardLatestVersionKey(clusterID, shardID)
+
+		var cmp clientv3.Cmp
+		if latestVersion == 0 {
+			cmp = clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
+		} else {
+			cmp = clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(uint64(latestVersion)))
+		}
+		resp, err := s.Txn(ctx).
+			If(cmp).
+			Then(clientv3.OpPut(key, string(value)), clientv3.OpPut(latestVersionKey, fmtID(uint64(shardTableInfo[index].Version)))).
+			Commit()
 
 		if err != nil {
 			return errors.Wrapf(err, "put shard failed, key:%v", key)
+		} else if !resp.Succeeded {
+			return ErrParsePutShardTopology.WithCausef("resp:%v", resp)
 		}
-		err = s.Put(ctx, makeShardLatestVersion(clusterID, item), fmt.Sprintf("%020d", shardTableInfo[index].Version))
-		if err != nil {
-			return errors.Wrapf(err, "put shard latest version failed")
-		}
+
 	}
 	return nil
 }
