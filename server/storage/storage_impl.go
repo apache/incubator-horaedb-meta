@@ -267,7 +267,6 @@ func (s *MetaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 		} else if !resp.Succeeded {
 			return ErrParsePutShardTopology.WithCausef("resp:%v", resp)
 		}
-
 	}
 	return nil
 }
