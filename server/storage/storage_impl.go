@@ -5,6 +5,7 @@ package storage
 import (
 	"context"
 	"math"
+	"path"
 
 	"github.com/CeresDB/ceresdbproto/pkg/metapb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -28,21 +29,23 @@ type MetaStorageImpl struct {
 	KV
 
 	opts Options
+
+	rootPath string
 }
 
 // NewMetaStorageImpl creates a new base storage endpoint with the given KV and encryption key manager.
 // It should be embedded insIDe a storage backend.
 func NewMetaStorageImpl(
 	kv KV,
-	opts Options,
+	opts Options, rootPath string,
 ) *MetaStorageImpl {
-	return &MetaStorageImpl{kv, opts}
+	return &MetaStorageImpl{kv, opts, rootPath}
 }
 
 // newEtcdBackend is used to create a new etcd backend.
 func newEtcdStorage(client *clientv3.Client, rootPath string, opts Options) *MetaStorageImpl {
 	return NewMetaStorageImpl(
-		NewEtcdKV(client, rootPath), opts)
+		NewEtcdKV(client, rootPath), opts, rootPath)
 }
 
 func (s *MetaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*metapb.Cluster, error) {
@@ -89,15 +92,14 @@ func (s *MetaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint
 	return clusterMetaData, nil
 }
 
-// TODO(shuangxiao): exist bug when execute Txn
 func (s *MetaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, latestVersion uint32, clusterMetaData *metapb.ClusterTopology) error {
 	value, err := proto.Marshal(clusterMetaData)
 	if err != nil {
 		return ErrParsePutClusterTopology.WithCausef("proto parse failed, err:%v", err)
 	}
-	key := makeClusterTopologyKey(clusterID, fmtID(uint64(latestVersion)))
+	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterID, fmtID(uint64(latestVersion))))
 
-	latestVersionKey := makeClusterTopologyLatestVersionKey(clusterID)
+	latestVersionKey := path.Join(s.rootPath, makeClusterTopologyLatestVersionKey(clusterID))
 
 	var cmp clientv3.Cmp
 	if latestVersion == 0 {
@@ -240,16 +242,16 @@ func (s *MetaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 	return shardTableInfo, nil
 }
 
-// TODO(shuangxiao): operator in a batch, exist bug when execute Txn
+// TODO(shuangxiao): operator in a batch
 func (s *MetaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32, latestVersion uint32, shardTableInfo []*metapb.ShardTopology) error {
 	for index, shardID := range shardIDs {
 		value, err := proto.Marshal(shardTableInfo[index])
 		if err != nil {
 			return ErrParsePutShardTopology.WithCausef("proto parse failed, err:%v", err)
 		}
-		key := makeShardKey(clusterID, shardID, fmtID(uint64(latestVersion)))
+		key := path.Join(s.rootPath, makeShardKey(clusterID, shardID, fmtID(uint64(latestVersion))))
 
-		latestVersionKey := makeShardLatestVersionKey(clusterID, shardID)
+		latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardID))
 
 		var cmp clientv3.Cmp
 		if latestVersion == 0 {

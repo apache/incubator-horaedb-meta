@@ -1,4 +1,5 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+// TODO: add test cause in the future
 
 package storage
 
@@ -107,7 +108,7 @@ func TestShardTopologies(t *testing.T) {
 	shardTableInfo := make([]*metapb.ShardTopology, 0)
 	shardID := make([]uint32, 0)
 	for i := 0; i < 10; i++ {
-		shardTableData := &metapb.ShardTopology{Version: uint64(i)}
+		shardTableData := &metapb.ShardTopology{Version: 0}
 		shardTableInfo = append(shardTableInfo, shardTableData)
 		shardID = append(shardID, uint32(i))
 	}
