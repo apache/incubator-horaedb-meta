@@ -22,9 +22,11 @@ func TestCluster(t *testing.T) {
 	s := NewStorage(t)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
+
 	meta := &metapb.Cluster{Id: 1, Name: "name", MinNodeCount: 1, ReplicationFactor: 1, ShardTotal: 1}
 	err := s.PutCluster(ctx, 0, meta)
 	re.NoError(err)
+
 	value, err := s.GetCluster(ctx, 0)
 	re.NoError(err)
 	re.Equal(meta.Id, value.Id)
@@ -39,9 +41,15 @@ func TestClusterTopology(t *testing.T) {
 	s := NewStorage(t)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
-	clusterMetaData := &metapb.ClusterTopology{ClusterId: 1, DataVersion: 0, Cause: "cause", CreatedAt: 1}
-	err := s.PutClusterTopology(ctx, 1, 0, clusterMetaData)
+
+	latestVersionKey := makeClusterTopologyLatestVersionKey(1)
+	err := s.Put(ctx, latestVersionKey, fmtID(uint64(0)))
 	re.NoError(err)
+
+	clusterMetaData := &metapb.ClusterTopology{ClusterId: 1, DataVersion: 1, Cause: "cause", CreatedAt: 1}
+	err = s.PutClusterTopology(ctx, 1, 0, clusterMetaData)
+	re.NoError(err)
+
 	value, err := s.GetClusterTopology(ctx, 1)
 	re.NoError(err)
 	re.Equal(clusterMetaData.ClusterId, value.ClusterId)
@@ -55,13 +63,16 @@ func TestSchemes(t *testing.T) {
 	s := NewStorage(t)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
+
 	schemas := make([]*metapb.Schema, 0)
 	for i := 0; i < 10; i++ {
 		schema := &metapb.Schema{Id: uint32(i), ClusterId: uint32(i), Name: "name"}
 		schemas = append(schemas, schema)
 	}
+
 	err := s.PutSchemas(ctx, 0, schemas)
 	re.NoError(err)
+
 	value, err := s.ListSchemas(ctx, 0)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {
@@ -76,17 +87,21 @@ func TestTables(t *testing.T) {
 	s := NewStorage(t)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
+
 	tables := make([]*metapb.Table, 0)
 	for i := 0; i < 10; i++ {
 		table := &metapb.Table{Id: uint64(i), Name: "name", SchemaId: uint32(i), ShardId: uint32(i), Desc: "desc"}
 		tables = append(tables, table)
 	}
+
 	err := s.PutTables(ctx, 0, 0, tables)
 	re.NoError(err)
+
 	tableID := make([]uint64, 0)
 	for i := 0; i < 10; i++ {
 		tableID = append(tableID, uint64(i))
 	}
+
 	value, err := s.ListTables(ctx, 0, 0, tableID)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {
@@ -96,8 +111,19 @@ func TestTables(t *testing.T) {
 		re.Equal(tables[i].ShardId, value[i].ShardId)
 		re.Equal(tables[i].Desc, value[i].Desc)
 	}
+
 	err = s.DeleteTables(ctx, 0, 0, tableID)
 	re.NoError(err)
+
+	value, err = s.ListTables(ctx, 0, 0, tableID)
+	re.NoError(err)
+	for i := 0; i < 10; i++ {
+		re.Equal(uint64(0), value[i].Id)
+		re.Equal(uint32(0), value[i].SchemaId)
+		re.Equal("", value[i].Name)
+		re.Equal(uint32(0), value[i].ShardId)
+		re.Equal("", value[i].Desc)
+	}
 }
 
 func TestShardTopologies(t *testing.T) {
@@ -105,15 +131,24 @@ func TestShardTopologies(t *testing.T) {
 	s := NewStorage(t)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
+
+	for i := 0; i < 10; i++ {
+		latestVersionKey := makeShardLatestVersionKey(0, uint32(i))
+		err := s.Put(ctx, latestVersionKey, fmtID(uint64(0)))
+		re.NoError(err)
+	}
+
 	shardTableInfo := make([]*metapb.ShardTopology, 0)
 	shardID := make([]uint32, 0)
 	for i := 0; i < 10; i++ {
-		shardTableData := &metapb.ShardTopology{Version: 0}
+		shardTableData := &metapb.ShardTopology{Version: 1}
 		shardTableInfo = append(shardTableInfo, shardTableData)
 		shardID = append(shardID, uint32(i))
 	}
+
 	err := s.PutShardTopologies(ctx, 0, shardID, 0, shardTableInfo)
 	re.NoError(err)
+
 	value, err := s.ListShardTopologies(ctx, 0, shardID)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {
@@ -126,13 +161,16 @@ func TestNodes(t *testing.T) {
 	s := NewStorage(t)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
+
 	nodes := make([]*metapb.Node, 0)
 	for i := 0; i < 10; i++ {
 		node := &metapb.Node{Id: uint32(i), CreateTime: uint64(i), LastTouchTime: uint64(i)}
 		nodes = append(nodes, node)
 	}
+
 	err := s.PutNodes(ctx, 0, nodes)
 	re.NoError(err)
+
 	value, err := s.ListNodes(ctx, 0)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {

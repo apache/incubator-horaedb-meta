@@ -19,7 +19,7 @@ type MetaStorage interface {
 	ListSchemas(ctx context.Context, clusterID uint32) ([]*metapb.Schema, error)
 	PutSchemas(ctx context.Context, clusterID uint32, schemas []*metapb.Schema) error
 
-	ListTables(ctx context.Context, clusterID uint32, schemaID uint32, tableID []uint64) ([]*metapb.Table, error)
+	ListTables(ctx context.Context, clusterID uint32, schemaID uint32, tableIDs []uint64) ([]*metapb.Table, error)
 	PutTables(ctx context.Context, clusterID uint32, schemaID uint32, tables []*metapb.Table) error
 	DeleteTables(ctx context.Context, clusterID uint32, schemaID uint32, tableIDs []uint64) error
 
