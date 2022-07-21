@@ -5,6 +5,7 @@ package id
 import (
 	"context"
 	"fmt"
+	"path"
 	"strconv"
 	"sync"
 
@@ -20,14 +21,15 @@ const defaultAllocStep = uint64(1000)
 type AllocatorImpl struct {
 	// lock var base&end when allocator ID
 	sync.Mutex
-	base uint64
-	end  uint64
-	kv   storage.KV
-	key  string
+	base     uint64
+	end      uint64
+	kv       storage.KV
+	rootPath string
+	key      string
 }
 
-func NewAllocatorImpl(kv storage.KV, key string) *AllocatorImpl {
-	return &AllocatorImpl{kv: kv, key: key}
+func NewAllocatorImpl(kv storage.KV, rootPath string, key string) *AllocatorImpl {
+	return &AllocatorImpl{kv: kv, key: key, rootPath: rootPath}
 }
 
 func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
@@ -68,16 +70,17 @@ func (alloc *AllocatorImpl) fastRebaseLocked(ctx context.Context) error {
 
 func (alloc *AllocatorImpl) idAllocBase(ctx context.Context, value uint64) error {
 	end := value + defaultAllocStep
+	key := path.Join(alloc.rootPath, alloc.key)
 
 	var cmp clientv3.Cmp
 	if value == 0 {
-		cmp = clientv3.Compare(clientv3.CreateRevision(alloc.key), "=", 0)
+		cmp = clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
 	} else {
-		cmp = clientv3.Compare(clientv3.Value(alloc.key), "=", fmt.Sprintf("%020d", value))
+		cmp = clientv3.Compare(clientv3.Value(key), "=", fmt.Sprintf("%020d", value))
 	}
-	resp, err := alloc.kv.Txn(ctx).If(cmp).Then(clientv3.OpPut(alloc.key, fmt.Sprintf("%020d", end))).Commit()
+	resp, err := alloc.kv.Txn(ctx).If(cmp).Then(clientv3.OpPut(key, fmt.Sprintf("%020d", end))).Commit()
 	if err != nil {
-		return errors.Wrapf(err, "put base id failed, key:%v", alloc.key)
+		return errors.Wrapf(err, "put base id failed, key:%v", key)
 	} else if !resp.Succeeded {
 		return ErrTxnPutBaseID.WithCausef("txn put base id failed, resp:%v", resp)
 	}
