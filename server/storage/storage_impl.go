@@ -115,7 +115,6 @@ func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 		If(cmp).
 		Then(opPutClusterTopology, opPutLatestVersion).
 		Commit()
-
 	if err != nil {
 		return errors.Wrapf(err, "meta storage put cluster topology failed, key:%s, clusterID:%d", key, clusterID)
 	}
@@ -275,7 +274,6 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 			If(cmp).
 			Then(opPutLatestVersion, opPutShardTopology).
 			Commit()
-
 		if err != nil {
 			return errors.Wrapf(err, "meta storage put shard failed, key:%s, clusterID:%d, shardID:%d", key, clusterID, shardID)
 		}
