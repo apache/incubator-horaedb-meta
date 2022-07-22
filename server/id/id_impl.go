@@ -78,11 +78,11 @@ func (alloc *AllocatorImpl) idAllocBase(ctx context.Context, value uint64) error
 	} else {
 		cmp = clientv3.Compare(clientv3.Value(key), "=", fmt.Sprintf("%020d", value))
 	}
-	opPutBaseId := clientv3.OpPut(key, fmt.Sprintf("%020d", end))
+	opPutBaseID := clientv3.OpPut(key, fmt.Sprintf("%020d", end))
 
 	resp, err := alloc.kv.Txn(ctx).
 		If(cmp).
-		Then(opPutBaseId).
+		Then(opPutBaseID).
 		Commit()
 	if err != nil {
 		return errors.Wrapf(err, "put base id failed, key:%v", key)
