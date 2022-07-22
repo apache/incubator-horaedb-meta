@@ -53,14 +53,13 @@ func (s *metaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*me
 	key := makeClusterKey(clusterID)
 	value, err := s.Get(ctx, key)
 	if err != nil {
-		return nil, errors.Wrapf(err, "meta storage get cluster failed, clusterID:%d, key:%s", clusterID, key)
+		return nil, errors.Wrapf(err, "meta storage get cluster failed, key:%s, clusterID:%d", key, clusterID)
 	}
 
 	meta := &metapb.Cluster{}
 	if err = proto.Unmarshal([]byte(value), meta); err != nil {
 		return nil, ErrParseGetCluster.WithCausef("proto parse failed, err:%s, clusterID:%d", err, clusterID)
 	}
-
 	return meta, nil
 }
 
@@ -327,16 +326,16 @@ func (s *metaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*m
 }
 
 // TODO: operator in a batch
-func (s *metaStorageImpl) PutNodes(ctx context.Context, clusterID uint32, node []*metapb.Node) error {
-	for _, item := range node {
-		key := makeNodeKey(clusterID, item.Id)
-		value, err := proto.Marshal(item)
+func (s *metaStorageImpl) PutNodes(ctx context.Context, clusterID uint32, nodes []*metapb.Node) error {
+	for _, node := range nodes {
+		key := makeNodeKey(clusterID, node.Id)
+		value, err := proto.Marshal(node)
 		if err != nil {
-			return ErrParsePutNodes.WithCausef("proto parse failed, err:%s, clusterID:%d, nodeID:%d", err, clusterID, item.Id)
+			return ErrParsePutNodes.WithCausef("proto parse failed, err:%s, clusterID:%d, nodeID:%d", err, clusterID, node.Id)
 		}
 
 		if err = s.Put(ctx, key, string(value)); err != nil {
-			return errors.Wrapf(err, "meta storage put nodes failed, key:%s, clusterID:%d, nodeID:%d", key, clusterID, item.Id)
+			return errors.Wrapf(err, "meta storage put nodes failed, key:%s, clusterID:%d, nodeID:%d", key, clusterID, node.Id)
 		}
 	}
 	return nil

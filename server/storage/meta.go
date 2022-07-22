@@ -27,5 +27,5 @@ type MetaStorage interface {
 	PutShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32, latestVersion uint32, topologies []*metapb.ShardTopology) error
 
 	ListNodes(ctx context.Context, clusterID uint32) ([]*metapb.Node, error)
-	PutNodes(ctx context.Context, clusterID uint32, node []*metapb.Node) error
+	PutNodes(ctx context.Context, clusterID uint32, nodes []*metapb.Node) error
 }
