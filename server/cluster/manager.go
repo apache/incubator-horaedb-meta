@@ -51,6 +51,10 @@ func (m *managerImpl) Load(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "clusters manager Load")
 	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	m.clusters = make(map[string]*Cluster, len(clusters))
 	for _, clusterPb := range clusters {
 		cluster := NewCluster(clusterPb, m.storage)
@@ -239,7 +243,9 @@ func (m *managerImpl) GetShards(ctx context.Context, clusterName, node string) (
 }
 
 func (m *managerImpl) getCluster(ctx context.Context, clusterName string) (*Cluster, error) {
+	m.lock.RLock()
 	cluster, ok := m.clusters[clusterName]
+	m.lock.RUnlock()
 	if !ok {
 		return nil, ErrClusterNotFound.WithCausef("clusters manager getCluster, clusterName:%s", clusterName)
 	}

@@ -51,7 +51,7 @@ func (c *coordinator) scatterShard(ctx context.Context) error {
 		for j := 0; j < perNodeShardCount; j++ {
 			if i*perNodeShardCount+j < shardTotal {
 				for ; nodeIndex < len(nodeList); nodeIndex++ {
-					// todo: consider nodesCache state
+					// TODO: consider nodesCache state
 					shards = append(shards, &clusterpb.Shard{
 						Id:        uint32(i*perNodeShardCount + j),
 						ShardRole: clusterpb.ShardRole_LEADER,

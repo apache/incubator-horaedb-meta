@@ -144,7 +144,9 @@ func (c *Cluster) updateTableCacheLocked(schema *Schema, tablePb *clusterpb.Tabl
 func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, node string) (map[uint32]*ShardTablesWithRole, error) {
 	shardTables := make(map[uint32]*ShardTablesWithRole, len(shardIDs))
 	for _, shardID := range shardIDs {
+		c.lock.RLock()
 		shard, ok := c.shardsCache[shardID]
+		c.lock.RUnlock()
 		if !ok {
 			return nil, ErrShardNotFound.WithCausef("shardID:%d", shardID)
 		}
@@ -307,15 +309,21 @@ func (c *Cluster) loadTableLocked(ctx context.Context) error {
 }
 
 func (c *Cluster) GetSchema(schemaName string) (*Schema, bool) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	schema, ok := c.schemasCache[schemaName]
 	return schema, ok
 }
 
 func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*Table, bool, error) {
+	c.lock.RLock()
 	schema, ok := c.schemasCache[schemaName]
+	c.lock.RUnlock()
 	if !ok {
 		return nil, false, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
 	}
+
 	table, exists := schema.getTable(tableName)
 	if exists {
 		return table, true, nil
@@ -336,6 +344,9 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 }
 
 func (c *Cluster) GetShardIDs(node string) ([]uint32, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	shardIDs, ok := c.nodesCache[node]
 	if !ok {
 		return nil, ErrNodeNotFound.WithCausef("clusters GetShardIDs, node:%s", c, node)
