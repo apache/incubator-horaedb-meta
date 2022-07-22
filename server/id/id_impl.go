@@ -78,7 +78,12 @@ func (alloc *AllocatorImpl) idAllocBase(ctx context.Context, value uint64) error
 	} else {
 		cmp = clientv3.Compare(clientv3.Value(key), "=", fmt.Sprintf("%020d", value))
 	}
-	resp, err := alloc.kv.Txn(ctx).If(cmp).Then(clientv3.OpPut(key, fmt.Sprintf("%020d", end))).Commit()
+	opPutBaseId := clientv3.OpPut(key, fmt.Sprintf("%020d", end))
+
+	resp, err := alloc.kv.Txn(ctx).
+		If(cmp).
+		Then(opPutBaseId).
+		Commit()
 	if err != nil {
 		return errors.Wrapf(err, "put base id failed, key:%v", key)
 	} else if !resp.Succeeded {
@@ -86,7 +91,9 @@ func (alloc *AllocatorImpl) idAllocBase(ctx context.Context, value uint64) error
 	}
 
 	log.Info("Allocator allocates a new id", zap.Uint64("alloc-id", end))
+
 	alloc.end = end
 	alloc.base = end - defaultAllocStep
+
 	return nil
 }
