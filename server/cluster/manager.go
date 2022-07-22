@@ -36,7 +36,7 @@ type Manager interface {
 
 type managerImpl struct {
 	// RWMutex is used to protect clusters when creating new cluster
-	sync.RWMutex
+	lock     sync.RWMutex
 	clusters map[string]*Cluster
 
 	storage storage.Storage
@@ -68,8 +68,9 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	if nodeCount < 1 {
 		return nil, ErrCreateCluster.WithCausef("nodeCount must > 0")
 	}
-	m.Lock()
-	defer m.Unlock()
+
+	m.lock.Lock()
+
 	_, ok := m.clusters[clusterName]
 	if ok {
 		return nil, ErrClusterAlreadyExists
@@ -89,7 +90,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusters:%v", clusterPb)
 	}
 
-	// todo: add scheduler
+	// TODO: add scheduler
 	clusterTopologyPb := &clusterpb.ClusterTopology{
 		ClusterId: clusterID, DataVersion: 0,
 		State: clusterpb.ClusterTopology_STABLE,
@@ -99,11 +100,14 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	}
 
 	cluster := NewCluster(clusterPb, m.storage)
+	m.clusters[clusterName] = cluster
+
+	m.lock.Unlock()
+
 	if err := cluster.Load(ctx); err != nil {
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterName:%s", clusterName)
 	}
 
-	m.clusters[clusterName] = cluster
 	return cluster, nil
 }
 
@@ -197,8 +201,8 @@ func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 	}
 
 	if err := cluster.DropTable(ctx, schemaName, tableName, tableID); err != nil {
-		return errors.Wrapf(err, "clusters manager DropTable, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, tableID:%d", clusterName, schemaName, tableName, tableID)
+		return errors.Wrapf(err, "clusters manager DropTable, clusterName:%s, schemaName:%s, tableName:%s, tableID:%d",
+			clusterName, schemaName, tableName, tableID)
 	}
 
 	return nil
@@ -214,7 +218,7 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName, node string
 		return errors.Wrap(err, "clusters manager RegisterNode")
 	}
 
-	// todo: refactor coordinator
+	// TODO: refactor coordinator
 	if err := cluster.coordinator.Run(ctx); err != nil {
 		return errors.Wrap(err, "RegisterNode")
 	}

@@ -13,7 +13,7 @@ import (
 
 type Cluster struct {
 	// RWMutex is used to project following fields
-	sync.RWMutex
+	lock         sync.RWMutex
 	metaData     *metaData
 	clusterID    uint32
 	shardsCache  map[uint32]*Shard   // shard_id -> shard
@@ -40,8 +40,8 @@ func (c *Cluster) Name() string {
 }
 
 func (c *Cluster) Load(ctx context.Context) error {
-	c.Lock()
-	defer c.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	if err := c.loadClusterTopologyLocked(ctx); err != nil {
 		return errors.Wrap(err, "clusters Load")
@@ -178,11 +178,12 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, t
 		return ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 	}
 	if err := c.storage.DeleteTables(ctx, c.clusterID, schema.GetID(), []uint64{tableID}); err != nil {
-		return errors.Wrapf(err, "clusters DropTable, "+
-			"clusterID:%d, schema:%v, tableID:%d", c.clusterID, schema, tableID)
+		return errors.Wrapf(err, "clusters DropTable, clusterID:%d, schema:%v, tableID:%d",
+			c.clusterID, schema, tableID)
 	}
-	c.Lock()
-	defer c.Unlock()
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	schema.dropTableLocked(tableName)
 	for _, shard := range c.shardsCache {
@@ -192,8 +193,8 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, t
 }
 
 func (c *Cluster) CreateSchema(ctx context.Context, schemaName string, schemaID uint32) (*Schema, error) {
-	c.Lock()
-	defer c.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	// check if exists
 	schema, exists := c.GetSchema(schemaName)
 	if exists {
@@ -215,8 +216,8 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string, schemaID 
 func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32,
 	tableName string, tableID uint64,
 ) (*Table, error) {
-	c.Lock()
-	defer c.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	// Check provided schema if exists.
 	schema, exists := c.GetSchema(schemaName)
@@ -325,8 +326,8 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 		return nil, false, errors.Wrap(err, "clusters GetTable")
 	}
 	if exists {
-		c.Lock()
-		defer c.Unlock()
+		c.lock.Lock()
+		defer c.lock.Unlock()
 		table := c.updateTableCacheLocked(schema, tablePb)
 		return table, true, nil
 	}
@@ -348,8 +349,8 @@ func (c *Cluster) RegisterNode(ctx context.Context, node string, lease uint32) e
 	if err != nil {
 		return errors.Wrapf(err, "clusters manager RegisterNode, node:%s", node)
 	}
-	c.Lock()
-	defer c.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	c.metaData.nodes[node] = nodePb1
 	return nil
 }
