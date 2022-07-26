@@ -70,7 +70,7 @@ func makeClusterTopologyKey(clusterID uint32, latestVersion string) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), topology, latestVersion)
 }
 
-// makeClusterTopologyLatestVersionKey returns the cluster topology latest version info key path with the given region ID.
+// makeClusterTopologyLatestVersionKey returns the latest version info key path of cluster topology with the given region ID.
 // example: v1/cluster/1/topo/latestVersion -> ceresmeta.ClusterTopologyLatestVersion
 //          v1/cluster/2/topo/latestVersion -> ceresmeta.ClusterTopologyLatestVersion
 //          v1/cluster/3/topo/latestVersion -> ceresmeta.ClusterTopologyLatestVersion
@@ -78,7 +78,7 @@ func makeClusterTopologyLatestVersionKey(clusterID uint32) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), topology, latestVersion)
 }
 
-// makeShardLatestVersionKey returns the shard latest version info key path with the given region ID.
+// makeShardLatestVersionKey returns the latest version info key path of shard with the given region ID.
 // example:
 // cluster 1: v1/cluster/1/shard/1/latestVersion -> ceresmeta.ShardLatestVersion
 //            v1/cluster/1/shard/2/latestVersion -> ceresmeta.ShardLatestVersion
