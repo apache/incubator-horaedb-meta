@@ -1,5 +1,7 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package id
 
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
-var ErrTxnPutBaseID = coderr.NewCodeError(coderr.Internal, "put base id in txn")
+var ErrTxnPutEndID = coderr.NewCodeError(coderr.Internal, "put end id in txn")

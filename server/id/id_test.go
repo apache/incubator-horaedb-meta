@@ -19,6 +19,7 @@ import (
 
 const defaultRequestTimeout = time.Second * 10
 
+// TODO: need a concurrent test case
 func TestAlloc(t *testing.T) {
 	re := require.New(t)
 	cfg := etcdutil.NewTestSingleConfig()
@@ -35,11 +36,11 @@ func TestAlloc(t *testing.T) {
 	rootPath := path.Join("/ceresmeta", strconv.FormatUint(100, 10))
 	kv := storage.NewEtcdKV(client, rootPath)
 
-	allo := NewAllocatorImpl(kv, rootPath, "id")
+	alloc := NewAllocatorImpl(kv, rootPath, "id")
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 	for i := 0; i < 2010; i++ {
-		value, err := allo.Alloc(ctx)
+		value, err := alloc.Alloc(ctx)
 		re.NoError(err)
 		re.Equal(uint64(i+1), value)
 	}
