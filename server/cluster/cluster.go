@@ -151,11 +151,13 @@ func (c *Cluster) updateTableCacheLocked(schema *Schema, tablePb *clusterpb.Tabl
 }
 
 func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, nodeName string) (map[uint32]*ShardTablesWithRole, error) {
+	// TODO: refactor more fine-grained locks
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	shardTables := make(map[uint32]*ShardTablesWithRole, len(shardIDs))
 	for _, shardID := range shardIDs {
-		c.lock.RLock()
 		shard, ok := c.shardsCache[shardID]
-		c.lock.RUnlock()
 		if !ok {
 			return nil, ErrShardNotFound.WithCausef("shardID:%d", shardID)
 		}
@@ -326,7 +328,6 @@ func (c *Cluster) GetSchema(schemaName string) (*Schema, bool) {
 func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*Table, bool, error) {
 	c.lock.RLock()
 	schema, ok := c.schemasCache[schemaName]
-	c.lock.RUnlock()
 	if !ok {
 		return nil, false, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
 	}
@@ -335,6 +336,8 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	if exists {
 		return table, true, nil
 	}
+	c.lock.RUnlock()
+
 	// Search table in storage.
 	tablePb, exists, err := c.storage.GetTable(ctx, c.clusterID, schema.GetID(), tableName)
 	if err != nil {
