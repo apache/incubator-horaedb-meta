@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
-
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/assert"
