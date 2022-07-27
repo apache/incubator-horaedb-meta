@@ -27,11 +27,11 @@ type ShardTables struct {
 type Manager interface {
 	CreateCluster(ctx context.Context, clusterName string, nodeCount, replicationFactor, shardTotal uint32) (*Cluster, error)
 	AllocSchemaID(ctx context.Context, clusterName, schemaName string) (uint32, error)
-	AllocTableID(ctx context.Context, clusterName, schemaName, tableName, node string) (uint64, error)
-	GetTables(ctx context.Context, clusterName, node string, shardIDs []uint32) (map[uint32]*ShardTables, error)
+	AllocTableID(ctx context.Context, clusterName, schemaName, tableName, nodeName string) (uint64, error)
+	GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error)
 	DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error
-	RegisterNode(ctx context.Context, clusterName, node string, lease uint32) error
-	GetShards(ctx context.Context, clusterName, node string) ([]uint32, error)
+	RegisterNode(ctx context.Context, clusterName, nodeName string, lease uint32) error
+	GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error)
 }
 
 type managerImpl struct {
@@ -138,7 +138,7 @@ func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 	return schemaID, nil
 }
 
-func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName, tableName, node string) (uint64, error) {
+func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName, tableName, nodeName string) (uint64, error) {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
 		return 0, errors.Wrap(err, "clusters manager AllocTableID")
@@ -147,7 +147,7 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 	table, exists, err := cluster.GetTable(ctx, schemaName, tableName)
 	if err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, node:%s", clusterName, schemaName, tableName, node)
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 	if exists {
 		return table.GetID(), nil
@@ -156,31 +156,31 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 	tableID, err := m.allocTableID(clusterName)
 	if err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, node:%s", clusterName, schemaName, tableName, node)
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
-	shardID, err := m.allocShardID(clusterName, node)
+	shardID, err := m.allocShardID(clusterName, nodeName)
 	if err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, node:%s", clusterName, schemaName, tableName, node)
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 
 	if _, err := cluster.CreateTable(ctx, schemaName, shardID, tableName, tableID); err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, node:%s", clusterName, schemaName, tableName, node)
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 	return tableID, nil
 }
 
-func (m *managerImpl) GetTables(ctx context.Context, clusterName, node string, shardIDs []uint32) (map[uint32]*ShardTables, error) {
+func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error) {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
 		return nil, errors.Wrap(err, "clusters manager GetTables")
 	}
 
-	shardTablesWithRole, err := cluster.GetTables(ctx, shardIDs, node)
+	shardTablesWithRole, err := cluster.GetTables(ctx, shardIDs, nodeName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "clusters manager GetTables, "+
-			"clusterName:%s, node:%s, shardIDs:%v", clusterName, node, shardIDs)
+			"clusterName:%s, nodeName:%s, shardIDs:%v", clusterName, nodeName, shardIDs)
 	}
 
 	ret := make(map[uint32]*ShardTables, len(shardIDs))
@@ -212,12 +212,12 @@ func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 	return nil
 }
 
-func (m *managerImpl) RegisterNode(ctx context.Context, clusterName, node string, lease uint32) error {
+func (m *managerImpl) RegisterNode(ctx context.Context, clusterName, nodeName string, lease uint32) error {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
 		return errors.Wrap(err, "clusters manager RegisterNode")
 	}
-	err = cluster.RegisterNode(ctx, node, lease)
+	err = cluster.RegisterNode(ctx, nodeName, lease)
 	if err != nil {
 		return errors.Wrap(err, "clusters manager RegisterNode")
 	}
@@ -229,13 +229,13 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName, node string
 	return nil
 }
 
-func (m *managerImpl) GetShards(ctx context.Context, clusterName, node string) ([]uint32, error) {
+func (m *managerImpl) GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error) {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
 		return nil, errors.Wrap(err, "clusters manager GetShards")
 	}
 
-	shardIDs, err := cluster.GetShardIDs(node)
+	shardIDs, err := cluster.GetShardIDs(nodeName)
 	if err != nil {
 		return nil, errors.Wrap(err, "clusters manager GetShards")
 	}
@@ -264,6 +264,6 @@ func (m *managerImpl) allocTableID(clusterName string) (uint64, error) {
 	return 0, nil
 }
 
-func (m *managerImpl) allocShardID(clusterName, node string) (uint32, error) {
+func (m *managerImpl) allocShardID(clusterName, nodeName string) (uint32, error) {
 	return 0, nil
 }
