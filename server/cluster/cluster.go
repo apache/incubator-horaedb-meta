@@ -64,17 +64,18 @@ func (c *Cluster) Load(ctx context.Context) error {
 		return errors.Wrap(err, "clusters Load")
 	}
 
-	if err := c.updateCacheLocked(ctx, shards, shardTopologies, schemas, tables); err != nil {
+	if err := c.updateCacheLocked(shards, shardTopologies, schemas, tables); err != nil {
 		return errors.Wrap(err, "clusters Load")
 	}
 	return nil
 }
 
-func (c *Cluster) updateCacheLocked(ctx context.Context,
+func (c *Cluster) updateCacheLocked(
 	shards map[uint32][]*clusterpb.Shard,
 	shardTopologies map[uint32]*clusterpb.ShardTopology,
 	schemasLoaded map[string]*clusterpb.Schema,
-	tablesLoaded map[string]map[uint64]*clusterpb.Table) error {
+	tablesLoaded map[string]map[uint64]*clusterpb.Table,
+) error {
 	for schemaName, tables := range tablesLoaded {
 		for _, table := range tables {
 			_, ok := c.schemasCache[schemaName]

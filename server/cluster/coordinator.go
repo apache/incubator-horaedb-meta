@@ -62,7 +62,8 @@ func (c *coordinator) scatterShard(ctx context.Context) error {
 		}
 	}
 	c.cluster.metaData.clusterTopology.ShardView = shards
-	if err := c.cluster.storage.PutClusterTopology(ctx, c.cluster.clusterID, c.cluster.metaData.clusterTopology); err != nil {
+	// TODO: refactor PutClusterTopology latestVersion to uint64
+	if err := c.cluster.storage.PutClusterTopology(ctx, c.cluster.clusterID, uint32(c.cluster.metaData.clusterTopology.DataVersion), c.cluster.metaData.clusterTopology); err != nil {
 		return errors.Wrap(err, "coordinator scatterShard")
 	}
 	if err := c.cluster.Load(ctx); err != nil {
