@@ -123,8 +123,8 @@ func testGetTables(ctx context.Context, re *require.Assertions, manager Manager,
 
 	tableNum := 0
 	for _, tables := range shardTables {
-		re.Equal(clusterpb.ShardRole_LEADER, tables.shardRole)
-		tableNum += len(tables.tables)
+		re.Equal(clusterpb.ShardRole_LEADER, tables.ShardRole)
+		tableNum += len(tables.Tables)
 	}
 	re.Equal(2, tableNum)
 }

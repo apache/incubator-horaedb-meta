@@ -189,7 +189,7 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, nodeName str
 func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, tableID uint64) error {
 	schema, exists := c.GetSchema(schemaName)
 	if exists {
-		return ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
+		return ErrSchemaNotFound.WithCausef("SchemaName:%s", schemaName)
 	}
 	if err := c.storage.DeleteTables(ctx, c.clusterID, schema.GetID(), []uint64{tableID}); err != nil {
 		return errors.Wrapf(err, "clusters DropTable, clusterID:%d, schema:%v, tableID:%d",
@@ -237,7 +237,7 @@ func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID ui
 	// Check provided schema if exists.
 	schema, exists := c.GetSchema(schemaName)
 	if !exists {
-		return nil, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
+		return nil, ErrSchemaNotFound.WithCausef("SchemaName", schemaName)
 	}
 
 	// Save table in storage.
@@ -330,7 +330,7 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	c.lock.RLock()
 	schema, ok := c.schemasCache[schemaName]
 	if !ok {
-		return nil, false, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
+		return nil, false, ErrSchemaNotFound.WithCausef("SchemaName", schemaName)
 	}
 
 	table, exists := schema.getTable(tableName)

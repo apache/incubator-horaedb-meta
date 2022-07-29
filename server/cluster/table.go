@@ -12,3 +12,15 @@ type Table struct {
 func (t *Table) GetID() uint64 {
 	return t.meta.GetId()
 }
+
+func (t *Table) GetName() string {
+	return t.meta.GetName()
+}
+
+func (t *Table) GetSchemaName() string {
+	return t.schema.GetName()
+}
+
+func (t *Table) GetSchemaID() uint32 {
+	return t.schema.GetId()
+}

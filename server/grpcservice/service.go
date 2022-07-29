@@ -7,16 +7,18 @@ import (
 	"io"
 	"time"
 
+	"github.com/CeresDB/ceresdbproto/pkg/commonpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/cluster"
 	"go.uber.org/zap"
 )
 
 type Service struct {
 	metaservicepb.UnimplementedCeresmetaRpcServiceServer
-
 	opTimeout time.Duration
 	h         Handler
+	manager   cluster.Manager
 }
 
 func NewService(opTimeout time.Duration, h Handler) *Service {
@@ -79,6 +81,15 @@ func (b *streamBinder) unbind(ctx context.Context) error {
 	return nil
 }
 
+func (s *Service) okHeader() *commonpb.ResponseHeader {
+	return s.header(nil, "")
+}
+
+func (s *Service) header(err error, errMsg string) *commonpb.ResponseHeader {
+	return &commonpb.ResponseHeader{Code: uint32(ConvertRPCErrorToAPICode(err, errMsg))}
+}
+
+// NodeHeartbeat implements gRPC CeresmetaServer.
 func (s *Service) NodeHeartbeat(heartbeatSrv metaservicepb.CeresmetaRpcService_NodeHeartbeatServer) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -120,4 +131,84 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metaservicepb.CeresmetaRpcService_N
 			}
 		}()
 	}
+}
+
+// AllocSchemaId implements gRPC CeresmetaServer.
+func (s *Service) AllocSchemaId(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
+	schemaID, err := s.manager.AllocSchemaID(ctx, req.GetHeader().GetClusterName(), req.GetName())
+	if err != nil {
+		return &metaservicepb.AllocSchemaIdResponse{Header: s.header(err, "grpc alloc schema id")}, nil
+	}
+
+	return &metaservicepb.AllocSchemaIdResponse{
+		Header: s.okHeader(),
+		Name:   req.GetName(),
+		Id:     schemaID,
+	}, nil
+}
+
+// AllocTableId implements gRPC CeresmetaServer.
+func (s *Service) AllocTableId(ctx context.Context, req *metaservicepb.AllocTableIdRequest) (*metaservicepb.AllocTableIdResponse, error) {
+	table, shardID, err := s.manager.AllocTableID(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetHeader().GetNode())
+	if err != nil {
+		return &metaservicepb.AllocTableIdResponse{Header: s.header(err, "grpc alloc table id")}, nil
+	}
+
+	return &metaservicepb.AllocTableIdResponse{
+		Header:     s.okHeader(),
+		ShardId:    shardID,
+		SchemaName: table.GetSchemaName(),
+		SchemaId:   table.GetSchemaID(),
+		Name:       table.GetName(),
+		Id:         table.GetID(),
+	}, nil
+}
+
+// GetTables implements gRPC CeresmetaServer.
+func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesRequest) (*metaservicepb.GetTablesResponse, error) {
+	tables, err := s.manager.GetTables(ctx, req.GetHeader().GetClusterName(), req.GetHeader().GetNode(), req.GetShardId())
+	if err != nil {
+		return &metaservicepb.GetTablesResponse{Header: s.header(err, "grpc get tables")}, nil
+	}
+
+	tableMap := make(map[uint32]*metaservicepb.ShardTables, len(tables))
+	for shardID, shardTables := range tables {
+		for _, table := range shardTables.Tables {
+			shardTablesPb, ok := tableMap[shardID]
+			if ok {
+				shardTablesPb.Tables = append(shardTablesPb.Tables, &metaservicepb.TableInfo{
+					Id:         table.Id,
+					Name:       table.Name,
+					SchemaId:   table.SchemaID,
+					SchemaName: table.SchemaName,
+				})
+			} else {
+				tableMap[shardID] = &metaservicepb.ShardTables{
+					Tables: []*metaservicepb.TableInfo{
+						{
+							Id:         table.Id,
+							Name:       table.Name,
+							SchemaId:   table.SchemaID,
+							SchemaName: table.SchemaName,
+						},
+					},
+				}
+			}
+		}
+	}
+	return &metaservicepb.GetTablesResponse{
+		Header:    s.okHeader(),
+		TablesMap: tableMap,
+	}, nil
+}
+
+// DropTable implements gRPC CeresmetaServer.
+func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
+	err := s.manager.DropTable(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetId())
+	if err != nil {
+		return &metaservicepb.DropTableResponse{Header: s.header(err, "grpc drop table")}, nil
+	}
+	return &metaservicepb.DropTableResponse{
+		Header: s.okHeader(),
+	}, nil
 }
