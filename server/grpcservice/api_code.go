@@ -1,3 +1,5 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package grpcservice
 
 import (
@@ -10,12 +12,10 @@ const (
 	APICodeSchemaNotFound  = iota + 4000
 )
 
-var (
-	logicalKeyWordsMapping = map[string]int{
-		"cluster not found": APICodeClusterNotFound,
-		"schema not found":  APICodeSchemaNotFound,
-	}
-)
+var logicalKeyWordsMapping = map[string]int{
+	"cluster not found": APICodeClusterNotFound,
+	"schema not found":  APICodeSchemaNotFound,
+}
 
 // ConvertRPCErrorToAPICode converts rpc error and its message to api code(APICode* or http codes).
 func ConvertRPCErrorToAPICode(err error, errMsg string) int {

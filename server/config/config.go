@@ -48,6 +48,7 @@ type Config struct {
 	NodeName            string `toml:"node-name" json:"node-name"`
 	DataDir             string `toml:"data-dir" json:"data-dir"`
 	WalDir              string `toml:"wal-dir" json:"wal-dir"`
+	StorageRootPath     string `toml:"storage-root-path" json:"storage-root-path"`
 	InitialCluster      string `toml:"initial-cluster" json:"initial-cluster"`
 	InitialClusterState string `toml:"initial-cluster-state" json:"initial-cluster-state"`
 	InitialClusterToken string `toml:"initial-cluster-token" json:"initial-cluster-token"`

@@ -12,7 +12,7 @@ import (
 )
 
 type TableInfo struct {
-	Id         uint64
+	ID         uint64
 	Name       string
 	SchemaID   uint32
 	SchemaName string
@@ -129,11 +129,11 @@ func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 	schemaID, err := m.allocSchemaID(clusterName)
 	if err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocSchemaID, "+
-			"clusterName:%s, SchemaName:%s", clusterName, schemaName)
+			"clusterName:%s, schemaName:%s", clusterName, schemaName)
 	}
 	if _, err1 := cluster.CreateSchema(ctx, schemaName, schemaID); err1 != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocSchemaID, "+
-			"clusterName:%s, SchemaName:%s", clusterName, schemaName)
+			"clusterName:%s, schemaName:%s", clusterName, schemaName)
 	}
 	return schemaID, nil
 }
@@ -147,7 +147,7 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 	table, exists, err := cluster.GetTable(ctx, schemaName, tableName)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, SchemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 	if exists {
 		return table, 0, nil
@@ -156,18 +156,18 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 	tableID, err := m.allocTableID(clusterName)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, SchemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 	shardID, err := m.allocShardID(clusterName, nodeName)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, SchemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 
 	table, err = cluster.CreateTable(ctx, schemaName, shardID, tableName, tableID)
 	if err != nil {
 		return nil, 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, SchemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 	return table, shardID, nil
 }
@@ -190,7 +190,7 @@ func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName strin
 
 		for _, t := range shardTables.tables {
 			tableInfos = append(tableInfos, &TableInfo{
-				Id: t.meta.GetId(), Name: t.meta.GetName(),
+				ID: t.meta.GetId(), Name: t.meta.GetName(),
 				SchemaID: t.schema.GetId(), SchemaName: t.schema.GetName(),
 			})
 		}
@@ -206,7 +206,7 @@ func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 	}
 
 	if err := cluster.DropTable(ctx, schemaName, tableName, tableID); err != nil {
-		return errors.Wrapf(err, "clusters manager DropTable, clusterName:%s, SchemaName:%s, tableName:%s, tableID:%d",
+		return errors.Wrapf(err, "clusters manager DropTable, clusterName:%s, schemaName:%s, tableName:%s, tableID:%d",
 			clusterName, schemaName, tableName, tableID)
 	}
 
