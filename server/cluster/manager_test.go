@@ -6,6 +6,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/CeresDB/ceresmeta/server/schedule"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
@@ -61,7 +63,7 @@ func newClusterManager(t *testing.T) Manager {
 	storage := storage.NewStorageWithEtcdBackend(client, "/", storage.Options{
 		MaxScanLimit: 100, MinScanLimit: 10,
 	})
-	return NewManagerImpl(storage)
+	return NewManagerImpl(storage, schedule.NewHeartbeatStreams(context.Background()))
 }
 
 func TestManager(t *testing.T) {
