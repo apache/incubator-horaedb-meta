@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/pkg/commonpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -87,14 +86,6 @@ func (b *streamBinder) unbind(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (s *Service) okResponseHeader() *commonpb.ResponseHeader {
-	return s.responseHeader(nil, "")
-}
-
-func (s *Service) responseHeader(err error, errMsg string) *commonpb.ResponseHeader {
-	return &commonpb.ResponseHeader{Code: uint32(ConvertRPCErrorToAPICode(err, errMsg))}
 }
 
 // NodeHeartbeat implements gRPC CeresmetaServer.
@@ -205,7 +196,7 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metaservicepb.CeresmetaRpcService_N
 func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
-		return &metaservicepb.AllocSchemaIdResponse{Header: s.responseHeader(err, "grpc alloc schema id")}, nil
+		return &metaservicepb.AllocSchemaIdResponse{Header: ResponseHeader(err, "grpc alloc schema id")}, nil
 	}
 
 	// Forward request to the leader.
@@ -215,11 +206,11 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 
 	schemaID, err := s.manager.AllocSchemaID(ctx, req.GetHeader().GetClusterName(), req.GetName())
 	if err != nil {
-		return &metaservicepb.AllocSchemaIdResponse{Header: s.responseHeader(err, "grpc alloc schema id")}, nil
+		return &metaservicepb.AllocSchemaIdResponse{Header: ResponseHeader(err, "grpc alloc schema id")}, nil
 	}
 
 	return &metaservicepb.AllocSchemaIdResponse{
-		Header: s.okResponseHeader(),
+		Header: OkResponseHeader(),
 		Name:   req.GetName(),
 		Id:     schemaID,
 	}, nil
@@ -229,7 +220,7 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 func (s *Service) AllocTableID(ctx context.Context, req *metaservicepb.AllocTableIdRequest) (*metaservicepb.AllocTableIdResponse, error) {
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
-		return &metaservicepb.AllocTableIdResponse{Header: s.responseHeader(err, "grpc alloc table id")}, nil
+		return &metaservicepb.AllocTableIdResponse{Header: ResponseHeader(err, "grpc alloc table id")}, nil
 	}
 
 	// Forward request to the leader.
@@ -239,11 +230,11 @@ func (s *Service) AllocTableID(ctx context.Context, req *metaservicepb.AllocTabl
 
 	table, shardID, err := s.manager.AllocTableID(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetHeader().GetNode())
 	if err != nil {
-		return &metaservicepb.AllocTableIdResponse{Header: s.responseHeader(err, "grpc alloc table id")}, nil
+		return &metaservicepb.AllocTableIdResponse{Header: ResponseHeader(err, "grpc alloc table id")}, nil
 	}
 
 	return &metaservicepb.AllocTableIdResponse{
-		Header:     s.okResponseHeader(),
+		Header:     OkResponseHeader(),
 		ShardId:    shardID,
 		SchemaName: table.GetSchemaName(),
 		SchemaId:   table.GetSchemaID(),
@@ -256,7 +247,7 @@ func (s *Service) AllocTableID(ctx context.Context, req *metaservicepb.AllocTabl
 func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesRequest) (*metaservicepb.GetTablesResponse, error) {
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
-		return &metaservicepb.GetTablesResponse{Header: s.responseHeader(err, "grpc get tables")}, nil
+		return &metaservicepb.GetTablesResponse{Header: ResponseHeader(err, "grpc get tables")}, nil
 	}
 
 	// Forward request to the leader.
@@ -266,7 +257,7 @@ func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesReq
 
 	tables, err := s.manager.GetTables(ctx, req.GetHeader().GetClusterName(), req.GetHeader().GetNode(), req.GetShardId())
 	if err != nil {
-		return &metaservicepb.GetTablesResponse{Header: s.responseHeader(err, "grpc get tables")}, nil
+		return &metaservicepb.GetTablesResponse{Header: ResponseHeader(err, "grpc get tables")}, nil
 	}
 
 	tableMap := make(map[uint32]*metaservicepb.ShardTables, len(tables))
@@ -296,7 +287,7 @@ func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesReq
 	}
 
 	return &metaservicepb.GetTablesResponse{
-		Header:    s.okResponseHeader(),
+		Header:    OkResponseHeader(),
 		TablesMap: tableMap,
 	}, nil
 }
@@ -305,7 +296,7 @@ func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesReq
 func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
-		return &metaservicepb.DropTableResponse{Header: s.responseHeader(err, "grpc drop table")}, nil
+		return &metaservicepb.DropTableResponse{Header: ResponseHeader(err, "grpc drop table")}, nil
 	}
 
 	// Forward request to the leader.
@@ -315,10 +306,10 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 
 	err = s.manager.DropTable(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetId())
 	if err != nil {
-		return &metaservicepb.DropTableResponse{Header: s.responseHeader(err, "grpc drop table")}, nil
+		return &metaservicepb.DropTableResponse{Header: ResponseHeader(err, "grpc drop table")}, nil
 	}
 
 	return &metaservicepb.DropTableResponse{
-		Header: s.okResponseHeader(),
+		Header: OkResponseHeader(),
 	}, nil
 }

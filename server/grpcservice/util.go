@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"net/url"
 
+	"github.com/CeresDB/ceresdbproto/pkg/commonpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -33,4 +34,12 @@ func GetClientConn(ctx context.Context, addr string, tlsCfg *tls.Config, do ...g
 		return nil, ErrGRPCDial.WithCause(err)
 	}
 	return cc, nil
+}
+
+func OkResponseHeader() *commonpb.ResponseHeader {
+	return ResponseHeader(nil, "")
+}
+
+func ResponseHeader(err error, errMsg string) *commonpb.ResponseHeader {
+	return &commonpb.ResponseHeader{Code: uint32(ConvertRPCErrorToAPICode(err, errMsg))}
 }
