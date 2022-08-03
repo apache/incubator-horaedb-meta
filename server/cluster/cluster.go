@@ -4,6 +4,7 @@ package cluster
 
 import (
 	"context"
+	"github.com/CeresDB/ceresmeta/server/id"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
@@ -23,12 +24,15 @@ type Cluster struct {
 
 	storage     storage.Storage
 	coordinator *coordinator
+	alloc       id.Allocator
 }
 
 func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage) *Cluster {
+	alloc := id.NewAllocatorImpl(storage, "/", "alloc-id")
 	return &Cluster{
 		clusterID:    cluster.GetId(),
 		storage:      storage,
+		alloc:        alloc,
 		metaData:     &metaData{cluster: cluster},
 		shardsCache:  make(map[uint32]*Shard),
 		schemasCache: make(map[string]*Schema),
@@ -43,6 +47,8 @@ func (c *Cluster) Name() string {
 func (c *Cluster) Load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	c.coordinator = NewCoordinator(c)
 
 	shards, shardIDs, err := c.loadClusterTopologyLocked(ctx)
 	if err != nil {
@@ -115,7 +121,9 @@ func (c *Cluster) updateCacheLocked(
 		shardMetaList := shards[shardID]
 		var nodes []*clusterpb.Node
 		for _, shardMeta := range shardMetaList {
-			nodes = append(nodes, c.nodesCache[shardMeta.Node].meta)
+			if node := c.nodesCache[shardMeta.Node]; node != nil {
+				nodes = append(nodes, node.meta)
+			}
 		}
 		c.shardsCache[shardID] = &Shard{
 			meta:    shards[shardID],
@@ -127,11 +135,14 @@ func (c *Cluster) updateCacheLocked(
 
 	for shardID, shardPbs := range shards {
 		for _, shard := range shardPbs {
-			if _, ok := c.nodesCache[shard.GetNode()]; ok {
-				c.nodesCache[shard.GetNode()].shardIDs = append(c.nodesCache[shard.GetNode()].shardIDs, shardID)
-			} else {
-				c.nodesCache[shard.GetNode()].shardIDs = []uint32{shardID}
+			if node := c.nodesCache[shard.GetNode()]; node != nil {
+				if _, ok := c.nodesCache[shard.GetNode()]; ok {
+					node.shardIDs = append(node.shardIDs, shardID)
+				} else {
+					node.shardIDs = []uint32{shardID}
+				}
 			}
+
 		}
 	}
 
@@ -139,7 +150,7 @@ func (c *Cluster) updateCacheLocked(
 }
 
 func (c *Cluster) updateSchemaCacheLocked(schemaPb *clusterpb.Schema) *Schema {
-	schema := &Schema{meta: schemaPb}
+	schema := &Schema{meta: schemaPb, tableMap: make(map[string]*Table, 0)}
 	c.schemasCache[schemaPb.GetName()] = schema
 	return schema
 }
@@ -176,7 +187,7 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, nodeName str
 			return nil, ErrNodeNotFound.WithCausef("nodeName not found in current shard, shardID:%d, nodeName:%s", shardID, nodeName)
 		}
 
-		tables := make([]*Table, len(shard.tables))
+		tables := make([]*Table, 0, len(shard.tables))
 		for _, table := range shard.tables {
 			tables = append(tables, table)
 		}
@@ -187,13 +198,14 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, nodeName str
 }
 
 func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, tableID uint64) error {
-	schema, exists := c.GetSchema(schemaName)
+	schema, exists := c.getSchemaLocked(schemaName)
 	if exists {
 		return ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 	}
-	if err := c.storage.DeleteTables(ctx, c.clusterID, schema.GetID(), []uint64{tableID}); err != nil {
-		return errors.Wrapf(err, "clusters DropTable, clusterID:%d, schema:%v, tableID:%d",
-			c.clusterID, schema, tableID)
+
+	if err := c.storage.DeleteTable(ctx, c.clusterID, schema.GetID(), tableName); err != nil {
+		return errors.Wrapf(err, "clusters DropTable, clusterID:%d, schema:%v, tableName:%s",
+			c.clusterID, schema, tableName)
 	}
 
 	c.lock.Lock()
@@ -206,50 +218,62 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, t
 	return nil
 }
 
-func (c *Cluster) CreateSchema(ctx context.Context, schemaName string, schemaID uint32) (*Schema, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
+func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (uint32, error) {
 	// check if exists
-	schema, exists := c.GetSchema(schemaName)
+	schema, exists := c.getSchemaLocked(schemaName)
 	if exists {
-		return schema, nil
+		return schema.GetID(), nil
+	}
+
+	// alloc schema id
+	schemaID, err := c.allocSchemaID(ctx)
+	if err != nil {
+		return 0, errors.Wrapf(err, "cluster AllocSchemaID, "+
+			"schemaName:%s", schemaName)
 	}
 
 	// persist
 	schemaPb := &clusterpb.Schema{Id: schemaID, Name: schemaName, ClusterId: c.clusterID}
-	err := c.storage.CreateSchema(ctx, c.clusterID, schemaPb)
+	schemaPb, err = c.storage.CreateSchema(ctx, c.clusterID, schemaPb)
 	if err != nil {
-		return nil, errors.Wrap(err, "clusters CreateSchema")
+		return 0, errors.Wrap(err, "clusters CreateSchema")
 	}
 
 	// cache
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	schema = c.updateSchemaCacheLocked(schemaPb)
-	return schema, nil
+	return schemaID, nil
 }
 
 func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32,
-	tableName string, tableID uint64,
-) (*Table, error) {
+	tableName string) (uint64, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	// Check provided schema if exists.
-	schema, exists := c.GetSchema(schemaName)
+	schema, exists := c.getSchemaLocked(schemaName)
 	if !exists {
-		return nil, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
+		return 0, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
+	}
+
+	// alloc table id
+	tableID, err := c.allocTableID(ctx)
+	if err != nil {
+		return 0, errors.Wrapf(err, "cluster AllocTableID, "+
+			"schemaName:%s, tableName:%s", schemaName, tableName)
 	}
 
 	// Save table in storage.
 	tablePb := &clusterpb.Table{Id: tableID, Name: tableName, SchemaId: schema.GetID(), ShardId: shardID}
-	err := c.storage.CreateTable(ctx, c.clusterID, schema.GetID(), tablePb)
+	tablePb, err = c.storage.CreateTable(ctx, c.clusterID, schema.GetID(), tablePb)
 	if err != nil {
-		return nil, errors.Wrap(err, "clusters CreateTable")
+		return 0, errors.Wrap(err, "clusters CreateTable")
 	}
 
 	// Update tableCache in memory.
-	table := c.updateTableCacheLocked(schema, tablePb)
-	return table, nil
+	_ = c.updateTableCacheLocked(schema, tablePb)
+	return tableID, nil
 }
 
 func (c *Cluster) loadClusterTopologyLocked(ctx context.Context) (map[uint32][]*clusterpb.Shard, []uint32, error) {
@@ -268,7 +292,7 @@ func (c *Cluster) loadClusterTopologyLocked(ctx context.Context) (map[uint32][]*
 		shardMap[shard.Id] = append(shardMap[shard.Id], shard)
 	}
 
-	shardIDs := make([]uint32, len(shardMap))
+	shardIDs := make([]uint32, 0, len(shardMap))
 	for id := range shardMap {
 		shardIDs = append(shardIDs, id)
 	}
@@ -318,10 +342,7 @@ func (c *Cluster) loadTableLocked(ctx context.Context, schemas map[string]*clust
 	return tables, nil
 }
 
-func (c *Cluster) GetSchema(schemaName string) (*Schema, bool) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
+func (c *Cluster) getSchemaLocked(schemaName string) (*Schema, bool) {
 	schema, ok := c.schemasCache[schemaName]
 	return schema, ok
 }
@@ -330,11 +351,13 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	c.lock.RLock()
 	schema, ok := c.schemasCache[schemaName]
 	if !ok {
+		c.lock.RUnlock()
 		return nil, false, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
 	}
 
 	table, exists := schema.getTable(tableName)
 	if exists {
+		c.lock.RUnlock()
 		return table, true, nil
 	}
 	c.lock.RUnlock()
@@ -347,7 +370,7 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	if exists {
 		c.lock.Lock()
 		defer c.lock.Unlock()
-		table := c.updateTableCacheLocked(schema, tablePb)
+		table = c.updateTableCacheLocked(schema, tablePb)
 		return table, true, nil
 	}
 
@@ -380,6 +403,22 @@ func (c *Cluster) RegisterNode(ctx context.Context, nodeName string, lease uint3
 		c.nodesCache[nodeName] = &Node{meta: nodePb1}
 	}
 	return nil
+}
+
+func (c *Cluster) allocSchemaID(ctx context.Context) (uint32, error) {
+	ID, err := c.alloc.Alloc(ctx)
+	if err != nil {
+		return 0, errors.Wrapf(err, "alloc schema id failed")
+	}
+	return uint32(ID), nil
+}
+
+func (c *Cluster) allocTableID(ctx context.Context) (uint64, error) {
+	ID, err := c.alloc.Alloc(ctx)
+	if err != nil {
+		return 0, errors.Wrapf(err, "alloc table id failed")
+	}
+	return ID, nil
 }
 
 type metaData struct {

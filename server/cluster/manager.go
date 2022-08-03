@@ -4,9 +4,12 @@ package cluster
 
 import (
 	"context"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
@@ -40,10 +43,12 @@ type managerImpl struct {
 	clusters map[string]*Cluster
 
 	storage storage.Storage
+	alloc   id.Allocator
 }
 
 func NewManagerImpl(storage storage.Storage) Manager {
-	return &managerImpl{storage: storage, clusters: make(map[string]*Cluster, 0)}
+	alloc := id.NewAllocatorImpl(storage, "/", "ClusterID")
+	return &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0)}
 }
 
 func (m *managerImpl) Load(ctx context.Context) error {
@@ -80,7 +85,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, ErrClusterAlreadyExists
 	}
 
-	clusterID, err := m.allocClusterID()
+	clusterID, err := m.allocClusterID(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterName:%s", clusterName)
 	}
@@ -97,9 +102,9 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	// TODO: add scheduler
 	clusterTopologyPb := &clusterpb.ClusterTopology{
 		ClusterId: clusterID, DataVersion: 0,
-		State: clusterpb.ClusterTopology_STABLE,
+		State: clusterpb.ClusterTopology_EMPTY,
 	}
-	if err := m.storage.CreateClusterTopology(ctx, clusterTopologyPb); err != nil {
+	if clusterTopologyPb, err := m.storage.CreateClusterTopology(ctx, clusterTopologyPb); err != nil {
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
 
@@ -121,17 +126,13 @@ func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 		return 0, errors.Wrap(err, "clusters manager AllocSchemaID")
 	}
 
-	schema, exists := cluster.GetSchema(schemaName)
+	schema, exists := cluster.getSchemaLocked(schemaName)
 	if exists {
 		return schema.GetID(), nil
 	}
 	// create new schema
-	schemaID, err := m.allocSchemaID(clusterName)
-	if err != nil {
-		return 0, errors.Wrapf(err, "clusters manager AllocSchemaID, "+
-			"clusterName:%s, schemaName:%s", clusterName, schemaName)
-	}
-	if _, err1 := cluster.CreateSchema(ctx, schemaName, schemaID); err1 != nil {
+	schemaID, err1 := cluster.CreateSchema(ctx, schemaName)
+	if err1 != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocSchemaID, "+
 			"clusterName:%s, schemaName:%s", clusterName, schemaName)
 	}
@@ -153,18 +154,14 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 		return table.GetID(), nil
 	}
 	// create new schemasCache
-	tableID, err := m.allocTableID(clusterName)
-	if err != nil {
-		return 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
-	}
-	shardID, err := m.allocShardID(clusterName, nodeName)
+	shardID, err := m.allocShardID(cluster)
 	if err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
 			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 
-	if _, err := cluster.CreateTable(ctx, schemaName, shardID, tableName, tableID); err != nil {
+	tableID, err := cluster.CreateTable(ctx, schemaName, shardID, tableName)
+	if err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
 			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
@@ -185,7 +182,7 @@ func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName strin
 
 	ret := make(map[uint32]*ShardTables, len(shardIDs))
 	for shardID, shardTables := range shardTablesWithRole {
-		tableInfos := make([]*TableInfo, len(shardTables.tables))
+		tableInfos := make([]*TableInfo, 0, len(shardTables.tables))
 
 		for _, t := range shardTables.tables {
 			tableInfos = append(tableInfos, &TableInfo{
@@ -252,18 +249,19 @@ func (m *managerImpl) getCluster(ctx context.Context, clusterName string) (*Clus
 	return cluster, nil
 }
 
-func (m *managerImpl) allocClusterID() (uint32, error) {
-	return 0, nil
+func (m *managerImpl) allocClusterID(ctx context.Context) (uint32, error) {
+	ID, err := m.alloc.Alloc(ctx)
+	if err != nil {
+		return 0, errors.Wrapf(err, "alloc cluster id failed")
+	}
+	return uint32(ID), nil
 }
 
-func (m *managerImpl) allocSchemaID(clusterName string) (uint32, error) {
-	return 0, nil
-}
-
-func (m *managerImpl) allocTableID(clusterName string) (uint64, error) {
-	return 0, nil
-}
-
-func (m *managerImpl) allocShardID(clusterName, nodeName string) (uint32, error) {
-	return 0, nil
+func (m *managerImpl) allocShardID(cluster *Cluster) (uint32, error) {
+	rand.Seed(time.Now().UnixNano())
+	if len(cluster.shardsCache) == 0 {
+		return 0, nil
+	}
+	ID := rand.Intn(len(cluster.shardsCache))
+	return uint32(ID), nil
 }

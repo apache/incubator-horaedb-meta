@@ -49,8 +49,9 @@ func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
 		}
 	}
 
+	ret := alloc.base
 	alloc.base++
-	return alloc.base, nil
+	return ret, nil
 }
 
 func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {

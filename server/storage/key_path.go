@@ -12,6 +12,7 @@ const (
 	schema        = "schema"
 	table         = "table"
 	shard         = "shard"
+	node          = "node"
 	topology      = "topo"
 	latestVersion = "latest_version"
 )
@@ -75,6 +76,15 @@ func makeClusterTopologyLatestVersionKey(clusterID uint32) string {
 //            v1/cluster/1/shard/3/latestVersion -> pb.ShardLatestVersion
 func makeShardLatestVersionKey(clusterID uint32, shardID uint32) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), shard, fmtID(uint64(shardID)), latestVersion)
+}
+
+// makeNodeKey returns the node meta info key path.
+// example:
+// cluster 1: v1/cluster/1/node/127.0.0.1:8081 -> pb.Node
+//            v1/cluster/1/node/127.0.0.2:8081 -> pb.Node
+//            v1/cluster/1/node/127.0.0.3:8081 -> pb.Node
+func makeNodeKey(clusterID uint32, nodeName string) string {
+	return path.Join(cluster, fmtID(uint64(clusterID)), nodeName)
 }
 
 func fmtID(id uint64) string {
