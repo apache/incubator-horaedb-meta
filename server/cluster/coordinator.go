@@ -34,7 +34,7 @@ func (c *coordinator) Run(ctx context.Context) error {
 
 // TODO: consider ReplicationFactor
 func (c *coordinator) scatterShard(ctx context.Context) error {
-	if !(int(c.cluster.metaData.cluster.MinNodeCount) >= len(c.cluster.nodesCache) &&
+	if !(int(c.cluster.metaData.cluster.MinNodeCount) <= len(c.cluster.nodesCache) &&
 		c.cluster.metaData.clusterTopology.State == clusterpb.ClusterTopology_EMPTY) {
 		return nil
 	}
@@ -52,28 +52,22 @@ func (c *coordinator) scatterShard(ctx context.Context) error {
 		nodeList = append(nodeList, v.meta)
 	}
 
-	nodeIndex := 0
 	for i := 0; i < minNodeCount; i++ {
 		for j := 0; j < perNodeShardCount; j++ {
 			if i*perNodeShardCount+j < shardTotal {
-				for ; nodeIndex < len(nodeList); nodeIndex++ {
-					// TODO: consider nodesCache state
-					shards = append(shards, &clusterpb.Shard{
-						Id:        uint32(i*perNodeShardCount + j),
-						ShardRole: clusterpb.ShardRole_LEADER,
-						Node:      nodeList[nodeIndex].GetName(),
-					})
-				}
+				// TODO: consider nodesCache state
+				shards = append(shards, &clusterpb.Shard{
+					Id:        uint32(i*perNodeShardCount + j),
+					ShardRole: clusterpb.ShardRole_LEADER,
+					Node:      nodeList[i].GetName(),
+				})
 			}
 		}
 	}
-	c.cluster.metaData.clusterTopology.ShardView = shards
-	// TODO: refactor PutClusterTopology latestVersion to uint64
-	if err := c.cluster.storage.PutClusterTopology(ctx, c.cluster.clusterID, c.cluster.metaData.clusterTopology.DataVersion, c.cluster.metaData.clusterTopology); err != nil {
+
+	if err := c.cluster.init(ctx, shards); err != nil {
 		return errors.Wrap(err, "coordinator scatterShard")
 	}
-
-	// c.cluster.init()
 	if err := c.cluster.Load(ctx); err != nil {
 		return errors.Wrap(err, "coordinator scatterShard")
 	}

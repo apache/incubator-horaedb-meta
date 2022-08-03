@@ -29,6 +29,7 @@ type MetaStorage interface {
 	PutTables(ctx context.Context, clusterID uint32, schemaID uint32, tables []*clusterpb.Table) error
 	DeleteTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) error
 
+	CreateShardTopologies(ctx context.Context, clusterID uint32, clusterTopology []*clusterpb.ShardTopology) ([]*clusterpb.ShardTopology, error)
 	ListShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32) ([]*clusterpb.ShardTopology, error)
 	PutShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32, latestVersion uint64, topologies []*clusterpb.ShardTopology) error
 

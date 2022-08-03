@@ -24,8 +24,9 @@ var (
 	ErrParsePutTables    = coderr.NewCodeError(coderr.Internal, "meta storage put tables")
 	ErrParseDeleteTables = coderr.NewCodeError(coderr.Internal, "meta storage delete tables")
 
-	ErrParseListShardTopology = coderr.NewCodeError(coderr.Internal, "meta storage list shard topology")
-	ErrParsePutShardTopology  = coderr.NewCodeError(coderr.Internal, "meta storage put shard topology")
+	ErrParseCreateShardTopology = coderr.NewCodeError(coderr.Internal, "meta storage create shard topology")
+	ErrParseListShardTopology   = coderr.NewCodeError(coderr.Internal, "meta storage list shard topology")
+	ErrParsePutShardTopology    = coderr.NewCodeError(coderr.Internal, "meta storage put shard topology")
 
 	ErrParseCreateOrUpdateNode = coderr.NewCodeError(coderr.Internal, "meta storage create or update nodes")
 )

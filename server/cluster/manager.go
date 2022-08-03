@@ -4,15 +4,15 @@ package cluster
 
 import (
 	"context"
-	"math/rand"
 	"sync"
-	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
+
+const clusterIDAllocPrefix = "ClusterID"
 
 type TableInfo struct {
 	id         uint64
@@ -46,9 +46,13 @@ type managerImpl struct {
 	alloc   id.Allocator
 }
 
-func NewManagerImpl(storage storage.Storage) Manager {
-	alloc := id.NewAllocatorImpl(storage, "/", "ClusterID")
-	return &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0)}
+func NewManagerImpl(ctx context.Context, storage storage.Storage) (Manager, error) {
+	alloc := id.NewAllocatorImpl(storage, "/", clusterIDAllocPrefix)
+	manager := &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0)}
+	if err := manager.Load(ctx); err != nil {
+		return nil, errors.Wrap(err, "new clusters manager")
+	}
+	return manager, nil
 }
 
 func (m *managerImpl) Load(ctx context.Context) error {
@@ -154,7 +158,7 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 		return table.GetID(), nil
 	}
 	// create new schemasCache
-	shardID, err := m.allocShardID(cluster)
+	shardID, err := cluster.assignShardID(nodeName)
 	if err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocTableID, "+
 			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
@@ -254,14 +258,5 @@ func (m *managerImpl) allocClusterID(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "alloc cluster id failed")
 	}
-	return uint32(ID), nil
-}
-
-func (m *managerImpl) allocShardID(cluster *Cluster) (uint32, error) {
-	rand.Seed(time.Now().UnixNano())
-	if len(cluster.shardsCache) == 0 {
-		return 0, nil
-	}
-	ID := rand.Intn(len(cluster.shardsCache))
 	return uint32(ID), nil
 }

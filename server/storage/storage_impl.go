@@ -76,7 +76,7 @@ func (s *metaStorageImpl) ListClusters(ctx context.Context) ([]*clusterpb.Cluste
 		for _, r := range res {
 			cluster := &clusterpb.Cluster{}
 			if err := proto.Unmarshal([]byte(r), cluster); err != nil {
-				return nil, ErrParseListClusters.WithCausef("proto parse failed, err:%s", err)
+				return nil, ErrParseListClusters.WithCausef("proto parse failed, err:%v", err)
 			}
 
 			clusters = append(clusters, cluster)
@@ -99,7 +99,7 @@ func (s *metaStorageImpl) CreateCluster(ctx context.Context, cluster *clusterpb.
 
 	value, err := proto.Marshal(cluster)
 	if err != nil {
-		return nil, ErrParseCreateCluster.WithCausef("proto parse failed, err:%s", err)
+		return nil, ErrParseCreateCluster.WithCausef("proto parse failed, err:%v", err)
 	}
 
 	key := path.Join(s.rootPath, makeClusterKey(cluster.Id))
@@ -115,7 +115,7 @@ func (s *metaStorageImpl) CreateCluster(ctx context.Context, cluster *clusterpb.
 		return nil, errors.Wrapf(err, "meta storage create cluster failed, clusterID:%d, key:%s", cluster.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateCluster.WithCausef("resp:%s", resp)
+		return nil, ErrParseCreateCluster.WithCausef("resp:%v", resp)
 	}
 	return cluster, nil
 }
@@ -129,7 +129,7 @@ func (s *metaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*cl
 
 	meta := &clusterpb.Cluster{}
 	if err = proto.Unmarshal([]byte(value), meta); err != nil {
-		return nil, ErrParseGetCluster.WithCausef("proto parse failed, clusterID:%d, err:%s", clusterID, err)
+		return nil, ErrParseGetCluster.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
 	return meta, nil
 }
@@ -137,7 +137,7 @@ func (s *metaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*cl
 func (s *metaStorageImpl) PutCluster(ctx context.Context, clusterID uint32, meta *clusterpb.Cluster) error {
 	value, err := proto.Marshal(meta)
 	if err != nil {
-		return ErrParsePutCluster.WithCausef("proto parse failed, clusterID:%d, err:%s", clusterID, err)
+		return ErrParsePutCluster.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
 
 	key := makeClusterKey(clusterID)
@@ -154,7 +154,7 @@ func (s *metaStorageImpl) CreateClusterTopology(ctx context.Context, clusterTopo
 
 	value, err := proto.Marshal(clusterTopology)
 	if err != nil {
-		return nil, ErrParseCreateClusterTopology.WithCausef("proto parse failed, err:%s", err)
+		return nil, ErrParseCreateClusterTopology.WithCausef("proto parse failed, err:%v", err)
 	}
 
 	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterTopology.ClusterId, fmtID(clusterTopology.DataVersion)))
@@ -173,7 +173,7 @@ func (s *metaStorageImpl) CreateClusterTopology(ctx context.Context, clusterTopo
 		return nil, errors.Wrapf(err, "meta storage create cluster topology failed, clusterID:%d, key:%s", clusterTopology.ClusterId, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateClusterTopology.WithCausef("resp:%s", resp)
+		return nil, ErrParseCreateClusterTopology.WithCausef("resp:%v", resp)
 	}
 	return clusterTopology, nil
 }
@@ -193,7 +193,7 @@ func (s *metaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint
 
 	clusterMetaData := &clusterpb.ClusterTopology{}
 	if err = proto.Unmarshal([]byte(value), clusterMetaData); err != nil {
-		return nil, ErrParseGetClusterTopology.WithCausef("proto parse failed, clusterID:%d, err:%s", clusterID, err)
+		return nil, ErrParseGetClusterTopology.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
 	return clusterMetaData, nil
 }
@@ -201,7 +201,7 @@ func (s *metaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint
 func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, latestVersion uint64, clusterMetaData *clusterpb.ClusterTopology) error {
 	value, err := proto.Marshal(clusterMetaData)
 	if err != nil {
-		return ErrParsePutClusterTopology.WithCausef("proto parse failed, clusterID:%d, err:%s", clusterID, err)
+		return ErrParsePutClusterTopology.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
 
 	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterID, fmtID(clusterMetaData.DataVersion)))
@@ -219,7 +219,7 @@ func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 		return errors.Wrapf(err, "meta storage put cluster topology failed, clusterID:%d, key:%s", clusterID, key)
 	}
 	if !resp.Succeeded {
-		return ErrParsePutClusterTopology.WithCausef("clusterID:%d, resp:%s", clusterID, resp)
+		return ErrParsePutClusterTopology.WithCausef("clusterID:%d, resp:%v", clusterID, resp)
 	}
 
 	return nil
@@ -250,7 +250,7 @@ func (s *metaStorageImpl) ListSchemas(ctx context.Context, clusterID uint32) ([]
 		for _, r := range res {
 			schema := &clusterpb.Schema{}
 			if err := proto.Unmarshal([]byte(r), schema); err != nil {
-				return nil, ErrParseListSchemas.WithCausef("proto parse failed, clusterID:%d, err:%s", clusterID, err)
+				return nil, ErrParseListSchemas.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 			}
 
 			schemas = append(schemas, schema)
@@ -273,7 +273,7 @@ func (s *metaStorageImpl) CreateSchema(ctx context.Context, clusterID uint32, sc
 
 	value, err := proto.Marshal(schema)
 	if err != nil {
-		return nil, ErrParseCreateSchema.WithCausef("proto parse failed, err:%s", err)
+		return nil, ErrParseCreateSchema.WithCausef("proto parse failed, err:%v", err)
 	}
 
 	key := path.Join(s.rootPath, makeSchemaKey(clusterID, schema.Id))
@@ -289,7 +289,7 @@ func (s *metaStorageImpl) CreateSchema(ctx context.Context, clusterID uint32, sc
 		return nil, errors.Wrapf(err, "meta storage create schema failed, clusterID:%d, schemaID:%d, key:%s", clusterID, schema.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParsePutCluster.WithCausef("resp:%s", resp)
+		return nil, ErrParsePutCluster.WithCausef("resp:%v", resp)
 	}
 	return schema, nil
 }
@@ -300,7 +300,7 @@ func (s *metaStorageImpl) PutSchemas(ctx context.Context, clusterID uint32, sche
 		key := makeSchemaKey(clusterID, schema.Id)
 		value, err := proto.Marshal(schema)
 		if err != nil {
-			return ErrParsePutSchemas.WithCausef("proto parse failed, clusterID:%d, schemaID:%d, err:%s", clusterID, schema.Id, err)
+			return ErrParsePutSchemas.WithCausef("proto parse failed, clusterID:%d, schemaID:%d, err:%v", clusterID, schema.Id, err)
 		}
 
 		if err = s.Put(ctx, key, string(value)); err != nil {
@@ -316,7 +316,7 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 
 	value, err := proto.Marshal(table)
 	if err != nil {
-		return nil, ErrParseCreateTable.WithCausef("proto parse failed, err:%s", err)
+		return nil, ErrParseCreateTable.WithCausef("proto parse failed, err:%v", err)
 	}
 
 	key := path.Join(s.rootPath, makeTableKey(clusterID, schemaID, table.Id))
@@ -335,7 +335,7 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 		return nil, errors.Wrapf(err, "meta storage create table failed, clusterID:%d, schemaID:%d, tableID:%d, key:%s", clusterID, schemaID, table.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateTable.WithCausef("resp:%s", resp)
+		return nil, ErrParseCreateTable.WithCausef("resp:%v", resp)
 	}
 	return table, nil
 }
@@ -361,7 +361,7 @@ func (s *metaStorageImpl) GetTable(ctx context.Context, clusterID uint32, schema
 
 	table := &clusterpb.Table{}
 	if err = proto.Unmarshal([]byte(value), table); err != nil {
-		return nil, false, ErrParseGetTable.WithCausef("proto parse failed, err:%s", err)
+		return nil, false, ErrParseGetTable.WithCausef("proto parse failed, err:%v", err)
 	}
 
 	return table, true, nil
@@ -392,7 +392,7 @@ func (s *metaStorageImpl) ListTables(ctx context.Context, clusterID uint32, sche
 		for _, r := range res {
 			table := &clusterpb.Table{}
 			if err := proto.Unmarshal([]byte(r), table); err != nil {
-				return nil, ErrParseListTables.WithCausef("proto parse failed, clusterID:%d, schemaID:%d, err:%s", clusterID, schemaID, err)
+				return nil, ErrParseListTables.WithCausef("proto parse failed, clusterID:%d, schemaID:%d, err:%v", clusterID, schemaID, err)
 			}
 
 			tables = append(tables, table)
@@ -415,7 +415,7 @@ func (s *metaStorageImpl) PutTables(ctx context.Context, clusterID uint32, schem
 		key := makeTableKey(clusterID, schemaID, item.Id)
 		value, err := proto.Marshal(item)
 		if err != nil {
-			return ErrParsePutTables.WithCausef("proto parse failed, clusterID:%d, schemaID:%d, tableID:%d, err:%s", clusterID, schemaID, item.Id, err)
+			return ErrParsePutTables.WithCausef("proto parse failed, clusterID:%d, schemaID:%d, tableID:%d, err:%v", clusterID, schemaID, item.Id, err)
 		}
 
 		if err = s.Put(ctx, key, string(value)); err != nil {
@@ -445,6 +445,39 @@ func (s *metaStorageImpl) DeleteTable(ctx context.Context, clusterID uint32, sch
 	return nil
 }
 
+func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID uint32, shardTopologies []*clusterpb.ShardTopology) ([]*clusterpb.ShardTopology, error) {
+	now := time.Now()
+	for _, shardTopology := range shardTopologies {
+		shardTopology.CreatedAt = uint64(now.Unix())
+
+		value, err := proto.Marshal(shardTopology)
+		if err != nil {
+			return nil, ErrParseCreateShardTopology.WithCausef("proto parse failed, err:%v", err)
+		}
+
+		key := path.Join(s.rootPath, makeShardTopologyKey(clusterID, shardTopology.GetShardId(), fmtID(shardTopology.Version)))
+		latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardTopology.GetShardId()))
+
+		cmplatestVersionKey := clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
+		cmpKey := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
+		opCreateClsuterTopology := clientv3.OpPut(key, string(value))
+		opCreateClsuterTopologyLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTopology.Version))
+
+		resp, err := s.Txn(ctx).
+			If(cmplatestVersionKey, cmpKey).
+			Then(opCreateClsuterTopology, opCreateClsuterTopologyLatestVersion).
+			Commit()
+		if err != nil {
+			return nil, errors.Wrapf(err, "meta storage create cluster topology failed, clusterID:%d, key:%s", clusterID, key)
+		}
+		if !resp.Succeeded {
+			return nil, ErrParseCreateClusterTopology.WithCausef("resp:%v", resp)
+		}
+
+	}
+	return shardTopologies, nil
+}
+
 // TODO: operator in a batch
 func (s *metaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32) ([]*clusterpb.ShardTopology, error) {
 	shardTableInfo := make([]*clusterpb.ShardTopology, 0)
@@ -456,7 +489,7 @@ func (s *metaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 			return nil, errors.Wrapf(err, "meta storage list shard topology latest version failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
 
-		key = makeShardKey(clusterID, shardID, version)
+		key = makeShardTopologyKey(clusterID, shardID, version)
 		value, err := s.Get(ctx, key)
 		if err != nil {
 			return nil, errors.Wrapf(err, "meta storage list shard topology failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
@@ -464,7 +497,7 @@ func (s *metaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 
 		shardTopology := &clusterpb.ShardTopology{}
 		if err = proto.Unmarshal([]byte(value), shardTopology); err != nil {
-			return nil, ErrParseListShardTopology.WithCausef("proto parse failed, clusterID:%d, shardID:%d, err:%s", clusterID, shardID, err)
+			return nil, ErrParseListShardTopology.WithCausef("proto parse failed, clusterID:%d, shardID:%d, err:%v", clusterID, shardID, err)
 		}
 		shardTableInfo = append(shardTableInfo, shardTopology)
 	}
@@ -476,10 +509,10 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 	for index, shardID := range shardIDs {
 		value, err := proto.Marshal(shardTableInfo[index])
 		if err != nil {
-			return ErrParsePutShardTopology.WithCausef("proto parse failed, clusterID:%d, shardID:%d, err:%s", clusterID, shardID, err)
+			return ErrParsePutShardTopology.WithCausef("proto parse failed, clusterID:%d, shardID:%d, err:%v", clusterID, shardID, err)
 		}
 
-		key := path.Join(s.rootPath, makeShardKey(clusterID, shardID, fmtID(shardTableInfo[index].Version)))
+		key := path.Join(s.rootPath, makeShardTopologyKey(clusterID, shardID, fmtID(shardTableInfo[index].Version)))
 		latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardID))
 
 		cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(uint64(latestVersion)))
@@ -494,7 +527,7 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 			return errors.Wrapf(err, "meta storage put shard failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
 		if !resp.Succeeded {
-			return ErrParsePutShardTopology.WithCausef("clusterID:%d, shardID:%d, resp:%s", clusterID, shardID, resp)
+			return ErrParsePutShardTopology.WithCausef("clusterID:%d, shardID:%d, resp:%v", clusterID, shardID, resp)
 		}
 	}
 	return nil
@@ -516,17 +549,17 @@ func (s *metaStorageImpl) CreateOrUpdateNode(ctx context.Context, clusterID uint
 	UpdateNode := node
 
 	key := path.Join(s.rootPath, makeNodeKey(clusterID, node.Name))
-	CreateNodevalue, err := proto.Marshal(CreateNode)
+	value, err := proto.Marshal(CreateNode)
 	if err != nil {
-		return nil, ErrParseCreateOrUpdateNode.WithCausef("proto parse failed, clusterID:%d, node name:%s, err:%s", clusterID, node.Name, err)
+		return nil, ErrParseCreateOrUpdateNode.WithCausef("proto parse failed, clusterID:%d, node name:%s, err:%v", clusterID, node.Name, err)
 	}
 	UpdateNodevalue, err := proto.Marshal(UpdateNode)
 	if err != nil {
-		return nil, ErrParseCreateOrUpdateNode.WithCausef("proto parse failed, clusterID:%d, node name:%s, err:%s", clusterID, node.Name, err)
+		return nil, ErrParseCreateOrUpdateNode.WithCausef("proto parse failed, clusterID:%d, node name:%s, err:%v", clusterID, node.Name, err)
 	}
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
-	opCreateNode := clientv3.OpPut(key, string(CreateNodevalue))
+	opCreateNode := clientv3.OpPut(key, string(value))
 	opUpdateNode := clientv3.OpPut(key, string(UpdateNodevalue))
 
 	_, err = s.Txn(ctx).
