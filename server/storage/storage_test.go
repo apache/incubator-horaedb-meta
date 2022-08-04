@@ -177,35 +177,30 @@ func TestTables(t *testing.T) {
 
 }
 
-// func TestShardTopologies(t *testing.T) {
-// 	re := require.New(t)
-// 	s := NewStorage(t)
-// 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
-// 	defer cancel()
+func TestShardTopologies(t *testing.T) {
+	re := require.New(t)
+	s := NewStorage(t)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
+	defer cancel()
 
-// 	for i := 0; i < 10; i++ {
-// 		latestVersionKey := makeShardLatestVersionKey(0, uint32(i))
-// 		err := s.Put(ctx, latestVersionKey, fmtID(uint64(0)))
-// 		re.NoError(err)
-// 	}
+	shardTableInfo := make([]*clusterpb.ShardTopology, 0)
+	shardID := make([]uint32, 0)
+	for i := 0; i < 10; i++ {
+		shardTableData := &clusterpb.ShardTopology{ShardId: uint32(i), Version: 0}
+		shardTableData, err := s.CreateShardTopology(ctx, 1, shardTableData)
+		re.NoError(err)
+		shardTableInfo = append(shardTableInfo, shardTableData)
+		shardID = append(shardID, uint32(i))
+	}
 
-// 	shardTableInfo := make([]*clusterpb.ShardTopology, 0)
-// 	shardID := make([]uint32, 0)
-// 	for i := 0; i < 10; i++ {
-// 		shardTableData := &clusterpb.ShardTopology{Version: 1}
-// 		shardTableInfo = append(shardTableInfo, shardTableData)
-// 		shardID = append(shardID, uint32(i))
-// 	}
-
-// 	err := s.PutShardTopologies(ctx, 0, shardID, 0, shardTableInfo)
-// 	re.NoError(err)
-
-// 	value, err := s.ListShardTopologies(ctx, 0, shardID)
-// 	re.NoError(err)
-// 	for i := 0; i < 10; i++ {
-// 		re.Equal(shardTableInfo[i].Version, value[i].Version)
-// 	}
-// }
+	value, err := s.ListShardTopologies(ctx, 1, shardID)
+	re.NoError(err)
+	for i := 0; i < 10; i++ {
+		re.Equal(shardTableInfo[i].ShardId, value[i].ShardId)
+		re.Equal(shardTableInfo[i].Version, value[i].Version)
+		re.Equal(shardTableInfo[i].CreatedAt, value[i].CreatedAt)
+	}
+}
 
 func TestNodes(t *testing.T) {
 	re := require.New(t)

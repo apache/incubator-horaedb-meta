@@ -445,6 +445,36 @@ func (s *metaStorageImpl) DeleteTable(ctx context.Context, clusterID uint32, sch
 	return nil
 }
 
+func (s *metaStorageImpl) CreateShardTopology(ctx context.Context, clusterID uint32, shardTopology *clusterpb.ShardTopology) (*clusterpb.ShardTopology, error) {
+	now := time.Now()
+	shardTopology.CreatedAt = uint64(now.Unix())
+
+	value, err := proto.Marshal(shardTopology)
+	if err != nil {
+		return nil, ErrParseCreateShardTopology.WithCausef("proto parse failed, err:%s", err)
+	}
+
+	key := path.Join(s.rootPath, makeShardKey(clusterID, shardTopology.ShardId, fmtID(shardTopology.Version)))
+	latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardTopology.ShardId))
+
+	cmplatestVersionKey := clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
+	cmpKey := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
+	opCreateShardTopology := clientv3.OpPut(key, string(value))
+	opCreateShardTopologyLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTopology.Version))
+
+	resp, err := s.Txn(ctx).
+		If(cmplatestVersionKey, cmpKey).
+		Then(opCreateShardTopology, opCreateShardTopologyLatestVersion).
+		Commit()
+	if err != nil {
+		return nil, errors.Wrapf(err, "meta storage create shard topology failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardTopology.ShardId, key)
+	}
+	if !resp.Succeeded {
+		return nil, ErrParseCreateShardTopology.WithCausef("resp:%s", resp)
+	}
+	return shardTopology, nil
+}
+
 // TODO: operator in a batch
 func (s *metaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32) ([]*clusterpb.ShardTopology, error) {
 	shardTableInfo := make([]*clusterpb.ShardTopology, 0)
