@@ -84,7 +84,7 @@ func makeShardLatestVersionKey(clusterID uint32, shardID uint32) string {
 //            v1/cluster/1/node/127.0.0.2:8081 -> pb.Node
 //            v1/cluster/1/node/127.0.0.3:8081 -> pb.Node
 func makeNodeKey(clusterID uint32, nodeName string) string {
-	return path.Join(cluster, fmtID(uint64(clusterID)), nodeName)
+	return path.Join(cluster, fmtID(uint64(clusterID)), node, nodeName)
 }
 
 func fmtID(id uint64) string {

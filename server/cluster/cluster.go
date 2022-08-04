@@ -4,8 +4,9 @@ package cluster
 
 import (
 	"context"
-	"github.com/CeresDB/ceresmeta/server/id"
 	"sync"
+
+	"github.com/CeresDB/ceresmeta/server/id"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -65,21 +66,28 @@ func (c *Cluster) Load(ctx context.Context) error {
 		return errors.Wrap(err, "clusters Load")
 	}
 
+	nodes, err := c.loadNodeLocked(ctx)
+	if err != nil {
+		return errors.Wrap(err, "clusters Load")
+	}
+
 	tables, err := c.loadTableLocked(ctx, schemas)
 	if err != nil {
 		return errors.Wrap(err, "clusters Load")
 	}
 
-	if err := c.updateCacheLocked(shards, shardTopologies, schemas, tables); err != nil {
+	if err := c.updateCacheLocked(shards, shardTopologies, schemas, nodes, tables); err != nil {
 		return errors.Wrap(err, "clusters Load")
 	}
 	return nil
 }
 
+// TODO: load node into nodesCache
 func (c *Cluster) updateCacheLocked(
 	shards map[uint32][]*clusterpb.Shard,
 	shardTopologies map[uint32]*clusterpb.ShardTopology,
 	schemasLoaded map[string]*clusterpb.Schema,
+	nodesLoaded map[string]*clusterpb.Node,
 	tablesLoaded map[string]map[uint64]*clusterpb.Table,
 ) error {
 	for schemaName, tables := range tablesLoaded {
@@ -100,6 +108,16 @@ func (c *Cluster) updateCacheLocked(
 				}
 			}
 		}
+	}
+
+	shardIDs := make(map[string][]uint32, len(nodesLoaded))
+	for shardID, shards := range shards {
+		for _, shard := range shards {
+			shardIDs[shard.Node] = append(shardIDs[shard.Node], shardID)
+		}
+	}
+	for nodeName, node := range nodesLoaded {
+		c.nodesCache[nodeName] = &Node{meta: node, shardIDs: shardIDs[nodeName]}
 	}
 
 	for shardID, shardTopology := range shardTopologies {
@@ -242,7 +260,7 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (uint32, 
 	// cache
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	schema = c.updateSchemaCacheLocked(schemaPb)
+	_ = c.updateSchemaCacheLocked(schemaPb)
 	return schemaID, nil
 }
 
@@ -322,6 +340,18 @@ func (c *Cluster) loadSchemaLocked(ctx context.Context) (map[string]*clusterpb.S
 		schemaMap[schema.Name] = schema
 	}
 	return schemaMap, nil
+}
+
+func (c *Cluster) loadNodeLocked(ctx context.Context) (map[string]*clusterpb.Node, error) {
+	nodes, err := c.storage.ListNodes(ctx, c.clusterID)
+	if err != nil {
+		return nil, errors.Wrap(err, "clusters loadNodeLocked")
+	}
+	nodeMap := make(map[string]*clusterpb.Node, len(nodes))
+	for _, node := range nodes {
+		nodeMap[node.Name] = node
+	}
+	return nodeMap, nil
 }
 
 func (c *Cluster) loadTableLocked(ctx context.Context, schemas map[string]*clusterpb.Schema) (map[string]map[uint64]*clusterpb.Table, error) {
