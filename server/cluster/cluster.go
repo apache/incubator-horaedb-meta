@@ -63,7 +63,6 @@ func (c *Cluster) init(ctx context.Context, shards []*clusterpb.Shard) error {
 			ShardId:  i,
 			TableIds: make([]uint64, 0),
 		})
-
 	}
 
 	if _, err := c.storage.CreateShardTopologies(ctx, c.clusterID, shardTopologies); err != nil {
@@ -76,7 +75,7 @@ func (c *Cluster) Load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.coordinator = NewCoordinator(c)
+	c.coordinator = newCoordinator(c)
 
 	shards, shardIDs, err := c.loadClusterTopologyLocked(ctx)
 	if err != nil {
@@ -187,7 +186,6 @@ func (c *Cluster) updateCacheLocked(
 					node.shardIDs = []uint32{shardID}
 				}
 			}
-
 		}
 	}
 
@@ -291,8 +289,7 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (uint32, 
 	return schemaID, nil
 }
 
-func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32,
-	tableName string) (uint64, error) {
+func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32, tableName string) (uint64, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -497,10 +494,8 @@ func (c *Cluster) assignShardID(nodeName string) (uint32, error) {
 		}
 		id := uint32(rand.Intn(len(node.shardIDs)))
 		return node.shardIDs[id], nil
-	} else {
-		return 0, ErrNodeNotFound.WithCausef("nodeName:%s", nodeName)
 	}
-
+	return 0, ErrNodeNotFound.WithCausef("nodeName:%s", nodeName)
 }
 
 type metaData struct {

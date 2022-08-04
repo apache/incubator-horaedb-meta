@@ -17,15 +17,13 @@ type coordinator struct {
 	cluster *Cluster
 }
 
-func NewCoordinator(cluster *Cluster) *coordinator {
+func newCoordinator(cluster *Cluster) *coordinator {
 	return &coordinator{
 		cluster: cluster,
 	}
 }
 
 func (c *coordinator) Run(ctx context.Context) error {
-	//c.Lock()
-	//defer c.Unlock()
 	if err := c.scatterShard(ctx); err != nil {
 		return errors.Wrap(err, "coordinator Run")
 	}

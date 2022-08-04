@@ -67,10 +67,6 @@ func newClusterManagerWithStorage(storage storage.Storage) (Manager, error) {
 	return NewManagerImpl(context.Background(), storage)
 }
 
-func newClusterManager(t *testing.T) (Manager, error) {
-	return NewManagerImpl(context.Background(), newTestStorage(t))
-}
-
 func TestManager(t *testing.T) {
 	re := require.New(t)
 	storage := newTestStorage(t)
@@ -96,8 +92,6 @@ func TestManager(t *testing.T) {
 
 	manager, err = newClusterManagerWithStorage(storage)
 	re.NoError(err)
-	testRegisterNode(ctx, re, manager, defaultCluster, node1, defaultLease)
-	testRegisterNode(ctx, re, manager, defaultCluster, node2, defaultLease)
 	testGetTables(ctx, re, manager, node1, defaultCluster)
 	testGetTables(ctx, re, manager, node2, defaultCluster)
 }
