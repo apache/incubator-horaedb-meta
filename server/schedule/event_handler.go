@@ -11,12 +11,12 @@ import (
 )
 
 type Event interface {
-	TransformToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse
+	ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse
 }
 
 type NoneEvent struct{}
 
-func (*NoneEvent) TransformToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
+func (*NoneEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
 	// TODO: add response header
 	return &metaservicepb.NodeHeartbeatResponse{Timestamp: uint64(time.Now().UnixMilli())}
 }
@@ -25,7 +25,7 @@ type OpenEvent struct {
 	ShardIDs []uint32
 }
 
-func (open *OpenEvent) TransformToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
+func (open *OpenEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
 	// TODO: add response header
 	return &metaservicepb.NodeHeartbeatResponse{Timestamp: uint64(time.Now().UnixMilli()), Cmd: &metaservicepb.NodeHeartbeatResponse_OpenCmd{
 		OpenCmd: &metaservicepb.OpenCmd{
@@ -45,7 +45,7 @@ func NewEventHandler(hbstream *HeartbeatStreams) *EventHandler {
 }
 
 func (e *EventHandler) Dispatch(ctx context.Context, nodeName string, event Event) error {
-	if err := e.hbstreams.SendMsgAsync(ctx, nodeName, event.TransformToHeartbeatResp()); err != nil {
+	if err := e.hbstreams.SendMsgAsync(ctx, nodeName, event.ToHeartbeatResp()); err != nil {
 		return errors.Wrap(err, "event handler dispatch")
 	}
 	return nil
