@@ -41,18 +41,18 @@ func TestCluster(t *testing.T) {
 		re.Equal(clusters[i].CreatedAt, values[i].CreatedAt)
 		re.Equal(clusters[i].ShardTotal, values[i].ShardTotal)
 	}
-	// cluster := &clusterpb.Cluster{Id: uint32(0), Name: "name", MinNodeCount: uint32(1), ReplicationFactor: uint32(1), ShardTotal: uint32(1)}
-	// err = s.PutCluster(ctx, uint32(0), cluster)
-	// re.NoError(err)
+	cluster := &clusterpb.Cluster{Id: uint32(0), Name: "name", MinNodeCount: uint32(1), ReplicationFactor: uint32(1), ShardTotal: uint32(1)}
+	err = s.PutCluster(ctx, uint32(0), cluster)
+	re.NoError(err)
 
-	// value, err := s.GetCluster(ctx, uint32(0))
-	// re.NoError(err)
-	// re.Equal(cluster.Id, value.Id)
-	// re.Equal(cluster.Name, value.Name)
-	// re.Equal(cluster.MinNodeCount, value.MinNodeCount)
-	// re.Equal(cluster.ReplicationFactor, value.ReplicationFactor)
-	// re.Equal(cluster.CreatedAt, value.CreatedAt)
-	// re.Equal(cluster.ShardTotal, value.ShardTotal)
+	value, err := s.GetCluster(ctx, uint32(0))
+	re.NoError(err)
+	re.Equal(cluster.Id, value.Id)
+	re.Equal(cluster.Name, value.Name)
+	re.Equal(cluster.MinNodeCount, value.MinNodeCount)
+	re.Equal(cluster.ReplicationFactor, value.ReplicationFactor)
+	re.Equal(cluster.CreatedAt, value.CreatedAt)
+	re.Equal(cluster.ShardTotal, value.ShardTotal)
 }
 
 func TestClusterTopology(t *testing.T) {
@@ -106,20 +106,20 @@ func TestSchemes(t *testing.T) {
 		re.Equal(schemas[i].Name, value[i].Name)
 		re.Equal(schemas[i].CreatedAt, value[i].CreatedAt)
 	}
-	// for i := 0; i < 10; i++ {
-	// 	schemas[i].Name = "name_"
-	// }
-	// err = s.PutSchemas(ctx, uint32(0), schemas)
-	// re.NoError(err)
+	for i := 0; i < 10; i++ {
+		schemas[i].Name = "name_"
+	}
+	err = s.PutSchemas(ctx, uint32(0), schemas)
+	re.NoError(err)
 
-	// value, err = s.ListSchemas(ctx, 0)
-	// re.NoError(err)
-	// for i := 0; i < 10; i++ {
-	// 	re.Equal(schemas[i].Id, value[i].Id)
-	// 	re.Equal(schemas[i].ClusterId, value[i].ClusterId)
-	// 	re.Equal(schemas[i].Name, value[i].Name)
-	// 	re.Equal(schemas[i].CreatedAt, value[i].CreatedAt)
-	// }
+	value, err = s.ListSchemas(ctx, 0)
+	re.NoError(err)
+	for i := 0; i < 10; i++ {
+		re.Equal(schemas[i].Id, value[i].Id)
+		re.Equal(schemas[i].ClusterId, value[i].ClusterId)
+		re.Equal(schemas[i].Name, value[i].Name)
+		re.Equal(schemas[i].CreatedAt, value[i].CreatedAt)
+	}
 }
 
 func TestTables(t *testing.T) {
