@@ -186,11 +186,11 @@ func TestShardTopologies(t *testing.T) {
 	shardID := make([]uint32, 0)
 	for i := 0; i < 10; i++ {
 		shardTableData := &clusterpb.ShardTopology{ShardId: uint32(i), Version: 0}
-		shardTableData, err := s.CreateShardTopology(ctx, 1, shardTableData)
-		re.NoError(err)
 		shardTableInfo = append(shardTableInfo, shardTableData)
 		shardID = append(shardID, uint32(i))
 	}
+	shardTableInfo, err := s.CreateShardTopologies(ctx, 1, shardTableInfo)
+	re.NoError(err)
 
 	value, err := s.ListShardTopologies(ctx, 1, shardID)
 	re.NoError(err)

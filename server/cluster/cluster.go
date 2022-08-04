@@ -4,9 +4,9 @@ package cluster
 
 import (
 	"context"
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"sync"
-	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -488,12 +488,14 @@ func (c *Cluster) allocTableID(ctx context.Context) (uint64, error) {
 
 func (c *Cluster) assignShardID(nodeName string) (uint32, error) {
 	if node, ok := c.nodesCache[nodeName]; ok {
-		rand.Seed(time.Now().UnixNano())
 		if len(node.shardIDs) == 0 {
 			return 0, ErrNodeShardsIsEmpty.WithCausef("nodeName:%s", nodeName)
 		}
-		id := uint32(rand.Intn(len(node.shardIDs)))
-		return node.shardIDs[id], nil
+		id, err := rand.Int(rand.Reader, big.NewInt(int64(len(node.shardIDs))))
+		if err != nil {
+			return 0, errors.Wrapf(err, "assign shard id failed, nameName:%s", nodeName)
+		}
+		return node.shardIDs[uint32(id.Uint64())], nil
 	}
 	return 0, ErrNodeNotFound.WithCausef("nodeName:%s", nodeName)
 }
