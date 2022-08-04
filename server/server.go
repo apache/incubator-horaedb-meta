@@ -57,7 +57,7 @@ func CreateServer(cfg *config.Config) (*Server, error) {
 		etcdCfg: etcdCfg,
 	}
 
-	grpcService := grpcservice.NewService(cfg.GrpcHandleTimeout(), srv, srv.clusterManager)
+	grpcService := grpcservice.NewService(cfg.GrpcHandleTimeout(), srv)
 	etcdCfg.ServiceRegister = func(grpcSrv *grpc.Server) {
 		grpcSrv.RegisterService(&metaservicepb.CeresmetaRpcService_ServiceDesc, grpcService)
 	}
@@ -138,7 +138,7 @@ func (srv *Server) startEtcd(ctx context.Context) error {
 func (srv *Server) startServer(ctx context.Context) error {
 	srv.hbStreams = schedule.NewHeartbeatStreams(ctx)
 	storage := storage.NewStorageWithEtcdBackend(srv.etcdCli, srv.cfg.StorageRootPath, storage.Options{
-		MaxScanLimit: 100, MinScanLimit: 10,
+		MaxScanLimit: srv.cfg.MaxScanLimit, MinScanLimit: srv.cfg.MinScanLimit,
 	})
 	srv.clusterManager = cluster.NewManagerImpl(storage)
 	return nil
@@ -189,6 +189,10 @@ func (ctx *leaderWatchContext) EtcdLeaderID() uint64 {
 	return ctx.srv.etcdSrv.Server.Lead()
 }
 
+func (srv *Server) GetClusterManager() cluster.Manager {
+	return srv.clusterManager
+}
+
 func (srv *Server) GetLeader(ctx context.Context) (*member.GetLeaderResp, error) {
 	return srv.member.GetLeader(ctx)
 }
@@ -204,5 +208,5 @@ func (srv *Server) UnbindHeartbeatStream(_ context.Context, node string) error {
 }
 
 func (srv *Server) ProcessHeartbeat(ctx context.Context, req *metaservicepb.NodeHeartbeatRequest) error {
-	return srv.clusterManager.RegisterNode(ctx, req.GetHeader().GetClusterName(), req.GetInfo().GetNode(), req.GetInfo().Lease)
+	return srv.clusterManager.RegisterNode(ctx, req.GetHeader().GetClusterName(), req.GetInfo().GetNode(), req.GetInfo().GetLease())
 }

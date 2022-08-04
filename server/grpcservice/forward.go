@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Service) getForwardedCeresmetaClient(ctx context.Context) (metaservicepb.CeresmetaRpcServiceClient, error) {
-	forwardedAddr, err := s.getForwardedAddr(ctx)
+	forwardedAddr, _, err := s.getForwardedAddr(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "get forwarded ceresmeta client")
 	}
@@ -35,27 +35,27 @@ func (s *Service) getCeresmetaClient(ctx context.Context, addr string) (metaserv
 }
 
 func (s *Service) getForwardedGrpcClient(ctx context.Context, forwardedAddr string) (*grpc.ClientConn, error) {
-	client, ok := s.grpcClientConns.Load(forwardedAddr)
+	client, ok := s.connConns.Load(forwardedAddr)
 	if !ok {
-		cc, err := GetClientConn(ctx, forwardedAddr, nil)
+		cc, err := GetClientConn(ctx, forwardedAddr)
 		if err != nil {
 			return nil, err
 		}
 		client = cc
-		s.grpcClientConns.Store(forwardedAddr, cc)
+		s.connConns.Store(forwardedAddr, cc)
 	}
 	return client.(*grpc.ClientConn), nil
 }
 
-func (s *Service) getForwardedAddr(ctx context.Context) (string, error) {
+func (s *Service) getForwardedAddr(ctx context.Context) (string, bool, error) {
 	member, err := s.h.GetLeader(ctx)
 	if err != nil {
-		return "", errors.Wrap(err, "get forwarded addr")
+		return "", false, errors.Wrap(err, "get forwarded addr")
 	}
 	if member.IsLocal {
-		return "", nil
+		return "", true, nil
 	}
-	return member.Leader.GetName(), nil
+	return member.Leader.GetName(), false, nil
 }
 
 func (s *Service) createHeartbeatForwardedStream(ctx context.Context,
@@ -65,7 +65,7 @@ func (s *Service) createHeartbeatForwardedStream(ctx context.Context,
 	return forwardedStream, err
 }
 
-func forwardRegionHeartbeatClientToLeader(forwardedStream metaservicepb.CeresmetaRpcService_NodeHeartbeatClient,
+func forwardRegionHeartbeatRespToClient(forwardedStream metaservicepb.CeresmetaRpcService_NodeHeartbeatClient,
 	server metaservicepb.CeresmetaRpcService_NodeHeartbeatServer,
 	errCh chan error,
 ) {

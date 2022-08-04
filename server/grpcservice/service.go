@@ -20,17 +20,16 @@ type Service struct {
 	metaservicepb.UnimplementedCeresmetaRpcServiceServer
 	opTimeout time.Duration
 	h         Handler
-	manager   cluster.Manager
 
 	// Store as map[string]*grpc.ClientConn
-	grpcClientConns sync.Map
+	// TODO: remove unavailable connection
+	connConns sync.Map
 }
 
-func NewService(opTimeout time.Duration, h Handler, manager cluster.Manager) *Service {
+func NewService(opTimeout time.Duration, h Handler) *Service {
 	return &Service{
 		opTimeout: opTimeout,
 		h:         h,
-		manager:   manager,
 	}
 }
 
@@ -40,6 +39,7 @@ type HeartbeatStreamSender interface {
 
 // Handler is needed by grpc service to process the requests.
 type Handler interface {
+	GetClusterManager() cluster.Manager
 	GetLeader(ctx context.Context) (*member.GetLeaderResp, error)
 	UnbindHeartbeatStream(ctx context.Context, node string) error
 	BindHeartbeatStream(ctx context.Context, node string, sender HeartbeatStreamSender) error
@@ -94,19 +94,13 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metaservicepb.CeresmetaRpcService_N
 	defer cancel()
 
 	var (
-		forwardedStream   metaservicepb.CeresmetaRpcService_NodeHeartbeatClient
-		ceresmetaClient   metaservicepb.CeresmetaRpcServiceClient
-		errCh             chan error
-		lastCtx           context.Context
-		lastCancel        context.CancelFunc
-		lastForwardedAddr string
+		forwardedStream       metaservicepb.CeresmetaRpcService_NodeHeartbeatClient
+		ceresmetaClient       metaservicepb.CeresmetaRpcServiceClient
+		errCh                 chan error
+		previousCtx           context.Context
+		previousCancel        context.CancelFunc
+		previousForwardedAddr string
 	)
-
-	defer func() {
-		if lastCancel != nil {
-			lastCancel()
-		}
-	}()
 
 	binder := streamBinder{
 		timeout: s.opTimeout,
@@ -133,33 +127,42 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metaservicepb.CeresmetaRpcService_N
 
 		// Forward request to the leader.
 		{
-			forwardedAddr, err := s.getForwardedAddr(ctx)
+			forwardedAddr, isLocal, err := s.getForwardedAddr(ctx)
 			if err != nil {
 				return errors.Wrap(err, "node heartbeat")
 			}
 
-			if forwardedStream == nil || forwardedAddr != lastForwardedAddr {
-				if lastCancel != nil {
-					lastCancel()
-				}
-
-				lastCtx, lastCancel = context.WithCancel(context.Background())
-				ceresmetaClient, err = s.getCeresmetaClient(lastCtx, forwardedAddr)
-				if err != nil {
-					return errors.Wrap(err, "node heartbeat")
-				}
-
-				if ceresmetaClient != nil {
-					forwardedStream, err = s.createHeartbeatForwardedStream(lastCtx, ceresmetaClient)
-					if err != nil {
-						return err
+			maybeInitForwardStream := func() (metaservicepb.CeresmetaRpcService_NodeHeartbeatClient, string, error) {
+				if forwardedStream == nil || forwardedAddr != previousForwardedAddr {
+					if previousCancel != nil {
+						previousCancel()
 					}
 
-					lastForwardedAddr = forwardedAddr
-					errCh = make(chan error, 1)
-					go forwardRegionHeartbeatClientToLeader(forwardedStream, heartbeatSrv, errCh)
+					if !isLocal {
+						dialCtx, dialCancel := context.WithTimeout(context.Background(), s.opTimeout)
+						defer dialCancel()
+						ceresmetaClient, err = s.getCeresmetaClient(dialCtx, forwardedAddr)
+						if err != nil {
+							return nil, "", errors.Wrap(err, "node heartbeat")
+						}
+
+						if ceresmetaClient != nil {
+							previousCtx, previousCancel = context.WithCancel(context.Background())
+							forwardedStream, err = s.createHeartbeatForwardedStream(previousCtx, ceresmetaClient)
+							if err != nil {
+								previousCancel()
+								return nil, "", err
+							}
+
+							previousForwardedAddr = forwardedAddr
+							errCh = make(chan error, 1)
+							go forwardRegionHeartbeatRespToClient(forwardedStream, heartbeatSrv, errCh)
+						}
+					}
 				}
+				return nil, "", nil
 			}
+			forwardedStream, previousForwardedAddr, err = maybeInitForwardStream()
 
 			if forwardedStream != nil {
 				if err := forwardedStream.Send(req); err != nil {
@@ -204,7 +207,7 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 		return ceresmetaClient.AllocSchemaID(ctx, req)
 	}
 
-	schemaID, err := s.manager.AllocSchemaID(ctx, req.GetHeader().GetClusterName(), req.GetName())
+	schemaID, err := s.h.GetClusterManager().AllocSchemaID(ctx, req.GetHeader().GetClusterName(), req.GetName())
 	if err != nil {
 		return &metaservicepb.AllocSchemaIdResponse{Header: ResponseHeader(err, "grpc alloc schema id")}, nil
 	}
@@ -228,14 +231,14 @@ func (s *Service) AllocTableID(ctx context.Context, req *metaservicepb.AllocTabl
 		return ceresmetaClient.AllocTableID(ctx, req)
 	}
 
-	table, shardID, err := s.manager.AllocTableID(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetHeader().GetNode())
+	table, err := s.h.GetClusterManager().AllocTableID(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetHeader().GetNode())
 	if err != nil {
 		return &metaservicepb.AllocTableIdResponse{Header: ResponseHeader(err, "grpc alloc table id")}, nil
 	}
 
 	return &metaservicepb.AllocTableIdResponse{
 		Header:     OkResponseHeader(),
-		ShardId:    shardID,
+		ShardId:    table.GetShardID(),
 		SchemaName: table.GetSchemaName(),
 		SchemaId:   table.GetSchemaID(),
 		Name:       table.GetName(),
@@ -255,7 +258,7 @@ func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesReq
 		return ceresmetaClient.GetTables(ctx, req)
 	}
 
-	tables, err := s.manager.GetTables(ctx, req.GetHeader().GetClusterName(), req.GetHeader().GetNode(), req.GetShardId())
+	tables, err := s.h.GetClusterManager().GetTables(ctx, req.GetHeader().GetClusterName(), req.GetHeader().GetNode(), req.GetShardId())
 	if err != nil {
 		return &metaservicepb.GetTablesResponse{Header: ResponseHeader(err, "grpc get tables")}, nil
 	}
@@ -304,7 +307,7 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 		return ceresmetaClient.DropTable(ctx, req)
 	}
 
-	err = s.manager.DropTable(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetId())
+	err = s.h.GetClusterManager().DropTable(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetId())
 	if err != nil {
 		return &metaservicepb.DropTableResponse{Header: ResponseHeader(err, "grpc drop table")}, nil
 	}

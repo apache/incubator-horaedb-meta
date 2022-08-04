@@ -68,6 +68,8 @@ type Config struct {
 	// Before etcd v3.3.x, the type of retention is int. We add 'v2' suffix to make it backward compatible.
 	AutoCompactionRetention string `toml:"auto-compaction-retention" json:"auto-compaction-retention-v2"`
 	MaxRequestBytes         uint   `toml:"max-request-bytes" json:"max-request-bytes"`
+	MaxScanLimit            int    `toml:"max-scan-limit" json:"max-scan-limit"`
+	MinScanLimit            int    `toml:"min-scan-limit" json:"min-scan-limit"`
 
 	ClientUrls          string `toml:"client-urls" json:"client-urls"`
 	PeerUrls            string `toml:"peer-urls" json:"peer-urls"`

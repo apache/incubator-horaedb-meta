@@ -107,11 +107,11 @@ func testAllocSchemaID(ctx context.Context, re *require.Assertions, manager Mana
 }
 
 func testAllocTableID(ctx context.Context, re *require.Assertions, manager Manager,
-	node, cluster, schema, table string, tableID uint64,
+	node, cluster, schema, tableName string, tableID uint64,
 ) {
-	id, _, err := manager.AllocTableID(ctx, cluster, schema, table, node)
+	table, err := manager.AllocTableID(ctx, cluster, schema, tableName, node)
 	re.NoError(err)
-	re.Equal(tableID, id)
+	re.Equal(tableID, table.GetID())
 }
 
 func testGetTables(ctx context.Context, re *require.Assertions, manager Manager, node, cluster string) {

@@ -144,11 +144,20 @@ func (c *Cluster) updateSchemaCacheLocked(schemaPb *clusterpb.Schema) *Schema {
 	return schema
 }
 
-func (c *Cluster) updateTableCacheLocked(schema *Schema, tablePb *clusterpb.Table) *Table {
-	table := &Table{meta: tablePb, schema: schema.meta}
+func (c *Cluster) updateTableCacheLocked(shardID uint32, schema *Schema, tablePb *clusterpb.Table) *Table {
+	table := &Table{meta: tablePb, schema: schema.meta, shardID: shardID}
 	schema.tableMap[tablePb.GetName()] = table
 	c.shardsCache[tablePb.GetShardId()].tables[table.GetID()] = table
 	return table
+}
+
+func (c *Cluster) getTableShardIDLocked(tableID uint64) (uint32, error) {
+	for id, shard := range c.shardsCache {
+		if _, ok := shard.tables[tableID]; ok {
+			return id, nil
+		}
+	}
+	return 0, ErrShardNotFound.WithCausef("get table shardID, tableID:%d", tableID)
 }
 
 func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, nodeName string) (map[uint32]*ShardTablesWithRole, error) {
@@ -240,7 +249,7 @@ func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID ui
 		return nil, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
 	}
 
-	// Save table in storage.
+	// Save Table in storage.
 	tablePb := &clusterpb.Table{Id: tableID, Name: tableName, SchemaId: schema.GetID(), ShardId: shardID}
 	err := c.storage.CreateTable(ctx, c.clusterID, schema.GetID(), tablePb)
 	if err != nil {
@@ -248,7 +257,7 @@ func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID ui
 	}
 
 	// Update tableCache in memory.
-	table := c.updateTableCacheLocked(schema, tablePb)
+	table := c.updateTableCacheLocked(shardID, schema, tablePb)
 	return table, nil
 }
 
@@ -339,7 +348,7 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	}
 	c.lock.RUnlock()
 
-	// Search table in storage.
+	// Search Table in storage.
 	tablePb, exists, err := c.storage.GetTable(ctx, c.clusterID, schema.GetID(), tableName)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "clusters GetTable")
@@ -347,7 +356,11 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	if exists {
 		c.lock.Lock()
 		defer c.lock.Unlock()
-		table := c.updateTableCacheLocked(schema, tablePb)
+		shardID, err := c.getTableShardIDLocked(tablePb.GetId())
+		if err != nil {
+			return nil, false, errors.Wrap(err, "clusters GetTable")
+		}
+		table = c.updateTableCacheLocked(shardID, schema, tablePb)
 		return table, true, nil
 	}
 

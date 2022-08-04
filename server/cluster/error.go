@@ -10,7 +10,7 @@ var (
 	ErrClusterNotFound         = coderr.NewCodeError(coderr.NotFound, "cluster not found")
 	ErrClusterTopologyNotFound = coderr.NewCodeError(coderr.NotFound, "cluster topology not found")
 	ErrSchemaNotFound          = coderr.NewCodeError(coderr.NotFound, "schema not found")
-	ErrTableNotFound           = coderr.NewCodeError(coderr.NotFound, "table not found")
+	ErrTableNotFound           = coderr.NewCodeError(coderr.NotFound, "Table not found")
 	ErrShardNotFound           = coderr.NewCodeError(coderr.NotFound, "shard not found")
 	ErrNodeNotFound            = coderr.NewCodeError(coderr.NotFound, "node not found")
 )

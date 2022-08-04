@@ -5,8 +5,9 @@ package cluster
 import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 
 type Table struct {
-	schema *clusterpb.Schema
-	meta   *clusterpb.Table
+	shardID uint32
+	schema  *clusterpb.Schema
+	meta    *clusterpb.Table
 }
 
 func (t *Table) GetID() uint64 {
@@ -23,4 +24,8 @@ func (t *Table) GetSchemaName() string {
 
 func (t *Table) GetSchemaID() uint32 {
 	return t.schema.GetId()
+}
+
+func (t *Table) GetShardID() uint32 {
+	return t.shardID
 }
