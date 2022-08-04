@@ -534,7 +534,49 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 }
 
 func (s *metaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*clusterpb.Node, error) {
-	return nil, nil
+	nodes := make([]*clusterpb.Node, 0)
+	startKey := makeNodeKey(clusterID, "0.0.0.0:8081")
+	endKey := makeNodeKey(clusterID, "255.255.255.255:8081")
+
+	rangeLimit := s.opts.MaxScanLimit
+	for {
+
+		keys, res, err := s.Scan(ctx, startKey, endKey, rangeLimit)
+		if err != nil {
+			if rangeLimit /= 2; rangeLimit >= s.opts.MinScanLimit {
+				continue
+			}
+			return nil, errors.Wrapf(err, "meta storage list nodes failed, clusterID:%d, start key:%s, end key:%s, range limit:%d", clusterID, startKey, endKey, rangeLimit)
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		if len(nodes) > 0 {
+			nodes = nodes[:len(nodes)-1]
+		}
+
+		for index, r := range res {
+			node := &clusterpb.Node{}
+			if err := proto.Unmarshal([]byte(r), node); err != nil {
+				return nil, ErrParseListNodes.WithCausef("proto parse failed, clusterID:%d, err:%s", clusterID, err)
+			}
+
+			nodes = append(nodes, node)
+			if node.Name == "255.255.255.255:8081" {
+				log.Warn("list node node_name has reached max value: 255.255.255.255:8081")
+				return nodes, nil
+			}
+			startKey = keys[index]
+		}
+
+		if len(res) < rangeLimit {
+			return nodes, nil
+		}
+	}
 }
 
 func (s *metaStorageImpl) PutNodes(ctx context.Context, clusterID uint32, nodes []*clusterpb.Node) error {

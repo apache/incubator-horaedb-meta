@@ -29,4 +29,5 @@ var (
 	ErrParsePutShardTopology    = coderr.NewCodeError(coderr.Internal, "meta storage put shard topology")
 
 	ErrParseCreateOrUpdateNode = coderr.NewCodeError(coderr.Internal, "meta storage create or update nodes")
+	ErrParseListNodes          = coderr.NewCodeError(coderr.Internal, "meta storage list nodes")
 )
