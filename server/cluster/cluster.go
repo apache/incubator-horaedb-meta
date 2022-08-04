@@ -4,11 +4,12 @@ package cluster
 
 import (
 	"context"
+	"math/rand"
 	"sync"
-
-	"github.com/CeresDB/ceresmeta/server/id"
+	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
@@ -45,11 +46,36 @@ func (c *Cluster) Name() string {
 	return c.metaData.cluster.Name
 }
 
+func (c *Cluster) init(ctx context.Context, shards []*clusterpb.Shard) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.metaData.clusterTopology.ShardView = shards
+	c.metaData.clusterTopology.State = clusterpb.ClusterTopology_STABLE
+	if err := c.storage.PutClusterTopology(ctx, c.clusterID, c.metaData.clusterTopology.DataVersion, c.metaData.clusterTopology); err != nil {
+		return errors.Wrap(err, "cluster init")
+	}
+
+	shardTopologies := make([]*clusterpb.ShardTopology, 0, c.metaData.cluster.ShardTotal)
+
+	for i := uint32(0); i < c.metaData.cluster.ShardTotal; i++ {
+		shardTopologies = append(shardTopologies, &clusterpb.ShardTopology{
+			ShardId:  i,
+			TableIds: make([]uint64, 0),
+		})
+	}
+
+	if _, err := c.storage.CreateShardTopologies(ctx, c.clusterID, shardTopologies); err != nil {
+		return errors.Wrap(err, "cluster init")
+	}
+	return nil
+}
+
 func (c *Cluster) Load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.coordinator = NewCoordinator(c)
+	c.coordinator = newCoordinator(c)
 
 	shards, shardIDs, err := c.loadClusterTopologyLocked(ctx)
 	if err != nil {
@@ -160,7 +186,6 @@ func (c *Cluster) updateCacheLocked(
 					node.shardIDs = []uint32{shardID}
 				}
 			}
-
 		}
 	}
 
@@ -264,8 +289,7 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (uint32, 
 	return schemaID, nil
 }
 
-func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32,
-	tableName string) (uint64, error) {
+func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID uint32, tableName string) (uint64, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -286,6 +310,17 @@ func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID ui
 	tablePb := &clusterpb.Table{Id: tableID, Name: tableName, SchemaId: schema.GetID(), ShardId: shardID}
 	tablePb, err = c.storage.CreateTable(ctx, c.clusterID, schema.GetID(), tablePb)
 	if err != nil {
+		return 0, errors.Wrap(err, "clusters CreateTable")
+	}
+
+	// Update shardTopology in storage.
+	shardTopologies, err := c.storage.ListShardTopologies(ctx, c.clusterID, []uint32{shardID})
+	if len(shardTopologies) != 1 {
+		return 0, errors.Wrapf(err, "clusters CreateTable, shard has more than one shardTopology, shardID:%d, shardTopologies:%v",
+			shardID, shardTopologies)
+	}
+	shardTopologies[0].TableIds = append(shardTopologies[0].TableIds, tableID)
+	if err = c.storage.PutShardTopologies(ctx, c.clusterID, []uint32{shardID}, shardTopologies[0].GetVersion(), shardTopologies); err != nil {
 		return 0, errors.Wrap(err, "clusters CreateTable")
 	}
 
@@ -449,6 +484,18 @@ func (c *Cluster) allocTableID(ctx context.Context) (uint64, error) {
 		return 0, errors.Wrapf(err, "alloc table id failed")
 	}
 	return ID, nil
+}
+
+func (c *Cluster) assignShardID(nodeName string) (uint32, error) {
+	if node, ok := c.nodesCache[nodeName]; ok {
+		rand.Seed(time.Now().UnixNano())
+		if len(node.shardIDs) == 0 {
+			return 0, ErrNodeShardsIsEmpty.WithCausef("nodeName:%s", nodeName)
+		}
+		id := uint32(rand.Intn(len(node.shardIDs)))
+		return node.shardIDs[id], nil
+	}
+	return 0, ErrNodeNotFound.WithCausef("nodeName:%s", nodeName)
 }
 
 type metaData struct {

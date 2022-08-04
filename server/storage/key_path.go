@@ -43,12 +43,12 @@ func makeTableKey(clusterID uint32, schemaID uint32, tableID uint64) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), schema, fmtID(uint64(schemaID)), table, fmtID(tableID))
 }
 
-// makeShardKey returns the shard meta info key path.
+// makeShardTopologyKey returns the shard meta info key path.
 // example:
 // cluster 1: v1/cluster/1/shard/1/1 -> pb.Shard
 //            v1/cluster/1/shard/2/1 -> pb.Shard
 //            v1/cluster/1/shard/3/1 -> pb.Shard
-func makeShardKey(clusterID uint32, shardID uint32, latestVersion string) string {
+func makeShardTopologyKey(clusterID uint32, shardID uint32, latestVersion string) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), shard, fmtID(uint64(shardID)), latestVersion)
 }
 

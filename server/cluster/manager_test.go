@@ -55,18 +55,23 @@ func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, fu
 	return etcd, client, clean
 }
 
-func newClusterManager(t *testing.T) Manager {
+func newTestStorage(t *testing.T) storage.Storage {
 	_, client, _ := prepareEtcdServerAndClient(t)
-	storage := storage.NewStorageWithEtcdBackend(client, "/", storage.Options{
+	storage := storage.NewStorageWithEtcdBackend(client, "/aaa", storage.Options{
 		MaxScanLimit: 100, MinScanLimit: 10,
 	})
+	return storage
+}
 
-	return NewManagerImpl(storage)
+func newClusterManagerWithStorage(storage storage.Storage) (Manager, error) {
+	return NewManagerImpl(context.Background(), storage)
 }
 
 func TestManager(t *testing.T) {
 	re := require.New(t)
-	manager := newClusterManager(t)
+	storage := newTestStorage(t)
+	manager, err := newClusterManagerWithStorage(storage)
+	re.NoError(err)
 
 	ctx := context.Background()
 	testCreateCluster(ctx, re, manager)
@@ -82,7 +87,12 @@ func TestManager(t *testing.T) {
 	testAllocTableID(ctx, re, manager, node2, defaultCluster, defaultSchema, table3, tableID3)
 	testAllocTableID(ctx, re, manager, node2, defaultCluster, defaultSchema, table4, tableID4)
 
-	//testGetTables(ctx, re, manager, node1, defaultCluster)
+	testGetTables(ctx, re, manager, node1, defaultCluster)
+	testGetTables(ctx, re, manager, node2, defaultCluster)
+
+	manager, err = newClusterManagerWithStorage(storage)
+	re.NoError(err)
+	testGetTables(ctx, re, manager, node1, defaultCluster)
 	testGetTables(ctx, re, manager, node2, defaultCluster)
 }
 

@@ -1,5 +1,4 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
-// TODO: add test cause in the future
 
 package storage
 
@@ -10,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
-
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,8 +19,7 @@ import (
 func TestCluster(t *testing.T) {
 	re := require.New(t)
 	s := NewStorage(t)
-	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
-	defer cancel()
+	ctx := context.Background()
 
 	clusters := make([]*clusterpb.Cluster, 0)
 	for i := 0; i < 20; i++ {
@@ -31,8 +28,10 @@ func TestCluster(t *testing.T) {
 		re.NoError(err)
 		clusters = append(clusters, cluster)
 	}
+
 	values, err := s.ListClusters(ctx)
 	re.NoError(err)
+
 	for i := 0; i < 20; i++ {
 		re.Equal(clusters[i].Id, values[i].Id)
 		re.Equal(clusters[i].Name, values[i].Name)
