@@ -207,7 +207,7 @@ func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterID, fmtID(clusterMetaData.DataVersion)))
 	latestVersionKey := path.Join(s.rootPath, makeClusterTopologyLatestVersionKey(clusterID))
 
-	cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(uint64(latestVersion)))
+	cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(latestVersion))
 	opPutClusterTopology := clientv3.OpPut(key, string(value))
 	opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(clusterMetaData.DataVersion))
 
@@ -515,7 +515,7 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 		key := path.Join(s.rootPath, makeShardTopologyKey(clusterID, shardID, fmtID(shardTableInfo[index].Version)))
 		latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardID))
 
-		cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(uint64(latestVersion)))
+		cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(latestVersion))
 		opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTableInfo[index].Version))
 		opPutShardTopology := clientv3.OpPut(key, string(value))
 
@@ -540,7 +540,6 @@ func (s *metaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*c
 
 	rangeLimit := s.opts.MaxScanLimit
 	for {
-
 		keys, res, err := s.Scan(ctx, startKey, endKey, rangeLimit)
 		if err != nil {
 			if rangeLimit /= 2; rangeLimit >= s.opts.MinScanLimit {

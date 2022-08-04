@@ -127,53 +127,52 @@ func TestTables(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	table_1 := &clusterpb.Table{Id: uint64(1), Name: "name_1", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
-	table_2 := &clusterpb.Table{Id: uint64(2), Name: "name_2", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
-	table_3 := &clusterpb.Table{Id: uint64(3), Name: "name_3", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
+	table1 := &clusterpb.Table{Id: uint64(1), Name: "name_1", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
+	table2 := &clusterpb.Table{Id: uint64(2), Name: "name_2", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
+	table3 := &clusterpb.Table{Id: uint64(3), Name: "name_3", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
 
-	table_1, err := s.CreateTable(ctx, 1, 1, table_1)
+	table1, err := s.CreateTable(ctx, 1, 1, table1)
 	re.NoError(err)
-	table_2, err = s.CreateTable(ctx, 1, 1, table_2)
+	table2, err = s.CreateTable(ctx, 1, 1, table2)
 	re.NoError(err)
-	table_3, err = s.CreateTable(ctx, 1, 1, table_3)
+	table3, err = s.CreateTable(ctx, 1, 1, table3)
 	re.NoError(err)
 
 	value, _, err := s.GetTable(ctx, 1, 1, "name_1")
 	re.NoError(err)
-	re.Equal(table_1.Id, value.Id)
-	re.Equal(table_1.Name, value.Name)
-	re.Equal(table_1.SchemaId, value.SchemaId)
-	re.Equal(table_1.ShardId, value.ShardId)
-	re.Equal(table_1.Desc, value.Desc)
-	re.Equal(table_1.CreatedAt, value.CreatedAt)
+	re.Equal(table1.Id, value.Id)
+	re.Equal(table1.Name, value.Name)
+	re.Equal(table1.SchemaId, value.SchemaId)
+	re.Equal(table1.ShardId, value.ShardId)
+	re.Equal(table1.Desc, value.Desc)
+	re.Equal(table1.CreatedAt, value.CreatedAt)
 
 	tables, err := s.ListTables(ctx, 1, 1)
 	re.NoError(err)
 
-	re.Equal(table_1.Id, tables[0].Id)
-	re.Equal(table_1.Name, tables[0].Name)
-	re.Equal(table_1.SchemaId, tables[0].SchemaId)
-	re.Equal(table_1.ShardId, tables[0].ShardId)
-	re.Equal(table_1.Desc, tables[0].Desc)
-	re.Equal(table_1.CreatedAt, tables[0].CreatedAt)
+	re.Equal(table1.Id, tables[0].Id)
+	re.Equal(table1.Name, tables[0].Name)
+	re.Equal(table1.SchemaId, tables[0].SchemaId)
+	re.Equal(table1.ShardId, tables[0].ShardId)
+	re.Equal(table1.Desc, tables[0].Desc)
+	re.Equal(table1.CreatedAt, tables[0].CreatedAt)
 
-	re.Equal(table_2.Id, tables[1].Id)
-	re.Equal(table_2.Name, tables[1].Name)
-	re.Equal(table_2.SchemaId, tables[1].SchemaId)
-	re.Equal(table_2.ShardId, tables[1].ShardId)
-	re.Equal(table_2.Desc, tables[1].Desc)
-	re.Equal(table_2.CreatedAt, tables[1].CreatedAt)
+	re.Equal(table2.Id, tables[1].Id)
+	re.Equal(table2.Name, tables[1].Name)
+	re.Equal(table2.SchemaId, tables[1].SchemaId)
+	re.Equal(table2.ShardId, tables[1].ShardId)
+	re.Equal(table2.Desc, tables[1].Desc)
+	re.Equal(table2.CreatedAt, tables[1].CreatedAt)
 
-	re.Equal(table_3.Id, tables[2].Id)
-	re.Equal(table_3.Name, tables[2].Name)
-	re.Equal(table_3.SchemaId, tables[2].SchemaId)
-	re.Equal(table_3.ShardId, tables[2].ShardId)
-	re.Equal(table_3.Desc, tables[2].Desc)
-	re.Equal(table_3.CreatedAt, tables[2].CreatedAt)
+	re.Equal(table3.Id, tables[2].Id)
+	re.Equal(table3.Name, tables[2].Name)
+	re.Equal(table3.SchemaId, tables[2].SchemaId)
+	re.Equal(table3.ShardId, tables[2].ShardId)
+	re.Equal(table3.Desc, tables[2].Desc)
+	re.Equal(table3.CreatedAt, tables[2].CreatedAt)
 
 	err = s.DeleteTable(ctx, 1, 1, "name_1")
 	re.NoError(err)
-
 }
 
 func TestShardTopologies(t *testing.T) {
