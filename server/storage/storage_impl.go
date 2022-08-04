@@ -473,7 +473,6 @@ func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID u
 		if !resp.Succeeded {
 			return nil, ErrParseCreateClusterTopology.WithCausef("resp:%v", resp)
 		}
-
 	}
 	return shardTopologies, nil
 }
