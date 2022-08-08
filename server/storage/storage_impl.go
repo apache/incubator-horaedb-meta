@@ -102,12 +102,12 @@ func (s *metaStorageImpl) CreateCluster(ctx context.Context, cluster *clusterpb.
 		return nil, ErrParseCreateCluster.WithCausef("proto parse failed, err:%v", err)
 	}
 
-	// concat rootPath and cluster key to get etcd key of cluster
 	key := path.Join(s.rootPath, makeClusterKey(cluster.Id))
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
 	opCreateCluster := clientv3.OpPut(key, string(value))
 
+	// Check if the key exists, if not，create cluster; Otherwise, the cluster already exists and return an error.
 	resp, err := s.Txn(ctx).
 		If(cmp).
 		Then(opCreateCluster).
@@ -116,7 +116,7 @@ func (s *metaStorageImpl) CreateCluster(ctx context.Context, cluster *clusterpb.
 		return nil, errors.Wrapf(err, "meta storage create cluster failed, clusterID:%d, key:%s", cluster.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateCluster.WithCausef("resp:%v", resp)
+		return nil, ErrParseCreateCluster.WithCausef("etcd transaction failed, conflicted and rolled back, resp:%v", resp)
 	}
 	return cluster, nil
 }
@@ -158,25 +158,24 @@ func (s *metaStorageImpl) CreateClusterTopology(ctx context.Context, clusterTopo
 		return nil, ErrParseCreateClusterTopology.WithCausef("proto parse failed, err:%v", err)
 	}
 
-	// concat rootPath and cluster topology key to get etcd key of cluster topology
 	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterTopology.ClusterId, fmtID(clusterTopology.DataVersion)))
-	// concat rootPath and cluster topology latest version key to get etcd key of cluster topology latest version
 	latestVersionKey := path.Join(s.rootPath, makeClusterTopologyLatestVersionKey(clusterTopology.ClusterId))
 
-	cmplatestVersionKey := clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
+	cmpLatestVersionKey := clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
 	cmpKey := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
-	opCreateClsuterTopology := clientv3.OpPut(key, string(value))
-	opCreateClsuterTopologyLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(clusterTopology.DataVersion))
+	opCreateClusterTopology := clientv3.OpPut(key, string(value))
+	opCreateClusterTopologyLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(clusterTopology.DataVersion))
 
+	// Check if the key and latest version key exists, if not，create cluster topology and latest version; Otherwise, the cluster topology already exists and return an error.
 	resp, err := s.Txn(ctx).
-		If(cmplatestVersionKey, cmpKey).
-		Then(opCreateClsuterTopology, opCreateClsuterTopologyLatestVersion).
+		If(cmpLatestVersionKey, cmpKey).
+		Then(opCreateClusterTopology, opCreateClusterTopologyLatestVersion).
 		Commit()
 	if err != nil {
 		return nil, errors.Wrapf(err, "meta storage create cluster topology failed, clusterID:%d, key:%s", clusterTopology.ClusterId, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateClusterTopology.WithCausef("resp:%v", resp)
+		return nil, ErrParseCreateClusterTopology.WithCausef("etcd transaction failed, conflicted and rolled back, resp:%v", resp)
 	}
 	return clusterTopology, nil
 }
@@ -207,15 +206,14 @@ func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 		return ErrParsePutClusterTopology.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
 
-	// concat rootPath and cluster topology key to get etcd key of cluster topology
 	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterID, fmtID(clusterTopology.DataVersion)))
-	// concat rootPath and cluster topology latest version key to get etcd key of cluster topology latest version
 	latestVersionKey := path.Join(s.rootPath, makeClusterTopologyLatestVersionKey(clusterID))
 
 	cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(latestVersion))
 	opPutClusterTopology := clientv3.OpPut(key, string(value))
 	opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(clusterTopology.DataVersion))
 
+	// Check whether the latest version is equal to that in etcd. If it is equal，update cluster topology and latest version; Otherwise, return an error.
 	resp, err := s.Txn(ctx).
 		If(cmp).
 		Then(opPutClusterTopology, opPutLatestVersion).
@@ -224,7 +222,7 @@ func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 		return errors.Wrapf(err, "meta storage put cluster topology failed, clusterID:%d, key:%s", clusterID, key)
 	}
 	if !resp.Succeeded {
-		return ErrParsePutClusterTopology.WithCausef("clusterID:%d, resp:%v", clusterID, resp)
+		return ErrParsePutClusterTopology.WithCausef("etcd transaction failed, conflicted and rolled back, resp:%v", resp)
 	}
 
 	return nil
@@ -281,12 +279,12 @@ func (s *metaStorageImpl) CreateSchema(ctx context.Context, clusterID uint32, sc
 		return nil, ErrParseCreateSchema.WithCausef("proto parse failed, err:%v", err)
 	}
 
-	// concat rootPath and schema key to get etcd key of schema
 	key := path.Join(s.rootPath, makeSchemaKey(clusterID, schema.Id))
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
 	opCreateSchema := clientv3.OpPut(key, string(value))
 
+	// Check if the key exists, if not，create schema; Otherwise, the schema already exists and return an error.
 	resp, err := s.Txn(ctx).
 		If(cmp).
 		Then(opCreateSchema).
@@ -295,7 +293,7 @@ func (s *metaStorageImpl) CreateSchema(ctx context.Context, clusterID uint32, sc
 		return nil, errors.Wrapf(err, "meta storage create schema failed, clusterID:%d, schemaID:%d, key:%s", clusterID, schema.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParsePutCluster.WithCausef("resp:%v", resp)
+		return nil, ErrParsePutCluster.WithCausef("etcd transaction failed, conflicted and rolled back, resp:%v", resp)
 	}
 	return schema, nil
 }
@@ -325,9 +323,7 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 		return nil, ErrParseCreateTable.WithCausef("proto parse failed, err:%v", err)
 	}
 
-	// concat rootPath and table key to get etcd key of table
 	key := path.Join(s.rootPath, makeTableKey(clusterID, schemaID, table.Id))
-	// concat rootPath and table id key to get etcd key of table id
 	nameToIDKey := path.Join(s.rootPath, table.Name)
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
@@ -335,6 +331,7 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 	opCreateTable := clientv3.OpPut(key, string(value))
 	opCreateNameToID := clientv3.OpPut(nameToIDKey, fmtID(table.Id))
 
+	// Check if the key and the name to id key exists, if not，create table; Otherwise, the table already exists and return an error.
 	resp, err := s.Txn(ctx).
 		If(cmp, cmpNameToID).
 		Then(opCreateTable, opCreateNameToID).
@@ -343,7 +340,7 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 		return nil, errors.Wrapf(err, "meta storage create table failed, clusterID:%d, schemaID:%d, tableID:%d, key:%s", clusterID, schemaID, table.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateTable.WithCausef("resp:%v", resp)
+		return nil, ErrParseCreateTable.WithCausef("etcd transaction failed, conflicted and rolled back, resp:%v", resp)
 	}
 	return table, nil
 }
@@ -463,25 +460,24 @@ func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID u
 			return nil, ErrParseCreateShardTopology.WithCausef("proto parse failed, err:%v", err)
 		}
 
-		// concat rootPath and shard topology key to get etcd key of shard topology
 		key := path.Join(s.rootPath, makeShardTopologyKey(clusterID, shardTopology.GetShardId(), fmtID(shardTopology.Version)))
-		// concat rootPath and shard topolog latest version key to get etcd key of shard topology latest version
 		latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardTopology.GetShardId()))
 
-		cmplatestVersionKey := clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
+		cmpLatestVersionKey := clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
 		cmpKey := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
-		opCreateClsuterTopology := clientv3.OpPut(key, string(value))
-		opCreateClsuterTopologyLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTopology.Version))
+		opCreateShardTopology := clientv3.OpPut(key, string(value))
+		opCreateShardTopologyLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTopology.Version))
 
+		// Check if the key and latest version key exists, if not，create shard topology and latest version; Otherwise, the shard topology already exists and return an error.
 		resp, err := s.Txn(ctx).
-			If(cmplatestVersionKey, cmpKey).
-			Then(opCreateClsuterTopology, opCreateClsuterTopologyLatestVersion).
+			If(cmpLatestVersionKey, cmpKey).
+			Then(opCreateShardTopology, opCreateShardTopologyLatestVersion).
 			Commit()
 		if err != nil {
 			return nil, errors.Wrapf(err, "meta storage create shard topology failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardTopology.ShardId, key)
 		}
 		if !resp.Succeeded {
-			return nil, ErrParseCreateClusterTopology.WithCausef("resp:%v", resp)
+			return nil, ErrParseCreateClusterTopology.WithCausef("etcd transaction failed, conflicted and rolled back, resp:%v", resp)
 		}
 	}
 	return shardTopologies, nil
@@ -521,15 +517,14 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 			return ErrParsePutShardTopology.WithCausef("proto parse failed, clusterID:%d, shardID:%d, err:%v", clusterID, shardID, err)
 		}
 
-		// concat rootPath and shard topology key to get etcd key of shard topology
 		key := path.Join(s.rootPath, makeShardTopologyKey(clusterID, shardID, fmtID(shardTopologies[index].Version)))
-		// concat rootPath and shard topology latest version key to get etcd key of shard topology latest version
 		latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardID))
 
 		cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(latestVersion))
 		opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTopologies[index].Version))
 		opPutShardTopology := clientv3.OpPut(key, string(value))
 
+		// Check whether the latest version is equal to that in etcd. If it is equal，update shard topology and latest version; Otherwise, return an error.
 		resp, err := s.Txn(ctx).
 			If(cmp).
 			Then(opPutLatestVersion, opPutShardTopology).
@@ -538,16 +533,19 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 			return errors.Wrapf(err, "meta storage put shard topology failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
 		if !resp.Succeeded {
-			return ErrParsePutShardTopology.WithCausef("clusterID:%d, shardID:%d, resp:%v", clusterID, shardID, resp)
+			return ErrParsePutShardTopology.WithCausef("etcd transaction failed, conflicted and rolled back, resp:%v", resp)
 		}
 	}
 	return nil
 }
 
 func (s *metaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*clusterpb.Node, error) {
+	defaultStartNodeName := string([]byte{0})
+	defaultEndNodeName := string([]byte{255})
+	startKey := makeNodeKey(clusterID, defaultStartNodeName)
+	endKey := makeNodeKey(clusterID, defaultEndNodeName)
+
 	nodes := make([]*clusterpb.Node, 0)
-	startKey := makeNodeKey(clusterID, "0.0.0.0:8081")
-	endKey := makeNodeKey(clusterID, "255.255.255.255:8081")
 
 	rangeLimit := s.opts.MaxScanLimit
 	for {
@@ -576,10 +574,7 @@ func (s *metaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*c
 			}
 
 			nodes = append(nodes, node)
-			if node.Name == "255.255.255.255:8081" {
-				log.Warn("list node node_name has reached max value: 255.255.255.255:8081")
-				return nodes, nil
-			}
+
 			startKey = keys[index]
 		}
 
@@ -601,7 +596,6 @@ func (s *metaStorageImpl) CreateOrUpdateNode(ctx context.Context, clusterID uint
 	CreateNode.CreateTime = CreateNode.LastTouchTime
 	UpdateNode := node
 
-	// concat rootPath and node key to get etcd key of node
 	key := path.Join(s.rootPath, makeNodeKey(clusterID, node.Name))
 	CreateNodeValue, err := proto.Marshal(CreateNode)
 	if err != nil {
@@ -616,6 +610,7 @@ func (s *metaStorageImpl) CreateOrUpdateNode(ctx context.Context, clusterID uint
 	opCreateNode := clientv3.OpPut(key, string(CreateNodeValue))
 	opUpdateNode := clientv3.OpPut(key, string(UpdateNodeValue))
 
+	// Check if the key exists, if not，create node; Otherwise, update node.
 	_, err = s.Txn(ctx).
 		If(cmp).
 		Then(opCreateNode).

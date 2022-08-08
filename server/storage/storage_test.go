@@ -4,8 +4,6 @@ package storage
 
 import (
 	"context"
-	"path"
-	"strconv"
 	"testing"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
@@ -16,19 +14,38 @@ import (
 	"go.etcd.io/etcd/server/v3/embed"
 )
 
+const (
+	defaultRootPath  = "/ceresmeta" // TODO: existed bug when rootPath = "/"
+	defaultName1     = "name_1"
+	defaultName2     = "name_2"
+	defaultName3     = "name_3"
+	defaultDesc      = "desc"
+	defaultClusterID = 1
+	defaultSchemaID  = 1
+	defaultVersion   = 0
+	defaultNodeName1 = "127.0.0.1:8081"
+	defaultNodeName2 = "127.0.0.2:8081"
+	defaultNodeName3 = "127.0.0.3:8081"
+	defaultNodeName4 = "127.0.0.4:8081"
+	defaultNodeName5 = "127.0.0.5:8081"
+	defaultCase      = "cause"
+)
+
 func TestCluster(t *testing.T) {
 	re := require.New(t)
 	s := NewStorage(t)
 	ctx := context.Background()
 
+	// test create cluster
 	clusters := make([]*clusterpb.Cluster, 0)
 	for i := 0; i < 20; i++ {
-		cluster := &clusterpb.Cluster{Id: uint32(i), Name: "name", MinNodeCount: uint32(i), ReplicationFactor: uint32(i), ShardTotal: uint32(i)}
+		cluster := &clusterpb.Cluster{Id: uint32(i), Name: defaultName1, MinNodeCount: uint32(i), ReplicationFactor: uint32(i), ShardTotal: uint32(i)}
 		cluster, err := s.CreateCluster(ctx, cluster)
 		re.NoError(err)
 		clusters = append(clusters, cluster)
 	}
 
+	// test list clusters
 	values, err := s.ListClusters(ctx)
 	re.NoError(err)
 
@@ -40,11 +57,14 @@ func TestCluster(t *testing.T) {
 		re.Equal(clusters[i].CreatedAt, values[i].CreatedAt)
 		re.Equal(clusters[i].ShardTotal, values[i].ShardTotal)
 	}
-	cluster := &clusterpb.Cluster{Id: uint32(0), Name: "name", MinNodeCount: uint32(1), ReplicationFactor: uint32(1), ShardTotal: uint32(1)}
-	err = s.PutCluster(ctx, uint32(0), cluster)
+
+	// test put cluster
+	cluster := &clusterpb.Cluster{Id: defaultClusterID, Name: defaultName1, MinNodeCount: uint32(1), ReplicationFactor: uint32(1), ShardTotal: uint32(1)}
+	err = s.PutCluster(ctx, defaultClusterID, cluster)
 	re.NoError(err)
 
-	value, err := s.GetCluster(ctx, uint32(0))
+	// test get cluster
+	value, err := s.GetCluster(ctx, defaultClusterID)
 	re.NoError(err)
 	re.Equal(cluster.Id, value.Id)
 	re.Equal(cluster.Name, value.Name)
@@ -60,22 +80,25 @@ func TestClusterTopology(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	clusterTopology := &clusterpb.ClusterTopology{ClusterId: 1, DataVersion: 0, Cause: "cause"}
+	// test create cluster topology
+	clusterTopology := &clusterpb.ClusterTopology{ClusterId: defaultClusterID, DataVersion: defaultVersion, Cause: defaultCase}
 	clusterTopology, err := s.CreateClusterTopology(ctx, clusterTopology)
 	re.NoError(err)
 
-	value, err := s.GetClusterTopology(ctx, 1)
+	// test get cluster topology
+	value, err := s.GetClusterTopology(ctx, defaultClusterID)
 	re.NoError(err)
 	re.Equal(clusterTopology.ClusterId, value.ClusterId)
 	re.Equal(clusterTopology.DataVersion, value.DataVersion)
 	re.Equal(clusterTopology.Cause, value.Cause)
 	re.Equal(clusterTopology.CreatedAt, value.CreatedAt)
 
+	// test put cluster topology
 	clusterTopology.DataVersion = uint64(1)
-	err = s.PutClusterTopology(ctx, 1, 0, clusterTopology)
+	err = s.PutClusterTopology(ctx, defaultClusterID, defaultVersion, clusterTopology)
 	re.NoError(err)
 
-	value, err = s.GetClusterTopology(ctx, 1)
+	value, err = s.GetClusterTopology(ctx, defaultClusterID)
 	re.NoError(err)
 	re.Equal(clusterTopology.ClusterId, value.ClusterId)
 	re.Equal(clusterTopology.DataVersion, value.DataVersion)
@@ -89,15 +112,17 @@ func TestSchemes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
+	// test create schema
 	schemas := make([]*clusterpb.Schema, 0)
 	for i := 0; i < 10; i++ {
-		schema := &clusterpb.Schema{Id: uint32(i), ClusterId: uint32(0), Name: "name"}
-		schema, err := s.CreateSchema(ctx, uint32(0), schema)
+		schema := &clusterpb.Schema{Id: uint32(i), ClusterId: defaultClusterID, Name: defaultName1}
+		schema, err := s.CreateSchema(ctx, defaultClusterID, schema)
 		re.NoError(err)
 		schemas = append(schemas, schema)
 	}
 
-	value, err := s.ListSchemas(ctx, 0)
+	// test list schemas
+	value, err := s.ListSchemas(ctx, defaultClusterID)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {
 		re.Equal(schemas[i].Id, value[i].Id)
@@ -105,13 +130,15 @@ func TestSchemes(t *testing.T) {
 		re.Equal(schemas[i].Name, value[i].Name)
 		re.Equal(schemas[i].CreatedAt, value[i].CreatedAt)
 	}
+
+	// test put schemas
 	for i := 0; i < 10; i++ {
-		schemas[i].Name = "name_"
+		schemas[i].Name = defaultName2
 	}
-	err = s.PutSchemas(ctx, uint32(0), schemas)
+	err = s.PutSchemas(ctx, defaultClusterID, schemas)
 	re.NoError(err)
 
-	value, err = s.ListSchemas(ctx, 0)
+	value, err = s.ListSchemas(ctx, defaultClusterID)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {
 		re.Equal(schemas[i].Id, value[i].Id)
@@ -127,18 +154,20 @@ func TestTables(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	table1 := &clusterpb.Table{Id: uint64(1), Name: "name_1", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
-	table2 := &clusterpb.Table{Id: uint64(2), Name: "name_2", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
-	table3 := &clusterpb.Table{Id: uint64(3), Name: "name_3", SchemaId: uint32(1), ShardId: uint32(1), Desc: "desc"}
+	// test create tables
+	table1 := &clusterpb.Table{Id: uint64(1), Name: defaultName1, SchemaId: defaultSchemaID, ShardId: uint32(1), Desc: defaultDesc}
+	table2 := &clusterpb.Table{Id: uint64(2), Name: defaultName2, SchemaId: defaultSchemaID, ShardId: uint32(1), Desc: defaultDesc}
+	table3 := &clusterpb.Table{Id: uint64(3), Name: defaultName3, SchemaId: defaultSchemaID, ShardId: uint32(1), Desc: defaultDesc}
 
-	table1, err := s.CreateTable(ctx, 1, 1, table1)
+	table1, err := s.CreateTable(ctx, defaultClusterID, defaultSchemaID, table1)
 	re.NoError(err)
-	table2, err = s.CreateTable(ctx, 1, 1, table2)
+	table2, err = s.CreateTable(ctx, defaultClusterID, defaultSchemaID, table2)
 	re.NoError(err)
-	table3, err = s.CreateTable(ctx, 1, 1, table3)
+	table3, err = s.CreateTable(ctx, defaultClusterID, defaultSchemaID, table3)
 	re.NoError(err)
 
-	value, exist, err := s.GetTable(ctx, 1, 1, "name_1")
+	// test get table
+	value, exist, err := s.GetTable(ctx, defaultClusterID, defaultSchemaID, defaultName1)
 	re.NoError(err)
 	re.True(exist)
 	re.Equal(table1.Id, value.Id)
@@ -148,7 +177,8 @@ func TestTables(t *testing.T) {
 	re.Equal(table1.Desc, value.Desc)
 	re.Equal(table1.CreatedAt, value.CreatedAt)
 
-	tables, err := s.ListTables(ctx, 1, 1)
+	// test list tables
+	tables, err := s.ListTables(ctx, defaultClusterID, defaultSchemaID)
 	re.NoError(err)
 
 	re.Equal(table1.Id, tables[0].Id)
@@ -172,10 +202,11 @@ func TestTables(t *testing.T) {
 	re.Equal(table3.Desc, tables[2].Desc)
 	re.Equal(table3.CreatedAt, tables[2].CreatedAt)
 
-	err = s.DeleteTable(ctx, 1, 1, "name_1")
+	// test delete table
+	err = s.DeleteTable(ctx, defaultClusterID, defaultSchemaID, defaultName1)
 	re.NoError(err)
 
-	value, exist, err = s.GetTable(ctx, 1, 1, "name_1")
+	value, exist, err = s.GetTable(ctx, defaultClusterID, defaultSchemaID, defaultName1)
 	re.NoError(err)
 	re.Empty(value)
 	re.True(!exist)
@@ -187,17 +218,19 @@ func TestShardTopologies(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
+	// test create shard topologies
 	shardTopologies := make([]*clusterpb.ShardTopology, 0)
 	shardID := make([]uint32, 0)
 	for i := 0; i < 10; i++ {
-		shardTopology := &clusterpb.ShardTopology{ShardId: uint32(i), Version: 0}
+		shardTopology := &clusterpb.ShardTopology{ShardId: uint32(i), Version: defaultVersion}
 		shardTopologies = append(shardTopologies, shardTopology)
 		shardID = append(shardID, uint32(i))
 	}
-	shardTopologies, err := s.CreateShardTopologies(ctx, 1, shardTopologies)
+	shardTopologies, err := s.CreateShardTopologies(ctx, defaultClusterID, shardTopologies)
 	re.NoError(err)
 
-	value, err := s.ListShardTopologies(ctx, 1, shardID)
+	// test list shard topologies
+	value, err := s.ListShardTopologies(ctx, defaultClusterID, shardID)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {
 		re.Equal(shardTopologies[i].ShardId, value[i].ShardId)
@@ -205,14 +238,15 @@ func TestShardTopologies(t *testing.T) {
 		re.Equal(shardTopologies[i].CreatedAt, value[i].CreatedAt)
 	}
 
+	// test put shard topologies
 	for i := 0; i < 10; i++ {
 		shardTopologies[i].Version = 1
 	}
 
-	err = s.PutShardTopologies(ctx, 1, shardID, 0, shardTopologies)
+	err = s.PutShardTopologies(ctx, defaultClusterID, shardID, defaultVersion, shardTopologies)
 	re.NoError(err)
 
-	value, err = s.ListShardTopologies(ctx, 1, shardID)
+	value, err = s.ListShardTopologies(ctx, defaultClusterID, shardID)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {
 		re.Equal(shardTopologies[i].ShardId, value[i].ShardId)
@@ -227,27 +261,29 @@ func TestNodes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	node1 := &clusterpb.Node{Name: "127.0.0.1:8081"}
-	node1, err := s.CreateOrUpdateNode(ctx, 1, node1)
+	// test create node
+	node1 := &clusterpb.Node{Name: defaultNodeName1}
+	node1, err := s.CreateOrUpdateNode(ctx, defaultClusterID, node1)
 	re.NoError(err)
 
-	node2 := &clusterpb.Node{Name: "127.0.0.2:8081"}
-	node2, err = s.CreateOrUpdateNode(ctx, 1, node2)
+	node2 := &clusterpb.Node{Name: defaultNodeName2}
+	node2, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node2)
 	re.NoError(err)
 
-	node3 := &clusterpb.Node{Name: "127.0.0.3:8081"}
-	node3, err = s.CreateOrUpdateNode(ctx, 1, node3)
+	node3 := &clusterpb.Node{Name: defaultNodeName3}
+	node3, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node3)
 	re.NoError(err)
 
-	node4 := &clusterpb.Node{Name: "127.0.0.4:8081"}
-	node4, err = s.CreateOrUpdateNode(ctx, 1, node4)
+	node4 := &clusterpb.Node{Name: defaultNodeName4}
+	node4, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node4)
 	re.NoError(err)
 
-	node5 := &clusterpb.Node{Name: "127.0.0.5:8081"}
-	node5, err = s.CreateOrUpdateNode(ctx, 1, node5)
+	node5 := &clusterpb.Node{Name: defaultNodeName5}
+	node5, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node5)
 	re.NoError(err)
 
-	nodes, err := s.ListNodes(ctx, 1)
+	// test list nodes
+	nodes, err := s.ListNodes(ctx, defaultClusterID)
 	re.NoError(err)
 
 	re.Equal(node1.Name, nodes[0].Name)
@@ -284,8 +320,7 @@ func NewStorage(t *testing.T) Storage {
 	})
 	assert.NoError(t, err)
 
-	rootPath := path.Join("/ceresmeta", strconv.FormatUint(100, 10))
 	ops := Options{MaxScanLimit: 100, MinScanLimit: 10}
 
-	return newEtcdStorage(client, rootPath, ops)
+	return newEtcdStorage(client, defaultRootPath, ops)
 }

@@ -108,7 +108,6 @@ func (c *Cluster) Load(ctx context.Context) error {
 	return nil
 }
 
-// TODO: load node into nodesCache
 func (c *Cluster) updateCacheLocked(
 	shards map[uint32][]*clusterpb.Shard,
 	shardTopologies map[uint32]*clusterpb.ShardTopology,
@@ -116,6 +115,7 @@ func (c *Cluster) updateCacheLocked(
 	nodesLoaded map[string]*clusterpb.Node,
 	tablesLoaded map[string]map[uint64]*clusterpb.Table,
 ) error {
+	// update schemas cache
 	for schemaName, tables := range tablesLoaded {
 		for _, table := range tables {
 			_, ok := c.schemasCache[schemaName]
@@ -136,16 +136,19 @@ func (c *Cluster) updateCacheLocked(
 		}
 	}
 
-	shardIDs := make(map[string][]uint32, len(nodesLoaded))
-	for shardID, shards := range shards {
-		for _, shard := range shards {
-			shardIDs[shard.Node] = append(shardIDs[shard.Node], shardID)
+	// update node cache
+	for shardID, shardPbs := range shards {
+		for _, shard := range shardPbs {
+			if _, ok := c.nodesCache[shard.GetNode()]; ok {
+				c.nodesCache[shard.GetNode()].shardIDs = append(c.nodesCache[shard.GetNode()].shardIDs, shardID)
+			} else {
+				// TODO: check node not found by node name
+				c.nodesCache[shard.GetNode()] = &Node{meta: nodesLoaded[shard.GetNode()], shardIDs: []uint32{shardID}}
+			}
 		}
 	}
-	for nodeName, node := range nodesLoaded {
-		c.nodesCache[nodeName] = &Node{meta: node, shardIDs: shardIDs[nodeName]}
-	}
 
+	// update shards cache
 	for shardID, shardTopology := range shardTopologies {
 		tables := make(map[uint64]*Table, len(shardTopology.TableIds))
 
@@ -174,18 +177,6 @@ func (c *Cluster) updateCacheLocked(
 			nodes:   nodes,
 			tables:  tables,
 			version: 0,
-		}
-	}
-
-	for shardID, shardPbs := range shards {
-		for _, shard := range shardPbs {
-			if node := c.nodesCache[shard.GetNode()]; node != nil {
-				if _, ok := c.nodesCache[shard.GetNode()]; ok {
-					node.shardIDs = append(node.shardIDs, shardID)
-				} else {
-					node.shardIDs = []uint32{shardID}
-				}
-			}
 		}
 	}
 

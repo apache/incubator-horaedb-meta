@@ -41,7 +41,7 @@ func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
 
 	if alloc.base == alloc.end {
 		if err := alloc.fastRebaseLocked(ctx); err != nil {
-			log.Info("fast rebase failed", zap.Error(err))
+			log.Debug("fast rebase failed", zap.Error(err))
 
 			if err := alloc.rebaseLocked(ctx); err != nil {
 				return 0, err
@@ -83,6 +83,9 @@ func (alloc *AllocatorImpl) doRebase(ctx context.Context, currEnd uint64) error 
 	}
 	opPutEndID := clientv3.OpPut(key, encodeID(newEnd))
 
+	// Check whether the currEnd id is existed in etcd, if not, create end id
+	// Check whether the currEnd id is equal to that in etcd. If it is equal，update end id
+	// otherwise return error
 	resp, err := alloc.kv.Txn(ctx).
 		If(cmp).
 		Then(opPutEndID).
