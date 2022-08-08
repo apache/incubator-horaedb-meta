@@ -493,7 +493,7 @@ func (c *Cluster) assignShardID(nodeName string) (uint32, error) {
 		}
 		id, err := rand.Int(rand.Reader, big.NewInt(int64(len(node.shardIDs))))
 		if err != nil {
-			return 0, errors.Wrapf(err, "assign shard id failed, nameName:%s", nodeName)
+			return 0, errors.Wrapf(err, "assign shard id failed, nodeName:%s", nodeName)
 		}
 		return node.shardIDs[uint32(id.Uint64())], nil
 	}

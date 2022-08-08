@@ -93,7 +93,7 @@ func (alloc *AllocatorImpl) doRebase(ctx context.Context, currEnd uint64) error 
 		return ErrTxnPutEndID.WithCausef("txn put end id failed, resp:%v", resp)
 	}
 
-	log.Info("Allocator allocates a new id", zap.Uint64("alloc-id", newEnd))
+	log.Info("Allocator allocates a new id", zap.Uint64(alloc.key, newEnd))
 
 	alloc.end = newEnd
 	alloc.base = newEnd - defaultAllocStep

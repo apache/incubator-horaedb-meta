@@ -13,11 +13,11 @@ type MetaStorage interface {
 	ListClusters(ctx context.Context) ([]*clusterpb.Cluster, error)
 	CreateCluster(ctx context.Context, cluster *clusterpb.Cluster) (*clusterpb.Cluster, error)
 	GetCluster(ctx context.Context, clusterID uint32) (*clusterpb.Cluster, error)
-	PutCluster(ctx context.Context, clusterID uint32, meta *clusterpb.Cluster) error
+	PutCluster(ctx context.Context, clusterID uint32, cluster *clusterpb.Cluster) error
 
 	CreateClusterTopology(ctx context.Context, clusterTopology *clusterpb.ClusterTopology) (*clusterpb.ClusterTopology, error)
 	GetClusterTopology(ctx context.Context, clusterID uint32) (*clusterpb.ClusterTopology, error)
-	PutClusterTopology(ctx context.Context, clusterID uint32, latestVersion uint64, clusterMetaData *clusterpb.ClusterTopology) error
+	PutClusterTopology(ctx context.Context, clusterID uint32, latestVersion uint64, clusterTopology *clusterpb.ClusterTopology) error
 
 	ListSchemas(ctx context.Context, clusterID uint32) ([]*clusterpb.Schema, error)
 	CreateSchema(ctx context.Context, clusterID uint32, schema *clusterpb.Schema) (*clusterpb.Schema, error)
@@ -29,11 +29,11 @@ type MetaStorage interface {
 	PutTables(ctx context.Context, clusterID uint32, schemaID uint32, tables []*clusterpb.Table) error
 	DeleteTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) error
 
-	CreateShardTopologies(ctx context.Context, clusterID uint32, clusterTopology []*clusterpb.ShardTopology) ([]*clusterpb.ShardTopology, error)
+	CreateShardTopologies(ctx context.Context, clusterID uint32, shardTopologies []*clusterpb.ShardTopology) ([]*clusterpb.ShardTopology, error)
 	ListShardTopologies(ctx context.Context, clusterID uint32, shardID []uint32) ([]*clusterpb.ShardTopology, error)
-	PutShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32, latestVersion uint64, topologies []*clusterpb.ShardTopology) error
+	PutShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32, latestVersion uint64, shardTopologies []*clusterpb.ShardTopology) error
 
 	ListNodes(ctx context.Context, clusterID uint32) ([]*clusterpb.Node, error)
-	PutNodes(ctx context.Context, clusterID uint32, node []*clusterpb.Node) error
+	PutNodes(ctx context.Context, clusterID uint32, nodes []*clusterpb.Node) error
 	CreateOrUpdateNode(ctx context.Context, clusterID uint32, node *clusterpb.Node) (*clusterpb.Node, error)
 }

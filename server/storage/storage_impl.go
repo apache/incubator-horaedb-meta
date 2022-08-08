@@ -102,6 +102,7 @@ func (s *metaStorageImpl) CreateCluster(ctx context.Context, cluster *clusterpb.
 		return nil, ErrParseCreateCluster.WithCausef("proto parse failed, err:%v", err)
 	}
 
+	// concat rootPath and cluster key to get etcd key of cluster
 	key := path.Join(s.rootPath, makeClusterKey(cluster.Id))
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
@@ -127,15 +128,15 @@ func (s *metaStorageImpl) GetCluster(ctx context.Context, clusterID uint32) (*cl
 		return nil, errors.Wrapf(err, "meta storage get cluster failed, clusterID:%d, key:%s", clusterID, key)
 	}
 
-	meta := &clusterpb.Cluster{}
-	if err = proto.Unmarshal([]byte(value), meta); err != nil {
+	cluster := &clusterpb.Cluster{}
+	if err = proto.Unmarshal([]byte(value), cluster); err != nil {
 		return nil, ErrParseGetCluster.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
-	return meta, nil
+	return cluster, nil
 }
 
-func (s *metaStorageImpl) PutCluster(ctx context.Context, clusterID uint32, meta *clusterpb.Cluster) error {
-	value, err := proto.Marshal(meta)
+func (s *metaStorageImpl) PutCluster(ctx context.Context, clusterID uint32, cluster *clusterpb.Cluster) error {
+	value, err := proto.Marshal(cluster)
 	if err != nil {
 		return ErrParsePutCluster.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
@@ -157,7 +158,9 @@ func (s *metaStorageImpl) CreateClusterTopology(ctx context.Context, clusterTopo
 		return nil, ErrParseCreateClusterTopology.WithCausef("proto parse failed, err:%v", err)
 	}
 
+	// concat rootPath and cluster topology key to get etcd key of cluster topology
 	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterTopology.ClusterId, fmtID(clusterTopology.DataVersion)))
+	// concat rootPath and cluster topology latest version key to get etcd key of cluster topology latest version
 	latestVersionKey := path.Join(s.rootPath, makeClusterTopologyLatestVersionKey(clusterTopology.ClusterId))
 
 	cmplatestVersionKey := clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
@@ -191,25 +194,27 @@ func (s *metaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint
 		return nil, errors.Wrapf(err, "meta storage get cluster topology failed, clusterID:%d, key:%s", clusterID, key)
 	}
 
-	clusterMetaData := &clusterpb.ClusterTopology{}
-	if err = proto.Unmarshal([]byte(value), clusterMetaData); err != nil {
+	clusterTopology := &clusterpb.ClusterTopology{}
+	if err = proto.Unmarshal([]byte(value), clusterTopology); err != nil {
 		return nil, ErrParseGetClusterTopology.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
-	return clusterMetaData, nil
+	return clusterTopology, nil
 }
 
-func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, latestVersion uint64, clusterMetaData *clusterpb.ClusterTopology) error {
-	value, err := proto.Marshal(clusterMetaData)
+func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint32, latestVersion uint64, clusterTopology *clusterpb.ClusterTopology) error {
+	value, err := proto.Marshal(clusterTopology)
 	if err != nil {
 		return ErrParsePutClusterTopology.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 	}
 
-	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterID, fmtID(clusterMetaData.DataVersion)))
+	// concat rootPath and cluster topology key to get etcd key of cluster topology
+	key := path.Join(s.rootPath, makeClusterTopologyKey(clusterID, fmtID(clusterTopology.DataVersion)))
+	// concat rootPath and cluster topology latest version key to get etcd key of cluster topology latest version
 	latestVersionKey := path.Join(s.rootPath, makeClusterTopologyLatestVersionKey(clusterID))
 
 	cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(latestVersion))
 	opPutClusterTopology := clientv3.OpPut(key, string(value))
-	opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(clusterMetaData.DataVersion))
+	opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(clusterTopology.DataVersion))
 
 	resp, err := s.Txn(ctx).
 		If(cmp).
@@ -276,6 +281,7 @@ func (s *metaStorageImpl) CreateSchema(ctx context.Context, clusterID uint32, sc
 		return nil, ErrParseCreateSchema.WithCausef("proto parse failed, err:%v", err)
 	}
 
+	// concat rootPath and schema key to get etcd key of schema
 	key := path.Join(s.rootPath, makeSchemaKey(clusterID, schema.Id))
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
@@ -319,7 +325,9 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 		return nil, ErrParseCreateTable.WithCausef("proto parse failed, err:%v", err)
 	}
 
+	// concat rootPath and table key to get etcd key of table
 	key := path.Join(s.rootPath, makeTableKey(clusterID, schemaID, table.Id))
+	// concat rootPath and table id key to get etcd key of table id
 	nameToIDKey := path.Join(s.rootPath, table.Name)
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
@@ -411,15 +419,15 @@ func (s *metaStorageImpl) ListTables(ctx context.Context, clusterID uint32, sche
 
 // TODO: operator in a batch
 func (s *metaStorageImpl) PutTables(ctx context.Context, clusterID uint32, schemaID uint32, tables []*clusterpb.Table) error {
-	for _, item := range tables {
-		key := makeTableKey(clusterID, schemaID, item.Id)
-		value, err := proto.Marshal(item)
+	for _, table := range tables {
+		key := makeTableKey(clusterID, schemaID, table.Id)
+		value, err := proto.Marshal(table)
 		if err != nil {
-			return ErrParsePutTables.WithCausef("proto parse failed, clusterID:%d, schemaID:%d, tableID:%d, err:%v", clusterID, schemaID, item.Id, err)
+			return ErrParsePutTables.WithCausef("proto parse failed, clusterID:%d, schemaID:%d, tableID:%d, err:%v", clusterID, schemaID, table.Id, err)
 		}
 
 		if err = s.Put(ctx, key, string(value)); err != nil {
-			return errors.Wrapf(err, "meta storage put tables failed, clusterID:%d, schemaID:%d, tableID:%d, key:%s", clusterID, schemaID, item.Id, key)
+			return errors.Wrapf(err, "meta storage put tables failed, clusterID:%d, schemaID:%d, tableID:%d, key:%s", clusterID, schemaID, table.Id, key)
 		}
 	}
 	return nil
@@ -455,7 +463,9 @@ func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID u
 			return nil, ErrParseCreateShardTopology.WithCausef("proto parse failed, err:%v", err)
 		}
 
+		// concat rootPath and shard topology key to get etcd key of shard topology
 		key := path.Join(s.rootPath, makeShardTopologyKey(clusterID, shardTopology.GetShardId(), fmtID(shardTopology.Version)))
+		// concat rootPath and shard topolog latest version key to get etcd key of shard topology latest version
 		latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardTopology.GetShardId()))
 
 		cmplatestVersionKey := clientv3.Compare(clientv3.CreateRevision(latestVersionKey), "=", 0)
@@ -468,7 +478,7 @@ func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID u
 			Then(opCreateClsuterTopology, opCreateClsuterTopologyLatestVersion).
 			Commit()
 		if err != nil {
-			return nil, errors.Wrapf(err, "meta storage create cluster topology failed, clusterID:%d, key:%s", clusterID, key)
+			return nil, errors.Wrapf(err, "meta storage create shard topology failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardTopology.ShardId, key)
 		}
 		if !resp.Succeeded {
 			return nil, ErrParseCreateClusterTopology.WithCausef("resp:%v", resp)
@@ -479,7 +489,7 @@ func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID u
 
 // TODO: operator in a batch
 func (s *metaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32) ([]*clusterpb.ShardTopology, error) {
-	shardTableInfo := make([]*clusterpb.ShardTopology, 0)
+	shardTopologies := make([]*clusterpb.ShardTopology, 0)
 
 	for _, shardID := range shardIDs {
 		key := makeShardLatestVersionKey(clusterID, shardID)
@@ -498,24 +508,26 @@ func (s *metaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 		if err = proto.Unmarshal([]byte(value), shardTopology); err != nil {
 			return nil, ErrParseListShardTopology.WithCausef("proto parse failed, clusterID:%d, shardID:%d, err:%v", clusterID, shardID, err)
 		}
-		shardTableInfo = append(shardTableInfo, shardTopology)
+		shardTopologies = append(shardTopologies, shardTopology)
 	}
-	return shardTableInfo, nil
+	return shardTopologies, nil
 }
 
 // TODO: operator in a batch
-func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32, latestVersion uint64, shardTableInfo []*clusterpb.ShardTopology) error {
+func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint32, shardIDs []uint32, latestVersion uint64, shardTopologies []*clusterpb.ShardTopology) error {
 	for index, shardID := range shardIDs {
-		value, err := proto.Marshal(shardTableInfo[index])
+		value, err := proto.Marshal(shardTopologies[index])
 		if err != nil {
 			return ErrParsePutShardTopology.WithCausef("proto parse failed, clusterID:%d, shardID:%d, err:%v", clusterID, shardID, err)
 		}
 
-		key := path.Join(s.rootPath, makeShardTopologyKey(clusterID, shardID, fmtID(shardTableInfo[index].Version)))
+		// concat rootPath and shard topology key to get etcd key of shard topology
+		key := path.Join(s.rootPath, makeShardTopologyKey(clusterID, shardID, fmtID(shardTopologies[index].Version)))
+		// concat rootPath and shard topology latest version key to get etcd key of shard topology latest version
 		latestVersionKey := path.Join(s.rootPath, makeShardLatestVersionKey(clusterID, shardID))
 
 		cmp := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(latestVersion))
-		opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTableInfo[index].Version))
+		opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTopologies[index].Version))
 		opPutShardTopology := clientv3.OpPut(key, string(value))
 
 		resp, err := s.Txn(ctx).
@@ -523,7 +535,7 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 			Then(opPutLatestVersion, opPutShardTopology).
 			Commit()
 		if err != nil {
-			return errors.Wrapf(err, "meta storage put shard failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
+			return errors.Wrapf(err, "meta storage put shard topology failed, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
 		if !resp.Succeeded {
 			return ErrParsePutShardTopology.WithCausef("clusterID:%d, shardID:%d, resp:%v", clusterID, shardID, resp)
@@ -560,7 +572,7 @@ func (s *metaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*c
 		for index, r := range res {
 			node := &clusterpb.Node{}
 			if err := proto.Unmarshal([]byte(r), node); err != nil {
-				return nil, ErrParseListNodes.WithCausef("proto parse failed, clusterID:%d, err:%s", clusterID, err)
+				return nil, ErrParseListNodes.WithCausef("proto parse failed, clusterID:%d, err:%v", clusterID, err)
 			}
 
 			nodes = append(nodes, node)
@@ -584,23 +596,25 @@ func (s *metaStorageImpl) PutNodes(ctx context.Context, clusterID uint32, nodes 
 func (s *metaStorageImpl) CreateOrUpdateNode(ctx context.Context, clusterID uint32, node *clusterpb.Node) (*clusterpb.Node, error) {
 	now := time.Now()
 	node.LastTouchTime = uint64(now.Unix())
+
 	CreateNode := node
 	CreateNode.CreateTime = CreateNode.LastTouchTime
 	UpdateNode := node
 
+	// concat rootPath and node key to get etcd key of node
 	key := path.Join(s.rootPath, makeNodeKey(clusterID, node.Name))
-	value, err := proto.Marshal(CreateNode)
+	CreateNodeValue, err := proto.Marshal(CreateNode)
 	if err != nil {
 		return nil, ErrParseCreateOrUpdateNode.WithCausef("proto parse failed, clusterID:%d, node name:%s, err:%v", clusterID, node.Name, err)
 	}
-	UpdateNodevalue, err := proto.Marshal(UpdateNode)
+	UpdateNodeValue, err := proto.Marshal(UpdateNode)
 	if err != nil {
 		return nil, ErrParseCreateOrUpdateNode.WithCausef("proto parse failed, clusterID:%d, node name:%s, err:%v", clusterID, node.Name, err)
 	}
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
-	opCreateNode := clientv3.OpPut(key, string(value))
-	opUpdateNode := clientv3.OpPut(key, string(UpdateNodevalue))
+	opCreateNode := clientv3.OpPut(key, string(CreateNodeValue))
+	opUpdateNode := clientv3.OpPut(key, string(UpdateNodeValue))
 
 	_, err = s.Txn(ctx).
 		If(cmp).
@@ -608,7 +622,7 @@ func (s *metaStorageImpl) CreateOrUpdateNode(ctx context.Context, clusterID uint
 		Else(opUpdateNode).
 		Commit()
 	if err != nil {
-		return nil, errors.Wrapf(err, "meta storage create node failed, clusterID:%d, node name:%s, key:%s", clusterID, node.Name, key)
+		return nil, errors.Wrapf(err, "meta storage create or update node failed, clusterID:%d, node name:%s, key:%s", clusterID, node.Name, key)
 	}
 
 	return node, nil
