@@ -219,7 +219,6 @@ func TestShardTopologies(t *testing.T) {
 		re.Equal(shardTopologies[i].Version, value[i].Version)
 		re.Equal(shardTopologies[i].CreatedAt, value[i].CreatedAt)
 	}
-
 }
 
 func TestNodes(t *testing.T) {
