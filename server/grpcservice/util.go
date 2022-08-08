@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-// GetClientConn returns a gRPC client connection.
-func GetClientConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
+// getClientConn returns a gRPC client connection.
+func getClientConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
 	u, err := url.Parse(addr)
 	if err != nil {
 		return nil, ErrParseURL.WithCause(err)
@@ -25,11 +25,11 @@ func GetClientConn(ctx context.Context, addr string) (*grpc.ClientConn, error) {
 	return cc, nil
 }
 
-func OkResponseHeader() *commonpb.ResponseHeader {
-	return ResponseHeader(nil, "")
+func okResponseHeader() *commonpb.ResponseHeader {
+	return responseHeader(nil, "")
 }
 
-func ResponseHeader(err error, errMsg string) *commonpb.ResponseHeader {
+func responseHeader(err error, errMsg string) *commonpb.ResponseHeader {
 	code, b := coderr.GetCauseCode(err)
 	if !b {
 		code = coderr.Internal

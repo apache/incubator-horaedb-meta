@@ -8,7 +8,6 @@ type Code int
 
 const (
 	InvalidParams Code = http.StatusBadRequest
-	Ok                 = http.StatusOK
 	Internal           = http.StatusInternalServerError
 	NotFound           = http.StatusNotFound
 	BadRequest         = http.StatusBadRequest

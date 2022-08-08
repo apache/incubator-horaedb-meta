@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// getForwardedCeresmetaClient get forwarded ceresmeta client. When current node is the leader, this func will return (nil,nil).
 func (s *Service) getForwardedCeresmetaClient(ctx context.Context) (metaservicepb.CeresmetaRpcServiceClient, error) {
 	forwardedAddr, _, err := s.getForwardedAddr(ctx)
 	if err != nil {
@@ -37,7 +38,7 @@ func (s *Service) getCeresmetaClient(ctx context.Context, addr string) (metaserv
 func (s *Service) getForwardedGrpcClient(ctx context.Context, forwardedAddr string) (*grpc.ClientConn, error) {
 	client, ok := s.connConns.Load(forwardedAddr)
 	if !ok {
-		cc, err := GetClientConn(ctx, forwardedAddr)
+		cc, err := getClientConn(ctx, forwardedAddr)
 		if err != nil {
 			return nil, err
 		}

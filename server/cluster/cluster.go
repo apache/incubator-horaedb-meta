@@ -219,7 +219,7 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string, schemaID 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	// Check provided schema if exists.
+	// Check if provided schema exists.
 	schema, exists := c.GetSchema(schemaName)
 	if exists {
 		return schema, nil

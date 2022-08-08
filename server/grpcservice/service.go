@@ -93,14 +93,7 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metaservicepb.CeresmetaRpcService_N
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var (
-		forwardedStream       metaservicepb.CeresmetaRpcService_NodeHeartbeatClient
-		ceresmetaClient       metaservicepb.CeresmetaRpcServiceClient
-		errCh                 chan error
-		previousCtx           context.Context
-		previousCancel        context.CancelFunc
-		previousForwardedAddr string
-	)
+	f := &forwarder{s: s, heartbeatSrv: heartbeatSrv, errCh: make(chan error, 1)}
 
 	binder := streamBinder{
 		timeout: s.opTimeout,
@@ -127,50 +120,18 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metaservicepb.CeresmetaRpcService_N
 
 		// Forward request to the leader.
 		{
-			forwardedAddr, isLocal, err := s.getForwardedAddr(ctx)
+			err = f.maybeInitForwardedStream(ctx)
 			if err != nil {
 				return errors.Wrap(err, "node heartbeat")
 			}
 
-			maybeInitForwardStream := func() (metaservicepb.CeresmetaRpcService_NodeHeartbeatClient, string, error) {
-				if forwardedStream == nil || forwardedAddr != previousForwardedAddr {
-					if previousCancel != nil {
-						previousCancel()
-					}
-
-					if !isLocal {
-						dialCtx, dialCancel := context.WithTimeout(context.Background(), s.opTimeout)
-						defer dialCancel()
-						ceresmetaClient, err = s.getCeresmetaClient(dialCtx, forwardedAddr)
-						if err != nil {
-							return nil, "", errors.Wrap(err, "node heartbeat")
-						}
-
-						if ceresmetaClient != nil {
-							previousCtx, previousCancel = context.WithCancel(context.Background())
-							forwardedStream, err = s.createHeartbeatForwardedStream(previousCtx, ceresmetaClient)
-							if err != nil {
-								previousCancel()
-								return nil, "", err
-							}
-
-							previousForwardedAddr = forwardedAddr
-							errCh = make(chan error, 1)
-							go forwardRegionHeartbeatRespToClient(forwardedStream, heartbeatSrv, errCh)
-						}
-					}
-				}
-				return nil, "", nil
-			}
-			forwardedStream, previousForwardedAddr, err = maybeInitForwardStream()
-
-			if forwardedStream != nil {
-				if err := forwardedStream.Send(req); err != nil {
+			if f.stream != nil {
+				if err = f.stream.Send(req); err != nil {
 					return errors.Wrap(err, "node heartbeat")
 				}
 
 				select {
-				case err := <-errCh:
+				case err = <-f.errCh:
 					return err
 				default:
 				}
@@ -199,7 +160,7 @@ func (s *Service) NodeHeartbeat(heartbeatSrv metaservicepb.CeresmetaRpcService_N
 func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
-		return &metaservicepb.AllocSchemaIdResponse{Header: ResponseHeader(err, "grpc alloc schema id")}, nil
+		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "grpc alloc schema id")}, nil
 	}
 
 	// Forward request to the leader.
@@ -209,11 +170,11 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 
 	schemaID, err := s.h.GetClusterManager().AllocSchemaID(ctx, req.GetHeader().GetClusterName(), req.GetName())
 	if err != nil {
-		return &metaservicepb.AllocSchemaIdResponse{Header: ResponseHeader(err, "grpc alloc schema id")}, nil
+		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "grpc alloc schema id")}, nil
 	}
 
 	return &metaservicepb.AllocSchemaIdResponse{
-		Header: OkResponseHeader(),
+		Header: okResponseHeader(),
 		Name:   req.GetName(),
 		Id:     schemaID,
 	}, nil
@@ -223,7 +184,7 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 func (s *Service) AllocTableID(ctx context.Context, req *metaservicepb.AllocTableIdRequest) (*metaservicepb.AllocTableIdResponse, error) {
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
-		return &metaservicepb.AllocTableIdResponse{Header: ResponseHeader(err, "grpc alloc table id")}, nil
+		return &metaservicepb.AllocTableIdResponse{Header: responseHeader(err, "grpc alloc table id")}, nil
 	}
 
 	// Forward request to the leader.
@@ -233,11 +194,11 @@ func (s *Service) AllocTableID(ctx context.Context, req *metaservicepb.AllocTabl
 
 	table, err := s.h.GetClusterManager().AllocTableID(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetHeader().GetNode())
 	if err != nil {
-		return &metaservicepb.AllocTableIdResponse{Header: ResponseHeader(err, "grpc alloc table id")}, nil
+		return &metaservicepb.AllocTableIdResponse{Header: responseHeader(err, "grpc alloc table id")}, nil
 	}
 
 	return &metaservicepb.AllocTableIdResponse{
-		Header:     OkResponseHeader(),
+		Header:     okResponseHeader(),
 		ShardId:    table.GetShardID(),
 		SchemaName: table.GetSchemaName(),
 		SchemaId:   table.GetSchemaID(),
@@ -250,7 +211,7 @@ func (s *Service) AllocTableID(ctx context.Context, req *metaservicepb.AllocTabl
 func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesRequest) (*metaservicepb.GetTablesResponse, error) {
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
-		return &metaservicepb.GetTablesResponse{Header: ResponseHeader(err, "grpc get tables")}, nil
+		return &metaservicepb.GetTablesResponse{Header: responseHeader(err, "grpc get tables")}, nil
 	}
 
 	// Forward request to the leader.
@@ -260,7 +221,7 @@ func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesReq
 
 	tables, err := s.h.GetClusterManager().GetTables(ctx, req.GetHeader().GetClusterName(), req.GetHeader().GetNode(), req.GetShardId())
 	if err != nil {
-		return &metaservicepb.GetTablesResponse{Header: ResponseHeader(err, "grpc get tables")}, nil
+		return &metaservicepb.GetTablesResponse{Header: responseHeader(err, "grpc get tables")}, nil
 	}
 
 	tableMap := make(map[uint32]*metaservicepb.ShardTables, len(tables))
@@ -290,7 +251,7 @@ func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesReq
 	}
 
 	return &metaservicepb.GetTablesResponse{
-		Header:    OkResponseHeader(),
+		Header:    okResponseHeader(),
 		TablesMap: tableMap,
 	}, nil
 }
@@ -299,7 +260,7 @@ func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesReq
 func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
-		return &metaservicepb.DropTableResponse{Header: ResponseHeader(err, "grpc drop table")}, nil
+		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "grpc drop table")}, nil
 	}
 
 	// Forward request to the leader.
@@ -309,10 +270,73 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 
 	err = s.h.GetClusterManager().DropTable(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetName(), req.GetId())
 	if err != nil {
-		return &metaservicepb.DropTableResponse{Header: ResponseHeader(err, "grpc drop table")}, nil
+		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "grpc drop table")}, nil
 	}
 
 	return &metaservicepb.DropTableResponse{
-		Header: OkResponseHeader(),
+		Header: okResponseHeader(),
 	}, nil
+}
+
+type forwarder struct {
+	heartbeatSrv metaservicepb.CeresmetaRpcService_NodeHeartbeatServer
+	s            *Service
+	stream       metaservicepb.CeresmetaRpcService_NodeHeartbeatClient
+	addr         string
+	cancel       context.CancelFunc
+	errCh        chan error
+}
+
+func (f *forwarder) needReconnect(addr string) bool {
+	return f.stream == nil || addr != f.addr
+}
+
+func (f *forwarder) reconnect(addr string) error {
+	dialCtx, dialCancel := context.WithTimeout(context.Background(), f.s.opTimeout)
+	defer dialCancel()
+
+	ceresmetaClient, err := f.s.getCeresmetaClient(dialCtx, addr)
+	if err != nil {
+		return errors.Wrap(err, "forwarder reconnect")
+	}
+
+	if ceresmetaClient != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		f.cancel = cancel
+		f.stream, err = f.s.createHeartbeatForwardedStream(ctx, ceresmetaClient)
+		if err != nil {
+			cancel()
+			return errors.Wrap(err, "forwarder reconnect")
+		}
+
+		// Forward the leader's response to the client.
+		go forwardRegionHeartbeatRespToClient(f.stream, f.heartbeatSrv, f.errCh)
+		return nil
+	}
+	return nil
+}
+
+func (f *forwarder) maybeInitForwardedStream(ctx context.Context) error {
+	forwardedAddr, isLocal, err := f.s.getForwardedAddr(ctx)
+	if err != nil {
+		return err
+	}
+
+	// In following two cases, will reconnect:
+	// 1. request need to be forwarded, but forwarded stream is nil.
+	// 2. the forwarded addr(the leader addr) is changed, need to close previous forwarded stream and create new forwarded stream.
+	if f.needReconnect(forwardedAddr) {
+		// Close previous forwarded stream.
+		if f.cancel != nil {
+			f.cancel()
+		}
+
+		// When isLocal is false, request need to be forwarded to the leader.
+		if !isLocal {
+			if err = f.reconnect(forwardedAddr); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
