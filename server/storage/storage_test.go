@@ -60,27 +60,27 @@ func TestClusterTopology(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	clusterMetaData := &clusterpb.ClusterTopology{ClusterId: 1, DataVersion: 0, Cause: "cause"}
-	clusterMetaData, err := s.CreateClusterTopology(ctx, clusterMetaData)
+	clusterTopology := &clusterpb.ClusterTopology{ClusterId: 1, DataVersion: 0, Cause: "cause"}
+	clusterTopology, err := s.CreateClusterTopology(ctx, clusterTopology)
 	re.NoError(err)
 
 	value, err := s.GetClusterTopology(ctx, 1)
 	re.NoError(err)
-	re.Equal(clusterMetaData.ClusterId, value.ClusterId)
-	re.Equal(clusterMetaData.DataVersion, value.DataVersion)
-	re.Equal(clusterMetaData.Cause, value.Cause)
-	re.Equal(clusterMetaData.CreatedAt, value.CreatedAt)
+	re.Equal(clusterTopology.ClusterId, value.ClusterId)
+	re.Equal(clusterTopology.DataVersion, value.DataVersion)
+	re.Equal(clusterTopology.Cause, value.Cause)
+	re.Equal(clusterTopology.CreatedAt, value.CreatedAt)
 
-	clusterMetaData.DataVersion = uint64(1)
-	err = s.PutClusterTopology(ctx, 1, 0, clusterMetaData)
+	clusterTopology.DataVersion = uint64(1)
+	err = s.PutClusterTopology(ctx, 1, 0, clusterTopology)
 	re.NoError(err)
 
 	value, err = s.GetClusterTopology(ctx, 1)
 	re.NoError(err)
-	re.Equal(clusterMetaData.ClusterId, value.ClusterId)
-	re.Equal(clusterMetaData.DataVersion, value.DataVersion)
-	re.Equal(clusterMetaData.Cause, value.Cause)
-	re.Equal(clusterMetaData.CreatedAt, value.CreatedAt)
+	re.Equal(clusterTopology.ClusterId, value.ClusterId)
+	re.Equal(clusterTopology.DataVersion, value.DataVersion)
+	re.Equal(clusterTopology.Cause, value.Cause)
+	re.Equal(clusterTopology.CreatedAt, value.CreatedAt)
 }
 
 func TestSchemes(t *testing.T) {
@@ -138,8 +138,9 @@ func TestTables(t *testing.T) {
 	table3, err = s.CreateTable(ctx, 1, 1, table3)
 	re.NoError(err)
 
-	value, _, err := s.GetTable(ctx, 1, 1, "name_1")
+	value, exist, err := s.GetTable(ctx, 1, 1, "name_1")
 	re.NoError(err)
+	re.True(exist)
 	re.Equal(table1.Id, value.Id)
 	re.Equal(table1.Name, value.Name)
 	re.Equal(table1.SchemaId, value.SchemaId)
@@ -173,6 +174,11 @@ func TestTables(t *testing.T) {
 
 	err = s.DeleteTable(ctx, 1, 1, "name_1")
 	re.NoError(err)
+
+	value, exist, err = s.GetTable(ctx, 1, 1, "name_1")
+	re.NoError(err)
+	re.Empty(value)
+	re.True(!exist)
 }
 
 func TestShardTopologies(t *testing.T) {
@@ -181,23 +187,39 @@ func TestShardTopologies(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	shardTableInfo := make([]*clusterpb.ShardTopology, 0)
+	shardTopologies := make([]*clusterpb.ShardTopology, 0)
 	shardID := make([]uint32, 0)
 	for i := 0; i < 10; i++ {
-		shardTableData := &clusterpb.ShardTopology{ShardId: uint32(i), Version: 0}
-		shardTableInfo = append(shardTableInfo, shardTableData)
+		shardTopology := &clusterpb.ShardTopology{ShardId: uint32(i), Version: 0}
+		shardTopologies = append(shardTopologies, shardTopology)
 		shardID = append(shardID, uint32(i))
 	}
-	shardTableInfo, err := s.CreateShardTopologies(ctx, 1, shardTableInfo)
+	shardTopologies, err := s.CreateShardTopologies(ctx, 1, shardTopologies)
 	re.NoError(err)
 
 	value, err := s.ListShardTopologies(ctx, 1, shardID)
 	re.NoError(err)
 	for i := 0; i < 10; i++ {
-		re.Equal(shardTableInfo[i].ShardId, value[i].ShardId)
-		re.Equal(shardTableInfo[i].Version, value[i].Version)
-		re.Equal(shardTableInfo[i].CreatedAt, value[i].CreatedAt)
+		re.Equal(shardTopologies[i].ShardId, value[i].ShardId)
+		re.Equal(shardTopologies[i].Version, value[i].Version)
+		re.Equal(shardTopologies[i].CreatedAt, value[i].CreatedAt)
 	}
+
+	for i := 0; i < 10; i++ {
+		shardTopologies[i].Version = 1
+	}
+
+	err = s.PutShardTopologies(ctx, 1, shardID, 0, shardTopologies)
+	re.NoError(err)
+
+	value, err = s.ListShardTopologies(ctx, 1, shardID)
+	re.NoError(err)
+	for i := 0; i < 10; i++ {
+		re.Equal(shardTopologies[i].ShardId, value[i].ShardId)
+		re.Equal(shardTopologies[i].Version, value[i].Version)
+		re.Equal(shardTopologies[i].CreatedAt, value[i].CreatedAt)
+	}
+
 }
 
 func TestNodes(t *testing.T) {
