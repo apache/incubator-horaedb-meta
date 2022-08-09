@@ -6,11 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/CeresDB/ceresmeta/server/schedule"
-
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
-
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
+	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

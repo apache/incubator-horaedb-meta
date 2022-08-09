@@ -47,9 +47,10 @@ func (c *Cluster) Name() string {
 func (c *Cluster) Load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	if c.coordinator == nil {
 		c.coordinator = newCoordinator(c, c.hbstream)
-		c.coordinator.runBgJob()
+		go c.coordinator.runBgJob()
 	}
 
 	shards, shardIDs, err := c.loadClusterTopologyLocked(ctx)

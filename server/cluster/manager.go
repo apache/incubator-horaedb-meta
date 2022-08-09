@@ -40,12 +40,12 @@ type managerImpl struct {
 	lock     sync.RWMutex
 	clusters map[string]*Cluster
 
-	storage  storage.Storage
-	hbstream *schedule.HeartbeatStreams
+	storage   storage.Storage
+	hbstreams *schedule.HeartbeatStreams
 }
 
 func NewManagerImpl(storage storage.Storage, hbstream *schedule.HeartbeatStreams) Manager {
-	return &managerImpl{storage: storage, clusters: make(map[string]*Cluster, 0), hbstream: hbstream}
+	return &managerImpl{storage: storage, clusters: make(map[string]*Cluster, 0), hbstreams: hbstream}
 }
 
 func (m *managerImpl) Load(ctx context.Context) error {
@@ -59,7 +59,7 @@ func (m *managerImpl) Load(ctx context.Context) error {
 
 	m.clusters = make(map[string]*Cluster, len(clusters))
 	for _, clusterPb := range clusters {
-		cluster := NewCluster(clusterPb, m.storage, m.hbstream)
+		cluster := NewCluster(clusterPb, m.storage, m.hbstreams)
 		if err := cluster.Load(ctx); err != nil {
 			return errors.Wrapf(err, "clusters manager Load, clusters:%v", cluster)
 		}
@@ -105,7 +105,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
 
-	cluster := NewCluster(clusterPb, m.storage, m.hbstream)
+	cluster := NewCluster(clusterPb, m.storage, m.hbstreams)
 	m.clusters[clusterName] = cluster
 
 	m.lock.Unlock()

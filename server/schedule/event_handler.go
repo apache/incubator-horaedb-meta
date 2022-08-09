@@ -17,7 +17,6 @@ type Event interface {
 type NoneEvent struct{}
 
 func (*NoneEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
-	// TODO: add response header
 	return &metaservicepb.NodeHeartbeatResponse{Timestamp: uint64(time.Now().UnixMilli())}
 }
 
@@ -26,12 +25,14 @@ type OpenEvent struct {
 }
 
 func (open *OpenEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
-	// TODO: add response header
-	return &metaservicepb.NodeHeartbeatResponse{Timestamp: uint64(time.Now().UnixMilli()), Cmd: &metaservicepb.NodeHeartbeatResponse_OpenCmd{
-		OpenCmd: &metaservicepb.OpenCmd{
-			ShardIds: open.ShardIDs,
+	return &metaservicepb.NodeHeartbeatResponse{
+		Timestamp: uint64(time.Now().UnixMilli()),
+		Cmd: &metaservicepb.NodeHeartbeatResponse_OpenCmd{
+			OpenCmd: &metaservicepb.OpenCmd{
+				ShardIds: open.ShardIDs,
+			},
 		},
-	}}
+	}
 }
 
 type EventHandler struct {

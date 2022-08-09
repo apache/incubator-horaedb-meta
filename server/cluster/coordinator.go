@@ -29,20 +29,21 @@ type coordinator struct {
 	eventHandler *schedule.EventHandler
 }
 
-func newCoordinator(cluster *Cluster, hbstream *schedule.HeartbeatStreams) *coordinator {
+func newCoordinator(cluster *Cluster, hbstreams *schedule.HeartbeatStreams) *coordinator {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &coordinator{
 		cluster: cluster,
 
 		ctx:          ctx,
 		cancel:       cancel,
-		eventHandler: schedule.NewEventHandler(hbstream),
+		eventHandler: schedule.NewEventHandler(hbstreams),
 	}
 }
 
 func (c *coordinator) runBgJob() {
 	c.bgJobWg.Add(1)
 	defer c.bgJobWg.Done()
+
 	for {
 		t := time.After(DefaultHeartbeatInterval)
 		select {
