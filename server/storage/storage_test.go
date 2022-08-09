@@ -15,20 +15,24 @@ import (
 )
 
 const (
-	defaultRootPath  = "/ceresmeta" // TODO: existed bug when rootPath = "/"
-	defaultName1     = "name_1"
-	defaultName2     = "name_2"
-	defaultName3     = "name_3"
-	defaultDesc      = "desc"
-	defaultClusterID = 1
-	defaultSchemaID  = 1
-	defaultVersion   = 0
-	defaultNodeName1 = "127.0.0.1:8081"
-	defaultNodeName2 = "127.0.0.2:8081"
-	defaultNodeName3 = "127.0.0.3:8081"
-	defaultNodeName4 = "127.0.0.4:8081"
-	defaultNodeName5 = "127.0.0.5:8081"
-	defaultCase      = "cause"
+	defaultRootPath          = "/ceresmeta" // TODO: existed bug when rootPath = "/"
+	defaultName1             = "name_1"
+	defaultName2             = "name_2"
+	defaultName3             = "name_3"
+	defaultDesc              = "desc"
+	defaultClusterID         = 1
+	defaultSchemaID          = 1
+	defaultVersion           = 0
+	defaultNodeName1         = "127.0.0.1:8081"
+	defaultNodeName2         = "127.0.0.2:8081"
+	defaultNodeName3         = "127.0.0.3:8081"
+	defaultNodeName4         = "127.0.0.4:8081"
+	defaultNodeName5         = "127.0.0.5:8081"
+	defaultCase              = "cause"
+	defaultMinNodeCount      = 1
+	defaultReplicationFactor = 3
+	defaultShardTotal        = 8
+	defaultShardID           = 1
 )
 
 func TestCluster(t *testing.T) {
@@ -39,7 +43,13 @@ func TestCluster(t *testing.T) {
 	// test create cluster
 	clusters := make([]*clusterpb.Cluster, 0)
 	for i := 0; i < 20; i++ {
-		cluster := &clusterpb.Cluster{Id: uint32(i), Name: defaultName1, MinNodeCount: uint32(i), ReplicationFactor: uint32(i), ShardTotal: uint32(i)}
+		cluster := &clusterpb.Cluster{
+			Id:                uint32(i),
+			Name:              defaultName1,
+			MinNodeCount:      uint32(i),
+			ReplicationFactor: uint32(i),
+			ShardTotal:        uint32(i),
+		}
 		cluster, err := s.CreateCluster(ctx, cluster)
 		re.NoError(err)
 		clusters = append(clusters, cluster)
@@ -59,7 +69,13 @@ func TestCluster(t *testing.T) {
 	}
 
 	// test put cluster
-	cluster := &clusterpb.Cluster{Id: defaultClusterID, Name: defaultName1, MinNodeCount: uint32(1), ReplicationFactor: uint32(1), ShardTotal: uint32(1)}
+	cluster := &clusterpb.Cluster{
+		Id:                defaultClusterID,
+		Name:              defaultName1,
+		MinNodeCount:      defaultMinNodeCount,
+		ReplicationFactor: defaultReplicationFactor,
+		ShardTotal:        defaultShardTotal,
+	}
 	err = s.PutCluster(ctx, defaultClusterID, cluster)
 	re.NoError(err)
 
@@ -81,7 +97,11 @@ func TestClusterTopology(t *testing.T) {
 	defer cancel()
 
 	// test create cluster topology
-	clusterTopology := &clusterpb.ClusterTopology{ClusterId: defaultClusterID, DataVersion: defaultVersion, Cause: defaultCase}
+	clusterTopology := &clusterpb.ClusterTopology{
+		ClusterId:   defaultClusterID,
+		DataVersion: defaultVersion,
+		Cause:       defaultCase,
+	}
 	clusterTopology, err := s.CreateClusterTopology(ctx, clusterTopology)
 	re.NoError(err)
 
@@ -155,9 +175,27 @@ func TestTables(t *testing.T) {
 	defer cancel()
 
 	// test create tables
-	table1 := &clusterpb.Table{Id: uint64(1), Name: defaultName1, SchemaId: defaultSchemaID, ShardId: uint32(1), Desc: defaultDesc}
-	table2 := &clusterpb.Table{Id: uint64(2), Name: defaultName2, SchemaId: defaultSchemaID, ShardId: uint32(1), Desc: defaultDesc}
-	table3 := &clusterpb.Table{Id: uint64(3), Name: defaultName3, SchemaId: defaultSchemaID, ShardId: uint32(1), Desc: defaultDesc}
+	table1 := &clusterpb.Table{
+		Id:       uint64(1),
+		Name:     defaultName1,
+		SchemaId: defaultSchemaID,
+		ShardId:  defaultShardID,
+		Desc:     defaultDesc,
+	}
+	table2 := &clusterpb.Table{
+		Id:       uint64(2),
+		Name:     defaultName2,
+		SchemaId: defaultSchemaID,
+		ShardId:  defaultShardID,
+		Desc:     defaultDesc,
+	}
+	table3 := &clusterpb.Table{
+		Id:       uint64(3),
+		Name:     defaultName3,
+		SchemaId: defaultSchemaID,
+		ShardId:  defaultShardID,
+		Desc:     defaultDesc,
+	}
 
 	table1, err := s.CreateTable(ctx, defaultClusterID, defaultSchemaID, table1)
 	re.NoError(err)
