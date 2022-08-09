@@ -30,7 +30,7 @@ type Cluster struct {
 }
 
 func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage) *Cluster {
-	alloc := id.NewAllocatorImpl(storage, "/", "alloc-id")
+	alloc := id.NewAllocatorImpl(storage, "/aaa", cluster.Name+"/alloc-id")
 	return &Cluster{
 		clusterID:    cluster.GetId(),
 		storage:      storage,
@@ -408,7 +408,7 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	schema, ok := c.schemasCache[schemaName]
 	if !ok {
 		c.lock.RUnlock()
-		return nil, false, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
+		return nil, false, ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 	}
 
 	table, exists := schema.getTable(tableName)

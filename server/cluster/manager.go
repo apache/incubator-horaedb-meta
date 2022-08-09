@@ -47,7 +47,7 @@ type managerImpl struct {
 }
 
 func NewManagerImpl(ctx context.Context, storage storage.Storage) (Manager, error) {
-	alloc := id.NewAllocatorImpl(storage, "/", clusterIDAllocPrefix)
+	alloc := id.NewAllocatorImpl(storage, "/aaa", clusterIDAllocPrefix)
 	manager := &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0)}
 	if err := manager.Load(ctx); err != nil {
 		return nil, errors.Wrap(err, "new clusters manager")

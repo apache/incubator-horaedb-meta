@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	defaultCluster                  = "ceresdbCluster"
+	cluster1                        = "ceresdbCluster1"
+	cluster2                        = "ceresdbCluster2"
 	defaultSchema                   = "ceresdbSchema"
 	defaultNodeCount                = 2
 	defaultReplicationFactor        = 1
@@ -24,6 +25,8 @@ const (
 	defaultLease                    = 100
 	node1                           = "127.0.0.1:8081"
 	node2                           = "127.0.0.2:8081"
+	node3                           = "127.0.0.3:8081"
+	node4                           = "127.0.0.4:8081"
 	table1                          = "table1"
 	table2                          = "table2"
 	table3                          = "table3"
@@ -74,30 +77,79 @@ func TestManager(t *testing.T) {
 	re.NoError(err)
 
 	ctx := context.Background()
-	testCreateCluster(ctx, re, manager)
+	testCreateCluster(ctx, re, manager, cluster1)
 
-	testRegisterNode(ctx, re, manager, defaultCluster, node1, defaultLease)
-	testRegisterNode(ctx, re, manager, defaultCluster, node2, defaultLease)
+	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
+	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
 
-	testAllocSchemaID(ctx, re, manager, defaultCluster, defaultSchema, defaultSchemaID)
+	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
 
-	testAllocTableID(ctx, re, manager, node1, defaultCluster, defaultSchema, table1, tableID1)
-	testAllocTableID(ctx, re, manager, node1, defaultCluster, defaultSchema, table1, tableID1)
-	testAllocTableID(ctx, re, manager, node1, defaultCluster, defaultSchema, table2, tableID2)
-	testAllocTableID(ctx, re, manager, node2, defaultCluster, defaultSchema, table3, tableID3)
-	testAllocTableID(ctx, re, manager, node2, defaultCluster, defaultSchema, table4, tableID4)
+	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table1, tableID1)
+	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table1, tableID1)
+	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table2, tableID2)
+	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table3, tableID3)
+	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table4, tableID4)
 
-	testGetTables(ctx, re, manager, node1, defaultCluster)
-	testGetTables(ctx, re, manager, node2, defaultCluster)
+	testGetTables(ctx, re, manager, node1, cluster1)
+	testGetTables(ctx, re, manager, node2, cluster1)
 
 	manager, err = newClusterManagerWithStorage(storage)
 	re.NoError(err)
-	testGetTables(ctx, re, manager, node1, defaultCluster)
-	testGetTables(ctx, re, manager, node2, defaultCluster)
+	testGetTables(ctx, re, manager, node1, cluster1)
+	testGetTables(ctx, re, manager, node2, cluster1)
 }
 
-func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager) {
-	_, err := manager.CreateCluster(ctx, defaultCluster, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
+func TestManagerWithMultiThread(t *testing.T) {
+	re := require.New(t)
+	storage := newTestStorage(t)
+	manager, err := newClusterManagerWithStorage(storage)
+	re.NoError(err)
+
+	ctx := context.Background()
+
+	go testCluster1(ctx, re, manager)
+	testCluster2(ctx, re, manager)
+
+}
+
+func testCluster1(ctx context.Context, re *require.Assertions, manager Manager) {
+	testCreateCluster(ctx, re, manager, cluster1)
+
+	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
+	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
+
+	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
+
+	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table1, tableID1)
+	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table1, tableID1)
+	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table2, tableID2)
+	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table3, tableID3)
+	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table4, tableID4)
+
+	testGetTables(ctx, re, manager, node1, cluster1)
+	testGetTables(ctx, re, manager, node2, cluster1)
+}
+
+func testCluster2(ctx context.Context, re *require.Assertions, manager Manager) {
+	testCreateCluster(ctx, re, manager, cluster2)
+
+	testRegisterNode(ctx, re, manager, cluster2, node3, defaultLease)
+	testRegisterNode(ctx, re, manager, cluster2, node4, defaultLease)
+
+	testAllocSchemaID(ctx, re, manager, cluster2, defaultSchema, defaultSchemaID)
+
+	testAllocTableID(ctx, re, manager, node3, cluster2, defaultSchema, table1, tableID1)
+	testAllocTableID(ctx, re, manager, node3, cluster2, defaultSchema, table1, tableID1)
+	testAllocTableID(ctx, re, manager, node3, cluster2, defaultSchema, table2, tableID2)
+	testAllocTableID(ctx, re, manager, node4, cluster2, defaultSchema, table3, tableID3)
+	testAllocTableID(ctx, re, manager, node4, cluster2, defaultSchema, table4, tableID4)
+
+	testGetTables(ctx, re, manager, node3, cluster2)
+	testGetTables(ctx, re, manager, node4, cluster2)
+}
+
+func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
+	_, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
 	re.NoError(err)
 }
 
