@@ -16,18 +16,18 @@ import (
 
 const (
 	defaultRootPath          = "/ceresmeta" // TODO: existed bug when rootPath = "/"
-	defaultName1             = "name_1"
-	defaultName2             = "name_2"
-	defaultName3             = "name_3"
+	name1                    = "name_1"
+	name2                    = "name_2"
+	name3                    = "name_3"
 	defaultDesc              = "desc"
 	defaultClusterID         = 1
 	defaultSchemaID          = 1
 	defaultVersion           = 0
-	defaultNodeName1         = "127.0.0.1:8081"
-	defaultNodeName2         = "127.0.0.2:8081"
-	defaultNodeName3         = "127.0.0.3:8081"
-	defaultNodeName4         = "127.0.0.4:8081"
-	defaultNodeName5         = "127.0.0.5:8081"
+	nodeName1                = "127.0.0.1:8081"
+	nodeName2                = "127.0.0.2:8081"
+	nodeName3                = "127.0.0.3:8081"
+	nodeName4                = "127.0.0.4:8081"
+	nodeName5                = "127.0.0.5:8081"
 	defaultCase              = "cause"
 	defaultMinNodeCount      = 1
 	defaultReplicationFactor = 3
@@ -45,7 +45,7 @@ func TestCluster(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		cluster := &clusterpb.Cluster{
 			Id:                uint32(i),
-			Name:              defaultName1,
+			Name:              name1,
 			MinNodeCount:      uint32(i),
 			ReplicationFactor: uint32(i),
 			ShardTotal:        uint32(i),
@@ -71,7 +71,7 @@ func TestCluster(t *testing.T) {
 	// test put cluster
 	cluster := &clusterpb.Cluster{
 		Id:                defaultClusterID,
-		Name:              defaultName1,
+		Name:              name1,
 		MinNodeCount:      defaultMinNodeCount,
 		ReplicationFactor: defaultReplicationFactor,
 		ShardTotal:        defaultShardTotal,
@@ -135,7 +135,7 @@ func TestSchemes(t *testing.T) {
 	// test create schema
 	schemas := make([]*clusterpb.Schema, 0)
 	for i := 0; i < 10; i++ {
-		schema := &clusterpb.Schema{Id: uint32(i), ClusterId: defaultClusterID, Name: defaultName1}
+		schema := &clusterpb.Schema{Id: uint32(i), ClusterId: defaultClusterID, Name: name1}
 		schema, err := s.CreateSchema(ctx, defaultClusterID, schema)
 		re.NoError(err)
 		schemas = append(schemas, schema)
@@ -153,7 +153,7 @@ func TestSchemes(t *testing.T) {
 
 	// test put schemas
 	for i := 0; i < 10; i++ {
-		schemas[i].Name = defaultName2
+		schemas[i].Name = name2
 	}
 	err = s.PutSchemas(ctx, defaultClusterID, schemas)
 	re.NoError(err)
@@ -177,21 +177,21 @@ func TestTables(t *testing.T) {
 	// test create tables
 	table1 := &clusterpb.Table{
 		Id:       uint64(1),
-		Name:     defaultName1,
+		Name:     name1,
 		SchemaId: defaultSchemaID,
 		ShardId:  defaultShardID,
 		Desc:     defaultDesc,
 	}
 	table2 := &clusterpb.Table{
 		Id:       uint64(2),
-		Name:     defaultName2,
+		Name:     name2,
 		SchemaId: defaultSchemaID,
 		ShardId:  defaultShardID,
 		Desc:     defaultDesc,
 	}
 	table3 := &clusterpb.Table{
 		Id:       uint64(3),
-		Name:     defaultName3,
+		Name:     name3,
 		SchemaId: defaultSchemaID,
 		ShardId:  defaultShardID,
 		Desc:     defaultDesc,
@@ -205,7 +205,7 @@ func TestTables(t *testing.T) {
 	re.NoError(err)
 
 	// test get table
-	value, exist, err := s.GetTable(ctx, defaultClusterID, defaultSchemaID, defaultName1)
+	value, exist, err := s.GetTable(ctx, defaultClusterID, defaultSchemaID, name1)
 	re.NoError(err)
 	re.True(exist)
 	re.Equal(table1.Id, value.Id)
@@ -241,10 +241,10 @@ func TestTables(t *testing.T) {
 	re.Equal(table3.CreatedAt, tables[2].CreatedAt)
 
 	// test delete table
-	err = s.DeleteTable(ctx, defaultClusterID, defaultSchemaID, defaultName1)
+	err = s.DeleteTable(ctx, defaultClusterID, defaultSchemaID, name1)
 	re.NoError(err)
 
-	value, exist, err = s.GetTable(ctx, defaultClusterID, defaultSchemaID, defaultName1)
+	value, exist, err = s.GetTable(ctx, defaultClusterID, defaultSchemaID, name1)
 	re.NoError(err)
 	re.Empty(value)
 	re.True(!exist)
@@ -300,23 +300,23 @@ func TestNodes(t *testing.T) {
 	defer cancel()
 
 	// test create node
-	node1 := &clusterpb.Node{Name: defaultNodeName1}
+	node1 := &clusterpb.Node{Name: nodeName1}
 	node1, err := s.CreateOrUpdateNode(ctx, defaultClusterID, node1)
 	re.NoError(err)
 
-	node2 := &clusterpb.Node{Name: defaultNodeName2}
+	node2 := &clusterpb.Node{Name: nodeName2}
 	node2, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node2)
 	re.NoError(err)
 
-	node3 := &clusterpb.Node{Name: defaultNodeName3}
+	node3 := &clusterpb.Node{Name: nodeName3}
 	node3, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node3)
 	re.NoError(err)
 
-	node4 := &clusterpb.Node{Name: defaultNodeName4}
+	node4 := &clusterpb.Node{Name: nodeName4}
 	node4, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node4)
 	re.NoError(err)
 
-	node5 := &clusterpb.Node{Name: defaultNodeName5}
+	node5 := &clusterpb.Node{Name: nodeName5}
 	node5, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node5)
 	re.NoError(err)
 
