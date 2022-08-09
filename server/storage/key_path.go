@@ -87,6 +87,13 @@ func makeNodeKey(clusterID uint32, nodeName string) string {
 	return path.Join(cluster, fmtID(uint64(clusterID)), node, nodeName)
 }
 
+// makeNameToIDKey return the table id key path
+// example:
+// cluster 1: v1/cluster/1/schema/1/table/tableName -> tableID
+func makeNameToIDKey(clusterID uint32, schemaID uint32, tableName string) string {
+	return path.Join(cluster, fmtID(uint64(clusterID)), schema, fmtID(uint64(schemaID)), table, tableName)
+}
+
 func fmtID(id uint64) string {
 	return fmt.Sprintf("%020d", id)
 }

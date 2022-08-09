@@ -18,11 +18,11 @@ var (
 	ErrParseGetClusterTopology    = coderr.NewCodeError(coderr.Internal, "meta storage get cluster topology")
 	ErrParsePutClusterTopology    = coderr.NewCodeError(coderr.Internal, "meta storage put cluster topology")
 
-	ErrParseCreateTable  = coderr.NewCodeError(coderr.Internal, "meta storage create tables")
-	ErrParseGetTable     = coderr.NewCodeError(coderr.Internal, "meta storage get tables")
-	ErrParseListTables   = coderr.NewCodeError(coderr.Internal, "meta storage list tables")
-	ErrParsePutTables    = coderr.NewCodeError(coderr.Internal, "meta storage put tables")
-	ErrParseDeleteTables = coderr.NewCodeError(coderr.Internal, "meta storage delete tables")
+	ErrParseCreateTable = coderr.NewCodeError(coderr.Internal, "meta storage create tables")
+	ErrParseGetTable    = coderr.NewCodeError(coderr.Internal, "meta storage get tables")
+	ErrParseListTables  = coderr.NewCodeError(coderr.Internal, "meta storage list tables")
+	ErrParsePutTables   = coderr.NewCodeError(coderr.Internal, "meta storage put tables")
+	ErrParseDeleteTable = coderr.NewCodeError(coderr.Internal, "meta storage delete table")
 
 	ErrParseCreateShardTopology = coderr.NewCodeError(coderr.Internal, "meta storage create shard topology")
 	ErrParseListShardTopology   = coderr.NewCodeError(coderr.Internal, "meta storage list shard topology")

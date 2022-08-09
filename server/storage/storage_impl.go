@@ -324,7 +324,7 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 	}
 
 	key := path.Join(s.rootPath, makeTableKey(clusterID, schemaID, table.Id))
-	nameToIDKey := path.Join(s.rootPath, table.Name)
+	nameToIDKey := path.Join(s.rootPath, makeNameToIDKey(clusterID, schemaID, table.Name))
 
 	cmp := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
 	cmpNameToID := clientv3.Compare(clientv3.CreateRevision(nameToIDKey), "=", 0)
@@ -346,9 +346,9 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 }
 
 func (s *metaStorageImpl) GetTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) (*clusterpb.Table, bool, error) {
-	value, err := s.Get(ctx, tableName)
+	value, err := s.Get(ctx, makeNameToIDKey(clusterID, schemaID, tableName))
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "meta storage get table id failed, table name:%s", tableName)
+		return nil, false, errors.Wrapf(err, "meta storage get table id failed, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
 	}
 	if value == "" {
 		return nil, false, nil
@@ -431,9 +431,12 @@ func (s *metaStorageImpl) PutTables(ctx context.Context, clusterID uint32, schem
 }
 
 func (s *metaStorageImpl) DeleteTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) error {
-	value, err := s.Get(ctx, tableName)
+	value, err := s.Get(ctx, makeNameToIDKey(clusterID, schemaID, tableName))
 	if err != nil {
-		return errors.Wrapf(err, "meta storage get table id failed, table name:%s", tableName)
+		return errors.Wrapf(err, "meta storage get table id failed, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
+	}
+	if value == "" {
+		return ErrParseDeleteTable.WithCausef("meta storage get table id failed, not found table id, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
 	}
 	tableID, err := strconv.ParseUint(value, 10, 64)
 	if err != nil {
@@ -444,12 +447,13 @@ func (s *metaStorageImpl) DeleteTable(ctx context.Context, clusterID uint32, sch
 	if err := s.Delete(ctx, key); err != nil {
 		return errors.Wrapf(err, "meta storage delete table failed, clusterID:%d, schemaID:%d, tableID:%d, key:%s", clusterID, schemaID, tableID, key)
 	}
-	if err := s.Delete(ctx, tableName); err != nil {
-		return errors.Wrapf(err, "meta storage delete table id failed, tableID:%d, tableName:%s", tableID, tableName)
+	if err := s.Delete(ctx, makeNameToIDKey(clusterID, schemaID, tableName)); err != nil {
+		return errors.Wrapf(err, "meta storage delete table id failed, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
 	}
 	return nil
 }
 
+// TODO: opertor in a batch
 func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID uint32, shardTopologies []*clusterpb.ShardTopology) ([]*clusterpb.ShardTopology, error) {
 	now := time.Now()
 	for _, shardTopology := range shardTopologies {
