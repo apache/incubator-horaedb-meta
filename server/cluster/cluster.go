@@ -17,7 +17,7 @@ import (
 type Cluster struct {
 	clusterID uint32
 
-	// RWMutex is used to project following fields
+	// RWMutex is used to project following fields.
 	lock         sync.RWMutex
 	metaData     *metaData
 	shardsCache  map[uint32]*Shard  // shard_id -> shard
@@ -233,7 +233,7 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, nodeName str
 
 func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, tableID uint64) error {
 	schema, exists := c.getSchemaLocked(schemaName)
-	if exists {
+	if !exists {
 		return ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 	}
 
@@ -253,6 +253,9 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, t
 }
 
 func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (uint32, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	// check if exists
 	schema, exists := c.getSchemaLocked(schemaName)
 	if exists {
@@ -274,8 +277,6 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (uint32, 
 	}
 
 	// cache
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	_ = c.updateSchemaCacheLocked(schemaPb)
 	return schemaID, nil
 }
@@ -288,6 +289,12 @@ func (c *Cluster) CreateTable(ctx context.Context, schemaName string, shardID ui
 	schema, exists := c.getSchemaLocked(schemaName)
 	if !exists {
 		return 0, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
+	}
+
+	// check if exists
+	table, exists := c.getTableLocked(schemaName, tableName)
+	if exists {
+		return table.GetID(), nil
 	}
 
 	// alloc table id
@@ -401,6 +408,11 @@ func (c *Cluster) loadTableLocked(ctx context.Context, schemas map[string]*clust
 func (c *Cluster) getSchemaLocked(schemaName string) (*Schema, bool) {
 	schema, ok := c.schemasCache[schemaName]
 	return schema, ok
+}
+
+func (c *Cluster) getTableLocked(schemaName string, tableName string) (*Table, bool) {
+	table, ok := c.schemasCache[schemaName].tableMap[tableName]
+	return table, ok
 }
 
 func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*Table, bool, error) {
