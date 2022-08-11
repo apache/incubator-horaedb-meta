@@ -70,14 +70,15 @@ func newClusterManagerWithStorage(storage storage.Storage) (Manager, error) {
 	return NewManagerImpl(context.Background(), storage)
 }
 
-func TestManager(t *testing.T) {
+func TestManagerWithSingleThread(t *testing.T) {
 	re := require.New(t)
 	storage := newTestStorage(t)
 	manager, err := newClusterManagerWithStorage(storage)
 	re.NoError(err)
 
 	ctx := context.Background()
-	testCreateCluster(ctx, re, manager, cluster1)
+	testCreateCluster(ctx, re, manager, cluster1, false)
+	testCreateCluster(ctx, re, manager, cluster1, true)
 
 	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
 	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
@@ -103,31 +104,6 @@ func TestManager(t *testing.T) {
 	testGetTables(ctx, re, manager, node2, cluster1)
 }
 
-func TestManagerWithMultiThread2(t *testing.T) {
-	re := require.New(t)
-	storage := newTestStorage(t)
-	manager, err := newClusterManagerWithStorage(storage)
-	re.NoError(err)
-
-	ctx := context.Background()
-	testCreateCluster(ctx, re, manager, cluster1)
-
-	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
-	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
-
-	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
-	go testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
-
-	testAllocTableIDWithMultiThread(ctx, re, manager, tableID1)
-	testDropTable(ctx, re, manager, cluster1, defaultSchema, table1, tableID1)
-	testAllocTableIDWithMultiThread(ctx, re, manager, tableID2)
-}
-
-func testAllocTableIDWithMultiThread(ctx context.Context, re *require.Assertions, manager Manager, tableID uint64) {
-	go testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table1, tableID)
-	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table1, tableID)
-}
-
 func TestManagerWithMultiThread(t *testing.T) {
 	re := require.New(t)
 	storage := newTestStorage(t)
@@ -141,50 +117,41 @@ func TestManagerWithMultiThread(t *testing.T) {
 }
 
 func testCluster1(ctx context.Context, re *require.Assertions, manager Manager) {
-	testCreateCluster(ctx, re, manager, cluster1)
+	testCreateCluster(ctx, re, manager, cluster1, false)
 
 	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
 	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
 
 	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
+	go testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
 
-	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table1, tableID1)
-	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table1, tableID1)
-	testAllocTableID(ctx, re, manager, node1, cluster1, defaultSchema, table2, tableID2)
-	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table3, tableID3)
-	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table4, tableID4)
-
+	testAllocTableIDWithMultiThread(ctx, re, manager, cluster1, tableID1)
 	testDropTable(ctx, re, manager, cluster1, defaultSchema, table1, tableID1)
-	testDropTable(ctx, re, manager, cluster1, defaultSchema, table3, tableID3)
-
-	testGetTables(ctx, re, manager, node1, cluster1)
-	testGetTables(ctx, re, manager, node2, cluster1)
+	testAllocTableIDWithMultiThread(ctx, re, manager, cluster1, tableID2)
 }
 
 func testCluster2(ctx context.Context, re *require.Assertions, manager Manager) {
-	testCreateCluster(ctx, re, manager, cluster2)
+	testCreateCluster(ctx, re, manager, cluster2, false)
 
-	testRegisterNode(ctx, re, manager, cluster2, node3, defaultLease)
-	testRegisterNode(ctx, re, manager, cluster2, node4, defaultLease)
+	testRegisterNode(ctx, re, manager, cluster2, node1, defaultLease)
+	testRegisterNode(ctx, re, manager, cluster2, node2, defaultLease)
 
 	testAllocSchemaID(ctx, re, manager, cluster2, defaultSchema, defaultSchemaID)
+	go testAllocSchemaID(ctx, re, manager, cluster2, defaultSchema, defaultSchemaID)
 
-	testAllocTableID(ctx, re, manager, node3, cluster2, defaultSchema, table1, tableID1)
-	testAllocTableID(ctx, re, manager, node3, cluster2, defaultSchema, table1, tableID1)
-	testAllocTableID(ctx, re, manager, node3, cluster2, defaultSchema, table2, tableID2)
-	testAllocTableID(ctx, re, manager, node4, cluster2, defaultSchema, table3, tableID3)
-	testAllocTableID(ctx, re, manager, node4, cluster2, defaultSchema, table4, tableID4)
-
+	testAllocTableIDWithMultiThread(ctx, re, manager, cluster2, tableID1)
 	testDropTable(ctx, re, manager, cluster2, defaultSchema, table1, tableID1)
-	testDropTable(ctx, re, manager, cluster2, defaultSchema, table3, tableID3)
-
-	testGetTables(ctx, re, manager, node3, cluster2)
-	testGetTables(ctx, re, manager, node4, cluster2)
+	testAllocTableIDWithMultiThread(ctx, re, manager, cluster2, tableID2)
 }
 
-func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
+func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, existed bool) {
 	_, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
-	re.NoError(err)
+	if !existed {
+		re.NoError(err)
+	}
+	if existed {
+		re.Error(err)
+	}
 }
 
 func testRegisterNode(ctx context.Context, re *require.Assertions, manager Manager,
@@ -228,4 +195,9 @@ func testGetTables(ctx context.Context, re *require.Assertions, manager Manager,
 func testDropTable(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, schemaName string, tableName string, tableID uint64) {
 	err := manager.DropTable(ctx, clusterName, schemaName, tableName, tableID)
 	re.NoError(err)
+}
+
+func testAllocTableIDWithMultiThread(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, tableID uint64) {
+	go testAllocTableID(ctx, re, manager, node1, clusterName, defaultSchema, table1, tableID)
+	testAllocTableID(ctx, re, manager, node2, clusterName, defaultSchema, table1, tableID)
 }

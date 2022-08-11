@@ -86,11 +86,13 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 
 	_, ok := m.clusters[clusterName]
 	if ok {
+		m.lock.Unlock()
 		return nil, ErrClusterAlreadyExists
 	}
 
 	clusterID, err := m.allocClusterID(ctx)
 	if err != nil {
+		m.lock.Unlock()
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterName:%s", clusterName)
 	}
 
@@ -100,6 +102,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	}
 	clusterPb, err = m.storage.CreateCluster(ctx, clusterPb)
 	if err != nil {
+		m.lock.Unlock()
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusters:%v", clusterPb)
 	}
 
@@ -109,6 +112,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		State: clusterpb.ClusterTopology_EMPTY,
 	}
 	if clusterTopologyPb, err := m.storage.CreateClusterTopology(ctx, clusterTopologyPb); err != nil {
+		m.lock.Unlock()
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
 
