@@ -65,7 +65,7 @@ func newTestStorage(t *testing.T) Manager {
 	return NewManagerImpl(storage, schedule.NewHeartbeatStreams(context.Background()))
 }
 
-func TestManagerWithSingleThread(t *testing.T) {
+func TestManagerSingleThread(t *testing.T) {
 	re := require.New(t)
 	manager := newTestStorage(t)
 
@@ -92,7 +92,7 @@ func TestManagerWithSingleThread(t *testing.T) {
 	testGetTables(ctx, re, manager, node2, cluster1)
 }
 
-func TestManagerWithMultiThread(t *testing.T) {
+func TestManagerMultiThread(t *testing.T) {
 	re := require.New(t)
 	manager := newTestStorage(t)
 

@@ -281,8 +281,7 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (*Schema,
 	// alloc schema id
 	schemaID, err := c.allocSchemaID(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cluster AllocSchemaID, "+
-			"schemaName:%s", schemaName)
+		return nil, errors.Wrapf(err, "cluster AllocSchemaID, schemaName:%s", schemaName)
 	}
 
 	// Save schema in storage.
@@ -340,6 +339,7 @@ func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName s
 		return nil, errors.Wrapf(err, "clusters CreateTable, shard has more than one shardTopology, shardID:%d, shardTopologies:%v",
 			shardID, shardTopologies)
 	}
+
 	shardTopologies[0].TableIds = append(shardTopologies[0].TableIds, tableID)
 	if err = c.storage.PutShardTopologies(ctx, c.clusterID, []uint32{shardID}, shardTopologies[0].GetVersion(), shardTopologies); err != nil {
 		return nil, errors.Wrap(err, "clusters CreateTable")
@@ -403,6 +403,7 @@ func (c *Cluster) loadNodeLocked(ctx context.Context) (map[string]*clusterpb.Nod
 	if err != nil {
 		return nil, errors.Wrap(err, "clusters loadNodeLocked")
 	}
+
 	nodeMap := make(map[string]*clusterpb.Node, len(nodes))
 	for _, node := range nodes {
 		nodeMap[node.Name] = node
@@ -522,6 +523,7 @@ func (c *Cluster) assignShardID(nodeName string) (uint32, error) {
 		if len(node.shardIDs) == 0 {
 			return 0, ErrNodeShardsIsEmpty.WithCausef("nodeName:%s", nodeName)
 		}
+
 		id, err := rand.Int(rand.Reader, big.NewInt(int64(len(node.shardIDs))))
 		if err != nil {
 			return 0, errors.Wrapf(err, "assign shard id failed, nodeName:%s", nodeName)

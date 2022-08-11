@@ -137,6 +137,11 @@ func (srv *Server) startEtcd(ctx context.Context) error {
 /// startServer starts involved services.
 func (srv *Server) startServer(ctx context.Context) error {
 	srv.hbStreams = schedule.NewHeartbeatStreams(ctx)
+
+	if srv.cfg.MaxScanLimit < 2 {
+		return ErrStartServer.WithCausef("scan limit must be greater than 1")
+	}
+
 	storage := storage.NewStorageWithEtcdBackend(srv.etcdCli, srv.cfg.StorageRootPath, storage.Options{
 		MaxScanLimit: srv.cfg.MaxScanLimit, MinScanLimit: srv.cfg.MinScanLimit,
 	})
