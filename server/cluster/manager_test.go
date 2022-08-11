@@ -59,7 +59,7 @@ func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, fu
 
 func newTestStorage(t *testing.T) Manager {
 	_, client, _ := prepareEtcdServerAndClient(t)
-	storage := storage.NewStorageWithEtcdBackend(client, "/aaa", storage.Options{
+	storage := storage.NewStorageWithEtcdBackend(client, defaultRootPath, storage.Options{
 		MaxScanLimit: 100, MinScanLimit: 10,
 	})
 	return NewManagerImpl(storage, schedule.NewHeartbeatStreams(context.Background()))
@@ -70,8 +70,8 @@ func TestManagerWithSingleThread(t *testing.T) {
 	manager := newTestStorage(t)
 
 	ctx := context.Background()
-	testCreateCluster(ctx, re, manager, cluster1, false)
-	testCreateCluster(ctx, re, manager, cluster1, true)
+	testCreateCluster(ctx, re, manager, cluster1)
+	testCreateCluster(ctx, re, manager, cluster1)
 
 	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
 	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
@@ -103,7 +103,7 @@ func TestManagerWithMultiThread(t *testing.T) {
 }
 
 func testCluster1(ctx context.Context, re *require.Assertions, manager Manager) {
-	testCreateCluster(ctx, re, manager, cluster1, false)
+	testCreateCluster(ctx, re, manager, cluster1)
 
 	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
 	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
@@ -117,7 +117,7 @@ func testCluster1(ctx context.Context, re *require.Assertions, manager Manager) 
 }
 
 func testCluster2(ctx context.Context, re *require.Assertions, manager Manager) {
-	testCreateCluster(ctx, re, manager, cluster2, false)
+	testCreateCluster(ctx, re, manager, cluster2)
 
 	testRegisterNode(ctx, re, manager, cluster2, node1, defaultLease)
 	testRegisterNode(ctx, re, manager, cluster2, node2, defaultLease)
@@ -130,14 +130,9 @@ func testCluster2(ctx context.Context, re *require.Assertions, manager Manager) 
 	testAllocTableIDWithMultiThread(ctx, re, manager, cluster2, tableID2)
 }
 
-func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, existed bool) {
+func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
 	_, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
-	if !existed {
-		re.NoError(err)
-	}
-	if existed {
-		re.Error(err)
-	}
+	re.NoError(err)
 }
 
 func testRegisterNode(ctx context.Context, re *require.Assertions, manager Manager,

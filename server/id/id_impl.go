@@ -31,6 +31,7 @@ type AllocatorImpl struct {
 	key      string
 }
 
+// TODO: existed bug when rootPath = "/"
 func NewAllocatorImpl(kv storage.KV, rootPath string, key string) *AllocatorImpl {
 	return &AllocatorImpl{kv: kv, rootPath: rootPath, key: key}
 }

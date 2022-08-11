@@ -13,7 +13,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-const clusterIDAllocPrefix = "ClusterID"
+const (
+	AllocClusterIDPrefix = "ClusterID"
+	AllocIDPrefix        = "/alloc-id"
+	defaultRootPath      = "/aaa"
+)
 
 type TableInfo struct {
 	ID         uint64
@@ -49,7 +53,7 @@ type managerImpl struct {
 }
 
 func NewManagerImpl(storage storage.Storage, hbstream *schedule.HeartbeatStreams) Manager {
-	alloc := id.NewAllocatorImpl(storage, "/aaa", clusterIDAllocPrefix)
+	alloc := id.NewAllocatorImpl(storage, defaultRootPath, AllocClusterIDPrefix)
 	return &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0), hbstreams: hbstream}
 }
 
@@ -82,10 +86,10 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 
 	m.lock.Lock()
 
-	_, ok := m.clusters[clusterName]
+	cluster, ok := m.clusters[clusterName]
 	if ok {
 		m.lock.Unlock()
-		return nil, ErrClusterAlreadyExists
+		return cluster, nil
 	}
 
 	clusterID, err := m.allocClusterID(ctx)
@@ -114,7 +118,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
 
-	cluster := NewCluster(clusterPb, m.storage, m.hbstreams)
+	cluster = NewCluster(clusterPb, m.storage, m.hbstreams)
 	m.clusters[clusterName] = cluster
 
 	m.lock.Unlock()
@@ -132,13 +136,9 @@ func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 		return 0, errors.Wrap(err, "clusters manager AllocSchemaID")
 	}
 
-	schema, exists := cluster.getSchemaLocked(schemaName)
-	if exists {
-		return schema.GetID(), nil
-	}
 	// create new schema
-	schema, err1 := cluster.CreateSchema(ctx, schemaName)
-	if err1 != nil {
+	schema, err := cluster.CreateSchema(ctx, schemaName)
+	if err != nil {
 		return 0, errors.Wrapf(err, "clusters manager AllocSchemaID, "+
 			"clusterName:%s, schemaName:%s", clusterName, schemaName)
 	}
@@ -151,23 +151,7 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 		return nil, errors.Wrap(err, "clusters manager AllocTableID")
 	}
 
-	table, exists, err := cluster.GetTable(ctx, schemaName, tableName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
-	}
-	if exists {
-		return table, nil
-	}
-
-	// create new schemasCache
-	shardID, err := cluster.assignShardID(nodeName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "clusters manager AllocTableID, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
-	}
-
-	table, err = cluster.CreateTable(ctx, shardID, schemaName, tableName)
+	table, err := cluster.CreateTable(ctx, nodeName, schemaName, tableName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "clusters manager AllocTableID, "+
 			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)

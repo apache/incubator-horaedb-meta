@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultRootPath          = "/ceresmeta" // TODO: existed bug when rootPath = "/"
+	defaultRootPath          = "/ceresmeta"
 	name1                    = "name_1"
 	name2                    = "name_2"
 	name3                    = "name_3"

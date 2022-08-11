@@ -32,7 +32,7 @@ type Cluster struct {
 }
 
 func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage, hbstream *schedule.HeartbeatStreams) *Cluster {
-	alloc := id.NewAllocatorImpl(storage, "/aaa", cluster.Name+"/alloc-id")
+	alloc := id.NewAllocatorImpl(storage, defaultRootPath, cluster.Name+AllocIDPrefix)
 	return &Cluster{
 		clusterID:    cluster.GetId(),
 		metaData:     &metaData{cluster: cluster},
@@ -248,6 +248,9 @@ func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, nodeName str
 }
 
 func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, tableID uint64) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	schema, exists := c.getSchemaLocked(schemaName)
 	if !exists {
 		return ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
@@ -257,9 +260,6 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, t
 		return errors.Wrapf(err, "clusters DropTable, clusterID:%d, schema:%v, tableName:%s",
 			c.clusterID, schema, tableName)
 	}
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
 
 	schema.dropTableLocked(tableName)
 	for _, shard := range c.shardsCache {
@@ -297,7 +297,7 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (*Schema,
 	return schema, nil
 }
 
-func (c *Cluster) CreateTable(ctx context.Context, shardID uint32, schemaName string, tableName string) (*Table, error) {
+func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName string, tableName string) (*Table, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -311,6 +311,13 @@ func (c *Cluster) CreateTable(ctx context.Context, shardID uint32, schemaName st
 	table, exists := c.getTableLocked(schemaName, tableName)
 	if exists {
 		return table, nil
+	}
+
+	// create new schemasCache
+	shardID, err := c.assignShardID(nodeName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "clusters AllocTableID, "+
+			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", c.Name(), schemaName, tableName, nodeName)
 	}
 
 	// alloc table id
