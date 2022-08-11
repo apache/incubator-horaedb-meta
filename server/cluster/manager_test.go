@@ -26,8 +26,6 @@ const (
 	defaultLease                    = 100
 	node1                           = "127.0.0.1:8081"
 	node2                           = "127.0.0.2:8081"
-	node3                           = "127.0.0.3:8081"
-	node4                           = "127.0.0.4:8081"
 	table1                          = "table1"
 	table2                          = "table2"
 	table3                          = "table3"
@@ -92,7 +90,6 @@ func TestManagerWithSingleThread(t *testing.T) {
 
 	testGetTables(ctx, re, manager, node1, cluster1)
 	testGetTables(ctx, re, manager, node2, cluster1)
-
 }
 
 func TestManagerWithMultiThread(t *testing.T) {
