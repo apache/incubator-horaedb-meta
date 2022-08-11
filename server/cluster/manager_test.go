@@ -8,6 +8,7 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
+	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,23 +59,17 @@ func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, fu
 	return etcd, client, clean
 }
 
-func newTestStorage(t *testing.T) storage.Storage {
+func newTestStorage(t *testing.T) Manager {
 	_, client, _ := prepareEtcdServerAndClient(t)
 	storage := storage.NewStorageWithEtcdBackend(client, "/aaa", storage.Options{
 		MaxScanLimit: 100, MinScanLimit: 10,
 	})
-	return storage
-}
-
-func newClusterManagerWithStorage(storage storage.Storage) (Manager, error) {
-	return NewManagerImpl(context.Background(), storage)
+	return NewManagerImpl(storage, schedule.NewHeartbeatStreams(context.Background()))
 }
 
 func TestManagerWithSingleThread(t *testing.T) {
 	re := require.New(t)
-	storage := newTestStorage(t)
-	manager, err := newClusterManagerWithStorage(storage)
-	re.NoError(err)
+	manager := newTestStorage(t)
 
 	ctx := context.Background()
 	testCreateCluster(ctx, re, manager, cluster1, false)
@@ -98,17 +93,11 @@ func TestManagerWithSingleThread(t *testing.T) {
 	testGetTables(ctx, re, manager, node1, cluster1)
 	testGetTables(ctx, re, manager, node2, cluster1)
 
-	manager, err = newClusterManagerWithStorage(storage)
-	re.NoError(err)
-	testGetTables(ctx, re, manager, node1, cluster1)
-	testGetTables(ctx, re, manager, node2, cluster1)
 }
 
 func TestManagerWithMultiThread(t *testing.T) {
 	re := require.New(t)
-	storage := newTestStorage(t)
-	manager, err := newClusterManagerWithStorage(storage)
-	re.NoError(err)
+	manager := newTestStorage(t)
 
 	ctx := context.Background()
 

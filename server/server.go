@@ -16,7 +16,6 @@ import (
 	"github.com/CeresDB/ceresmeta/server/member"
 	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
-	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 	"go.uber.org/zap"
@@ -141,12 +140,8 @@ func (srv *Server) startServer(ctx context.Context) error {
 	storage := storage.NewStorageWithEtcdBackend(srv.etcdCli, srv.cfg.StorageRootPath, storage.Options{
 		MaxScanLimit: srv.cfg.MaxScanLimit, MinScanLimit: srv.cfg.MinScanLimit,
 	})
-	manager, err := cluster.NewManagerImpl(ctx, storage)
-	if err != nil {
-		return errors.Wrap(err, "start server")
-	}
-	srv.clusterManager = manager
 
+	srv.clusterManager = cluster.NewManagerImpl(storage, srv.hbStreams)
 	return nil
 }
 

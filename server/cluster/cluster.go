@@ -10,6 +10,7 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/id"
+	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
@@ -25,20 +26,23 @@ type Cluster struct {
 	nodesCache   map[string]*Node   // node_name -> node
 
 	storage     storage.Storage
+	hbstream    *schedule.HeartbeatStreams
 	coordinator *coordinator
 	alloc       id.Allocator
 }
 
-func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage) *Cluster {
+func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage, hbstream *schedule.HeartbeatStreams) *Cluster {
 	alloc := id.NewAllocatorImpl(storage, "/aaa", cluster.Name+"/alloc-id")
 	return &Cluster{
 		clusterID:    cluster.GetId(),
-		storage:      storage,
-		alloc:        alloc,
 		metaData:     &metaData{cluster: cluster},
 		shardsCache:  make(map[uint32]*Shard),
 		schemasCache: make(map[string]*Schema),
 		nodesCache:   make(map[string]*Node),
+		alloc:        alloc,
+
+		storage:  storage,
+		hbstream: hbstream,
 	}
 }
 
@@ -75,7 +79,10 @@ func (c *Cluster) Load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.coordinator = newCoordinator(c)
+	if c.coordinator == nil {
+		c.coordinator = newCoordinator(c, c.hbstream)
+		go c.coordinator.runBgJob()
+	}
 
 	shards, shardIDs, err := c.loadClusterTopologyLocked(ctx)
 	if err != nil {
