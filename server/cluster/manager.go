@@ -52,9 +52,13 @@ type managerImpl struct {
 	hbstreams *schedule.HeartbeatStreams
 }
 
-func NewManagerImpl(storage storage.Storage, hbstream *schedule.HeartbeatStreams) Manager {
+func NewManagerImpl(ctx context.Context, storage storage.Storage, hbstream *schedule.HeartbeatStreams) (Manager, error) {
 	alloc := id.NewAllocatorImpl(storage, defaultRootPath, AllocClusterIDPrefix)
-	return &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0), hbstreams: hbstream}
+	manager := &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0), hbstreams: hbstream}
+	if err := manager.Load(ctx); err != nil {
+		return nil, errors.Wrap(err, "new clusters manager")
+	}
+	return manager, nil
 }
 
 func (m *managerImpl) Load(ctx context.Context) error {

@@ -57,17 +57,31 @@ func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, fu
 	return etcd, client, clean
 }
 
-func newTestStorage(t *testing.T) Manager {
+func newTestStorage(t *testing.T) storage.Storage {
 	_, client, _ := prepareEtcdServerAndClient(t)
 	storage := storage.NewStorageWithEtcdBackend(client, defaultRootPath, storage.Options{
 		MaxScanLimit: 100, MinScanLimit: 10,
 	})
-	return NewManagerImpl(storage, schedule.NewHeartbeatStreams(context.Background()))
+	return storage
+}
+
+func newClusterManagerWithStorage(storage storage.Storage) (Manager, error) {
+	return NewManagerImpl(context.Background(), storage, schedule.NewHeartbeatStreams(context.Background()))
+}
+
+func newTestClusterManager(t *testing.T) Manager {
+	re := require.New(t)
+	storage := newTestStorage(t)
+	manager, err := newClusterManagerWithStorage(storage)
+	re.NoError(err)
+	return manager
 }
 
 func TestManagerSingleThread(t *testing.T) {
 	re := require.New(t)
-	manager := newTestStorage(t)
+	storage := newTestStorage(t)
+	manager, err := newClusterManagerWithStorage(storage)
+	re.NoError(err)
 
 	ctx := context.Background()
 	testCreateCluster(ctx, re, manager, cluster1)
@@ -90,11 +104,16 @@ func TestManagerSingleThread(t *testing.T) {
 
 	testGetTables(ctx, re, manager, node1, cluster1)
 	testGetTables(ctx, re, manager, node2, cluster1)
+
+	manager, err = newClusterManagerWithStorage(storage)
+	re.NoError(err)
+	testGetTables(ctx, re, manager, node1, cluster1)
+	testGetTables(ctx, re, manager, node2, cluster1)
 }
 
 func TestManagerMultiThread(t *testing.T) {
 	re := require.New(t)
-	manager := newTestStorage(t)
+	manager := newTestClusterManager(t)
 
 	ctx := context.Background()
 
