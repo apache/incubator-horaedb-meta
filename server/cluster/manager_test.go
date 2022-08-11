@@ -154,6 +154,9 @@ func testCluster1(ctx context.Context, re *require.Assertions, manager Manager) 
 	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table3, tableID3)
 	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table4, tableID4)
 
+	testDropTable(ctx, re, manager, cluster1, defaultSchema, table1, tableID1)
+	testDropTable(ctx, re, manager, cluster1, defaultSchema, table3, tableID3)
+
 	testGetTables(ctx, re, manager, node1, cluster1)
 	testGetTables(ctx, re, manager, node2, cluster1)
 }
@@ -171,6 +174,9 @@ func testCluster2(ctx context.Context, re *require.Assertions, manager Manager) 
 	testAllocTableID(ctx, re, manager, node3, cluster2, defaultSchema, table2, tableID2)
 	testAllocTableID(ctx, re, manager, node4, cluster2, defaultSchema, table3, tableID3)
 	testAllocTableID(ctx, re, manager, node4, cluster2, defaultSchema, table4, tableID4)
+
+	testDropTable(ctx, re, manager, cluster2, defaultSchema, table1, tableID1)
+	testDropTable(ctx, re, manager, cluster2, defaultSchema, table3, tableID3)
 
 	testGetTables(ctx, re, manager, node3, cluster2)
 	testGetTables(ctx, re, manager, node4, cluster2)

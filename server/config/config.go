@@ -33,6 +33,9 @@ const (
 	defaultQuotaBackendBytes       = 8 * 1024 * 1024 * 1024 // 8GB
 
 	defaultMaxRequestBytes uint = 2 * 1024 * 1024 // 2MB
+
+	defaultMaxScanLimit int = 100
+	defaultMinScanLimit int = 20
 )
 
 type Config struct {
@@ -216,6 +219,7 @@ func MakeConfigParser() (*Parser, error) {
 	fs.StringVar(&cfg.AutoCompactionMode, "auto-compaction-mode", defaultCompactionMode, "mode of auto compaction of etcd server")
 	fs.StringVar(&cfg.AutoCompactionRetention, "auto-compaction-retention", defaultAutoCompactionRetention, "retention for auto compaction(works only if auto-compaction-mode is periodic)")
 	fs.UintVar(&cfg.MaxRequestBytes, "max-request-bytes", defaultMaxRequestBytes, "max bytes of requests received by etcd server")
-
+	fs.IntVar(&cfg.MaxScanLimit, "max-scan-limit", defaultMaxScanLimit, "max kv storage scan limit")
+	fs.IntVar(&cfg.MinScanLimit, "min-scan-limit", defaultMinScanLimit, "min kv storage scan limit")
 	return builder, nil
 }
