@@ -15,7 +15,8 @@ import (
 
 const (
 	AllocClusterIDPrefix = "ClusterID"
-	AllocIDPrefix        = "/alloc-id"
+	AllocSchemaIDPrefix  = "SchemaID"
+	AllocTableIDPrefix   = "TableID"
 )
 
 type TableInfo struct {

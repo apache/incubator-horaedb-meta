@@ -28,11 +28,11 @@ const (
 	nodeName3                = "127.0.0.3:8081"
 	nodeName4                = "127.0.0.4:8081"
 	nodeName5                = "127.0.0.5:8081"
-	defaultCase              = "cause"
 	defaultMinNodeCount      = 1
 	defaultReplicationFactor = 3
 	defaultShardTotal        = 8
 	defaultShardID           = 1
+	defaultCount             = 10
 )
 
 func TestCluster(t *testing.T) {
@@ -40,9 +40,9 @@ func TestCluster(t *testing.T) {
 	s := NewStorage(t)
 	ctx := context.Background()
 
-	// test create cluster
+	// Test to create clusters.
 	clusters := make([]*clusterpb.Cluster, 0)
-	for i := 0; i < 20; i++ {
+	for i := 0; i < defaultCount; i++ {
 		cluster := &clusterpb.Cluster{
 			Id:                uint32(i),
 			Name:              name1,
@@ -55,11 +55,11 @@ func TestCluster(t *testing.T) {
 		clusters = append(clusters, cluster)
 	}
 
-	// test list clusters
+	// Test to list clusters.
 	values, err := s.ListClusters(ctx)
 	re.NoError(err)
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < defaultCount; i++ {
 		re.Equal(clusters[i].Id, values[i].Id)
 		re.Equal(clusters[i].Name, values[i].Name)
 		re.Equal(clusters[i].MinNodeCount, values[i].MinNodeCount)
@@ -68,7 +68,7 @@ func TestCluster(t *testing.T) {
 		re.Equal(clusters[i].ShardTotal, values[i].ShardTotal)
 	}
 
-	// test put cluster
+	// Test to put cluster.
 	cluster := &clusterpb.Cluster{
 		Id:                defaultClusterID,
 		Name:              name1,
@@ -79,7 +79,7 @@ func TestCluster(t *testing.T) {
 	err = s.PutCluster(ctx, defaultClusterID, cluster)
 	re.NoError(err)
 
-	// test get cluster
+	// Test to get cluster.
 	value, err := s.GetCluster(ctx, defaultClusterID)
 	re.NoError(err)
 	re.Equal(cluster.Id, value.Id)
@@ -96,24 +96,22 @@ func TestClusterTopology(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	// test create cluster topology
+	// Test to create cluster topology.
 	clusterTopology := &clusterpb.ClusterTopology{
 		ClusterId:   defaultClusterID,
 		DataVersion: defaultVersion,
-		Cause:       defaultCase,
 	}
 	clusterTopology, err := s.CreateClusterTopology(ctx, clusterTopology)
 	re.NoError(err)
 
-	// test get cluster topology
+	// Test to get cluster topology.
 	value, err := s.GetClusterTopology(ctx, defaultClusterID)
 	re.NoError(err)
 	re.Equal(clusterTopology.ClusterId, value.ClusterId)
 	re.Equal(clusterTopology.DataVersion, value.DataVersion)
-	re.Equal(clusterTopology.Cause, value.Cause)
 	re.Equal(clusterTopology.CreatedAt, value.CreatedAt)
 
-	// test put cluster topology
+	// Test to put cluster topology.
 	clusterTopology.DataVersion = uint64(1)
 	err = s.PutClusterTopology(ctx, defaultClusterID, defaultVersion, clusterTopology)
 	re.NoError(err)
@@ -132,27 +130,27 @@ func TestSchemes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	// test create schema
+	// Test to create schemas.
 	schemas := make([]*clusterpb.Schema, 0)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < defaultCount; i++ {
 		schema := &clusterpb.Schema{Id: uint32(i), ClusterId: defaultClusterID, Name: name1}
 		schema, err := s.CreateSchema(ctx, defaultClusterID, schema)
 		re.NoError(err)
 		schemas = append(schemas, schema)
 	}
 
-	// test list schemas
+	// Test to list schemas.
 	value, err := s.ListSchemas(ctx, defaultClusterID)
 	re.NoError(err)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < defaultCount; i++ {
 		re.Equal(schemas[i].Id, value[i].Id)
 		re.Equal(schemas[i].ClusterId, value[i].ClusterId)
 		re.Equal(schemas[i].Name, value[i].Name)
 		re.Equal(schemas[i].CreatedAt, value[i].CreatedAt)
 	}
 
-	// test put schemas
-	for i := 0; i < 10; i++ {
+	// Test to put schemas.
+	for i := 0; i < defaultCount; i++ {
 		schemas[i].Name = name2
 	}
 	err = s.PutSchemas(ctx, defaultClusterID, schemas)
@@ -160,7 +158,7 @@ func TestSchemes(t *testing.T) {
 
 	value, err = s.ListSchemas(ctx, defaultClusterID)
 	re.NoError(err)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < defaultCount; i++ {
 		re.Equal(schemas[i].Id, value[i].Id)
 		re.Equal(schemas[i].ClusterId, value[i].ClusterId)
 		re.Equal(schemas[i].Name, value[i].Name)
@@ -174,7 +172,7 @@ func TestTables(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	// test create tables
+	// Test to create tables.
 	table1 := &clusterpb.Table{
 		Id:       uint64(1),
 		Name:     name1,
@@ -204,7 +202,7 @@ func TestTables(t *testing.T) {
 	table3, err = s.CreateTable(ctx, defaultClusterID, defaultSchemaID, table3)
 	re.NoError(err)
 
-	// test get table
+	// Test to get table.
 	value, exist, err := s.GetTable(ctx, defaultClusterID, defaultSchemaID, name1)
 	re.NoError(err)
 	re.True(exist)
@@ -215,7 +213,7 @@ func TestTables(t *testing.T) {
 	re.Equal(table1.Desc, value.Desc)
 	re.Equal(table1.CreatedAt, value.CreatedAt)
 
-	// test list tables
+	// Test to list tables.
 	tables, err := s.ListTables(ctx, defaultClusterID, defaultSchemaID)
 	re.NoError(err)
 
@@ -240,7 +238,7 @@ func TestTables(t *testing.T) {
 	re.Equal(table3.Desc, tables[2].Desc)
 	re.Equal(table3.CreatedAt, tables[2].CreatedAt)
 
-	// test delete table
+	// Test to delete table.
 	err = s.DeleteTable(ctx, defaultClusterID, defaultSchemaID, name1)
 	re.NoError(err)
 
@@ -256,10 +254,10 @@ func TestShardTopologies(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	// test create shard topologies
+	// Test to create shard topologies.
 	shardTopologies := make([]*clusterpb.ShardTopology, 0)
 	shardID := make([]uint32, 0)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < defaultCount; i++ {
 		shardTopology := &clusterpb.ShardTopology{ShardId: uint32(i), Version: defaultVersion}
 		shardTopologies = append(shardTopologies, shardTopology)
 		shardID = append(shardID, uint32(i))
@@ -267,17 +265,17 @@ func TestShardTopologies(t *testing.T) {
 	shardTopologies, err := s.CreateShardTopologies(ctx, defaultClusterID, shardTopologies)
 	re.NoError(err)
 
-	// test list shard topologies
+	// Test to list shard topologies.
 	value, err := s.ListShardTopologies(ctx, defaultClusterID, shardID)
 	re.NoError(err)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < defaultCount; i++ {
 		re.Equal(shardTopologies[i].ShardId, value[i].ShardId)
 		re.Equal(shardTopologies[i].Version, value[i].Version)
 		re.Equal(shardTopologies[i].CreatedAt, value[i].CreatedAt)
 	}
 
-	// test put shard topologies
-	for i := 0; i < 10; i++ {
+	// Test to put shard topologies.
+	for i := 0; i < defaultCount; i++ {
 		shardTopologies[i].Version = 1
 	}
 
@@ -286,7 +284,7 @@ func TestShardTopologies(t *testing.T) {
 
 	value, err = s.ListShardTopologies(ctx, defaultClusterID, shardID)
 	re.NoError(err)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < defaultCount; i++ {
 		re.Equal(shardTopologies[i].ShardId, value[i].ShardId)
 		re.Equal(shardTopologies[i].Version, value[i].Version)
 		re.Equal(shardTopologies[i].CreatedAt, value[i].CreatedAt)
@@ -299,7 +297,7 @@ func TestNodes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
-	// test create node
+	// Test to create nodes.
 	node1 := &clusterpb.Node{Name: nodeName1}
 	node1, err := s.CreateOrUpdateNode(ctx, defaultClusterID, node1)
 	re.NoError(err)
@@ -320,7 +318,7 @@ func TestNodes(t *testing.T) {
 	node5, err = s.CreateOrUpdateNode(ctx, defaultClusterID, node5)
 	re.NoError(err)
 
-	// test list nodes
+	// Test to list nodes.
 	nodes, err := s.ListNodes(ctx, defaultClusterID)
 	re.NoError(err)
 

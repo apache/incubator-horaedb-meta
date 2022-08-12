@@ -25,21 +25,25 @@ type Cluster struct {
 	schemasCache map[string]*Schema // schema_name -> schema
 	nodesCache   map[string]*Node   // node_name -> node
 
-	storage     storage.Storage
-	hbstream    *schedule.HeartbeatStreams
-	coordinator *coordinator
-	alloc       id.Allocator
+	storage       storage.Storage
+	hbstream      *schedule.HeartbeatStreams
+	coordinator   *coordinator
+	schemaIDAlloc id.Allocator
+	tableIDAlloc  id.Allocator
 }
 
 func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage, hbstream *schedule.HeartbeatStreams, rootPath string) *Cluster {
-	alloc := id.NewAllocatorImpl(storage, rootPath, cluster.Name+AllocIDPrefix)
+	schemaIDAlloc := id.NewAllocatorImpl(storage, rootPath, cluster.Name+AllocSchemaIDPrefix)
+	tableIDAlloc := id.NewAllocatorImpl(storage, rootPath, cluster.Name+AllocTableIDPrefix)
+
 	return &Cluster{
-		clusterID:    cluster.GetId(),
-		metaData:     &metaData{cluster: cluster},
-		shardsCache:  make(map[uint32]*Shard),
-		schemasCache: make(map[string]*Schema),
-		nodesCache:   make(map[string]*Node),
-		alloc:        alloc,
+		clusterID:     cluster.GetId(),
+		metaData:      &metaData{cluster: cluster},
+		shardsCache:   make(map[uint32]*Shard),
+		schemasCache:  make(map[string]*Schema),
+		nodesCache:    make(map[string]*Node),
+		schemaIDAlloc: schemaIDAlloc,
+		tableIDAlloc:  tableIDAlloc,
 
 		storage:  storage,
 		hbstream: hbstream,
@@ -109,20 +113,20 @@ func (c *Cluster) Load(ctx context.Context) error {
 		return errors.Wrap(err, "clusters Load")
 	}
 
-	if err := c.updateCacheLocked(shards, shardTopologies, schemas, nodes, tables); err != nil {
+	if err := c.loadCacheLocked(shards, shardTopologies, schemas, nodes, tables); err != nil {
 		return errors.Wrap(err, "clusters Load")
 	}
 	return nil
 }
 
-func (c *Cluster) updateCacheLocked(
+func (c *Cluster) loadCacheLocked(
 	shards map[uint32][]*clusterpb.Shard,
 	shardTopologies map[uint32]*clusterpb.ShardTopology,
 	schemasLoaded map[string]*clusterpb.Schema,
 	nodesLoaded map[string]*clusterpb.Node,
 	tablesLoaded map[string]map[uint64]*clusterpb.Table,
 ) error {
-	// update schemas cache
+	// Load schema data into schema cache
 	for schemaName, tables := range tablesLoaded {
 		for _, table := range tables {
 			_, ok := c.schemasCache[schemaName]
@@ -143,7 +147,7 @@ func (c *Cluster) updateCacheLocked(
 		}
 	}
 
-	// update node cache
+	// Load node data into node cache
 	for shardID, shardPbs := range shards {
 		for _, shard := range shardPbs {
 			if _, ok := c.nodesCache[shard.GetNode()]; ok {
@@ -155,7 +159,7 @@ func (c *Cluster) updateCacheLocked(
 		}
 	}
 
-	// update shards cache
+	// Load shard data into shard cache
 	for shardID, shardTopology := range shardTopologies {
 		tables := make(map[uint64]*Table, len(shardTopology.TableIds))
 
@@ -313,7 +317,7 @@ func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName s
 	}
 
 	// create new schemasCache
-	shardID, err := c.assignShardID(nodeName)
+	shardID, err := c.pickOneShardOnNode(nodeName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "clusters AllocTableID, "+
 			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", c.Name(), schemaName, tableName, nodeName)
@@ -404,11 +408,11 @@ func (c *Cluster) loadNodeLocked(ctx context.Context) (map[string]*clusterpb.Nod
 		return nil, errors.Wrap(err, "clusters loadNodeLocked")
 	}
 
-	nodeMap := make(map[string]*clusterpb.Node, len(nodes))
+	nameNodes := make(map[string]*clusterpb.Node, len(nodes))
 	for _, node := range nodes {
-		nodeMap[node.Name] = node
+		nameNodes[node.Name] = node
 	}
-	return nodeMap, nil
+	return nameNodes, nil
 }
 
 func (c *Cluster) loadTableLocked(ctx context.Context, schemas map[string]*clusterpb.Schema) (map[string]map[uint64]*clusterpb.Table, error) {
@@ -503,22 +507,22 @@ func (c *Cluster) RegisterNode(ctx context.Context, nodeName string, lease uint3
 }
 
 func (c *Cluster) allocSchemaID(ctx context.Context) (uint32, error) {
-	ID, err := c.alloc.Alloc(ctx)
+	id, err := c.schemaIDAlloc.Alloc(ctx)
 	if err != nil {
-		return 0, errors.Wrapf(err, "alloc schema id failed")
+		return 0, errors.Wrap(err, "alloc schema id failed")
 	}
-	return uint32(ID), nil
+	return uint32(id), nil
 }
 
 func (c *Cluster) allocTableID(ctx context.Context) (uint64, error) {
-	ID, err := c.alloc.Alloc(ctx)
+	id, err := c.tableIDAlloc.Alloc(ctx)
 	if err != nil {
-		return 0, errors.Wrapf(err, "alloc table id failed")
+		return 0, errors.Wrap(err, "alloc table id failed")
 	}
-	return ID, nil
+	return id, nil
 }
 
-func (c *Cluster) assignShardID(nodeName string) (uint32, error) {
+func (c *Cluster) pickOneShardOnNode(nodeName string) (uint32, error) {
 	if node, ok := c.nodesCache[nodeName]; ok {
 		if len(node.shardIDs) == 0 {
 			return 0, ErrNodeShardsIsEmpty.WithCausef("nodeName:%s", nodeName)
@@ -526,7 +530,7 @@ func (c *Cluster) assignShardID(nodeName string) (uint32, error) {
 
 		id, err := rand.Int(rand.Reader, big.NewInt(int64(len(node.shardIDs))))
 		if err != nil {
-			return 0, errors.Wrapf(err, "assign shard id failed, nodeName:%s", nodeName)
+			return 0, errors.Wrapf(err, "pick one shard id on node failed, nodeName:%s", nodeName)
 		}
 		return node.shardIDs[uint32(id.Uint64())], nil
 	}

@@ -31,10 +31,10 @@ const (
 	table3                          = "table3"
 	table4                          = "table4"
 	defaultSchemaID          uint32 = 0
-	tableID1                 uint64 = 1
-	tableID2                 uint64 = 2
-	tableID3                 uint64 = 3
-	tableID4                 uint64 = 4
+	tableID1                 uint64 = 0
+	tableID2                 uint64 = 1
+	tableID3                 uint64 = 2
+	tableID4                 uint64 = 3
 	testRootPath                    = "/rootPath"
 )
 
