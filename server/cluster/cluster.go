@@ -31,8 +31,8 @@ type Cluster struct {
 	alloc       id.Allocator
 }
 
-func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage, hbstream *schedule.HeartbeatStreams) *Cluster {
-	alloc := id.NewAllocatorImpl(storage, defaultRootPath, cluster.Name+AllocIDPrefix)
+func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage, hbstream *schedule.HeartbeatStreams, rootPath string) *Cluster {
+	alloc := id.NewAllocatorImpl(storage, rootPath, cluster.Name+AllocIDPrefix)
 	return &Cluster{
 		clusterID:    cluster.GetId(),
 		metaData:     &metaData{cluster: cluster},

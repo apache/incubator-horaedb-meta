@@ -35,6 +35,7 @@ const (
 	tableID2                 uint64 = 2
 	tableID3                 uint64 = 3
 	tableID4                 uint64 = 4
+	testRootPath                    = "/rootPath"
 )
 
 func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, func()) {
@@ -59,14 +60,14 @@ func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, fu
 
 func newTestStorage(t *testing.T) storage.Storage {
 	_, client, _ := prepareEtcdServerAndClient(t)
-	storage := storage.NewStorageWithEtcdBackend(client, defaultRootPath, storage.Options{
+	storage := storage.NewStorageWithEtcdBackend(client, testRootPath, storage.Options{
 		MaxScanLimit: 100, MinScanLimit: 10,
 	})
 	return storage
 }
 
 func newClusterManagerWithStorage(storage storage.Storage) (Manager, error) {
-	return NewManagerImpl(context.Background(), storage, schedule.NewHeartbeatStreams(context.Background()))
+	return NewManagerImpl(context.Background(), storage, schedule.NewHeartbeatStreams(context.Background()), testRootPath)
 }
 
 func newTestClusterManager(t *testing.T) Manager {
@@ -105,7 +106,6 @@ func TestManagerSingleThread(t *testing.T) {
 	testGetTables(ctx, re, manager, node2, cluster1)
 
 	manager, err = newClusterManagerWithStorage(storage)
-	//testCreateCluster(ctx, re, manager, cluster1)
 	re.NoError(err)
 	testGetTables(ctx, re, manager, node1, cluster1)
 	testGetTables(ctx, re, manager, node2, cluster1)

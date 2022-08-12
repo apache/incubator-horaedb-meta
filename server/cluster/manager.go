@@ -16,7 +16,6 @@ import (
 const (
 	AllocClusterIDPrefix = "ClusterID"
 	AllocIDPrefix        = "/alloc-id"
-	defaultRootPath      = "/rootPath"
 )
 
 type TableInfo struct {
@@ -50,11 +49,12 @@ type managerImpl struct {
 	storage   storage.Storage
 	alloc     id.Allocator
 	hbstreams *schedule.HeartbeatStreams
+	rootPath  string
 }
 
-func NewManagerImpl(ctx context.Context, storage storage.Storage, hbstream *schedule.HeartbeatStreams) (Manager, error) {
-	alloc := id.NewAllocatorImpl(storage, defaultRootPath, AllocClusterIDPrefix)
-	manager := &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0), hbstreams: hbstream}
+func NewManagerImpl(ctx context.Context, storage storage.Storage, hbstream *schedule.HeartbeatStreams, rootPath string) (Manager, error) {
+	alloc := id.NewAllocatorImpl(storage, rootPath, AllocClusterIDPrefix)
+	manager := &managerImpl{storage: storage, alloc: alloc, clusters: make(map[string]*Cluster, 0), hbstreams: hbstream, rootPath: rootPath}
 	if err := manager.Load(ctx); err != nil {
 		return nil, errors.Wrap(err, "new clusters manager")
 	}
@@ -72,7 +72,7 @@ func (m *managerImpl) Load(ctx context.Context) error {
 
 	m.clusters = make(map[string]*Cluster, len(clusters))
 	for _, clusterPb := range clusters {
-		cluster := NewCluster(clusterPb, m.storage, m.hbstreams)
+		cluster := NewCluster(clusterPb, m.storage, m.hbstreams, m.rootPath)
 		if err := cluster.Load(ctx); err != nil {
 			return errors.Wrapf(err, "clusters manager Load, clusters:%v", cluster)
 		}
@@ -122,7 +122,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
 
-	cluster := NewCluster(clusterPb, m.storage, m.hbstreams)
+	cluster := NewCluster(clusterPb, m.storage, m.hbstreams, m.rootPath)
 	m.clusters[clusterName] = cluster
 
 	m.lock.Unlock()
