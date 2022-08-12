@@ -21,6 +21,7 @@ const (
 	defaultNodeNamePrefix          = "ceresmeta"
 	defaultDataDir                 = "/tmp/ceresmeta/data"
 	defaultWalDir                  = "/tmp/ceresmeta/wal"
+	defaultRootPath                = "/rootPath"
 	defaultClientUrls              = "http://127.0.0.1:2379"
 	defaultPeerUrls                = "http://127.0.0.1:2380"
 	defaultInitialClusterState     = embed.ClusterStateFlagNew
@@ -201,6 +202,7 @@ func MakeConfigParser() (*Parser, error) {
 
 	fs.StringVar(&cfg.DataDir, "data-dir", defaultDataDir, "data directory for the etcd server")
 	fs.StringVar(&cfg.WalDir, "wal-dir", defaultWalDir, "wal directory for the etcd server")
+	fs.StringVar(&cfg.StorageRootPath, "storage-root-path", defaultRootPath, "root path for the etcd server")
 
 	defaultInitialCluster := makeDefaultInitialCluster(defaultNodeName)
 	fs.StringVar(&cfg.InitialCluster, "initial-cluster", defaultInitialCluster, "members in the initial etcd cluster")

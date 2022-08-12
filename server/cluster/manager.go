@@ -16,7 +16,7 @@ import (
 const (
 	AllocClusterIDPrefix = "ClusterID"
 	AllocIDPrefix        = "/alloc-id"
-	defaultRootPath      = "/aaa"
+	defaultRootPath      = "/rootPath"
 )
 
 type TableInfo struct {
@@ -90,10 +90,10 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 
 	m.lock.Lock()
 
-	cluster, ok := m.clusters[clusterName]
+	_, ok := m.clusters[clusterName]
 	if ok {
 		m.lock.Unlock()
-		return cluster, nil
+		return nil, ErrClusterAlreadyExists
 	}
 
 	clusterID, err := m.allocClusterID(ctx)
@@ -122,7 +122,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
 
-	cluster = NewCluster(clusterPb, m.storage, m.hbstreams)
+	cluster := NewCluster(clusterPb, m.storage, m.hbstreams)
 	m.clusters[clusterName] = cluster
 
 	m.lock.Unlock()
