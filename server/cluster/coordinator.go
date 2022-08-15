@@ -101,9 +101,12 @@ func (c *coordinator) scatterShard(ctx context.Context) error {
 		}
 	}
 
-	if err := c.cluster.init(ctx, shards); err != nil {
+	c.cluster.metaData.clusterTopology.ShardView = shards
+	c.cluster.metaData.clusterTopology.State = clusterpb.ClusterTopology_STABLE
+	if err := c.cluster.storage.PutClusterTopology(ctx, c.cluster.clusterID, c.cluster.metaData.clusterTopology.DataVersion, c.cluster.metaData.clusterTopology); err != nil {
 		return errors.Wrap(err, "coordinator scatterShard")
 	}
+
 	if err := c.cluster.Load(ctx); err != nil {
 		return errors.Wrap(err, "coordinator scatterShard")
 	}

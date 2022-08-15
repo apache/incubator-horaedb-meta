@@ -32,61 +32,32 @@ type Cluster struct {
 	tableIDAlloc  id.Allocator
 }
 
-func NewCluster(cluster *clusterpb.Cluster, storage storage.Storage, hbstream *schedule.HeartbeatStreams, rootPath string) *Cluster {
-	schemaIDAlloc := id.NewAllocatorImpl(storage, rootPath, cluster.Name+AllocSchemaIDPrefix)
-	tableIDAlloc := id.NewAllocatorImpl(storage, rootPath, cluster.Name+AllocTableIDPrefix)
-
-	return &Cluster{
-		clusterID:     cluster.GetId(),
-		metaData:      &metaData{cluster: cluster},
+func NewCluster(meta *clusterpb.Cluster, storage storage.Storage, hbstream *schedule.HeartbeatStreams, rootPath string) *Cluster {
+	cluster := &Cluster{
+		clusterID:     meta.GetId(),
+		metaData:      &metaData{cluster: meta},
 		shardsCache:   make(map[uint32]*Shard),
 		schemasCache:  make(map[string]*Schema),
 		nodesCache:    make(map[string]*Node),
-		schemaIDAlloc: schemaIDAlloc,
-		tableIDAlloc:  tableIDAlloc,
+		schemaIDAlloc: id.NewAllocatorImpl(storage, rootPath, meta.Name+AllocSchemaIDPrefix),
+		tableIDAlloc:  id.NewAllocatorImpl(storage, rootPath, meta.Name+AllocTableIDPrefix),
 
 		storage:  storage,
 		hbstream: hbstream,
 	}
+	cluster.coordinator = newCoordinator(cluster, cluster.hbstream)
+	go cluster.coordinator.runBgJob()
+
+	return cluster
 }
 
 func (c *Cluster) Name() string {
 	return c.metaData.cluster.Name
 }
 
-func (c *Cluster) init(ctx context.Context, shards []*clusterpb.Shard) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.metaData.clusterTopology.ShardView = shards
-	c.metaData.clusterTopology.State = clusterpb.ClusterTopology_STABLE
-	if err := c.storage.PutClusterTopology(ctx, c.clusterID, c.metaData.clusterTopology.DataVersion, c.metaData.clusterTopology); err != nil {
-		return errors.Wrap(err, "cluster init")
-	}
-
-	shardTopologies := make([]*clusterpb.ShardTopology, 0, c.metaData.cluster.ShardTotal)
-
-	for i := uint32(0); i < c.metaData.cluster.ShardTotal; i++ {
-		shardTopologies = append(shardTopologies, &clusterpb.ShardTopology{
-			ShardId:  i,
-			TableIds: make([]uint64, 0),
-		})
-	}
-
-	if _, err := c.storage.CreateShardTopologies(ctx, c.clusterID, shardTopologies); err != nil {
-		return errors.Wrap(err, "cluster init")
-	}
-	return nil
-}
-
 func (c *Cluster) Load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
-	if c.coordinator == nil {
-		c.coordinator = newCoordinator(c, c.hbstream)
-		go c.coordinator.runBgJob()
-	}
 
 	shards, shardIDs, err := c.loadClusterTopologyLocked(ctx)
 	if err != nil {

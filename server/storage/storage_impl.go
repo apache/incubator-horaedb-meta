@@ -118,7 +118,7 @@ func (s *metaStorageImpl) CreateCluster(ctx context.Context, cluster *clusterpb.
 		return nil, errors.Wrapf(err, "fail to create cluster, clusterID:%d, key:%s", cluster.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateCluster.WithCausef("cluster may already exist, clusterID:%d, resp:%v", cluster.Id, resp)
+		return nil, ErrParseCreateCluster.WithCausef("cluster may already exist, clusterID:%d, key:%s, resp:%v", cluster.Id, key, resp)
 	}
 	return cluster, nil
 }
@@ -177,7 +177,7 @@ func (s *metaStorageImpl) CreateClusterTopology(ctx context.Context, clusterTopo
 		return nil, errors.Wrapf(err, "fail to create cluster topology, clusterID:%d, key:%s", clusterTopology.ClusterId, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateClusterTopology.WithCausef("cluster topology may already exist, clusterID:%d, resp:%v", clusterTopology.ClusterId, resp)
+		return nil, ErrParseCreateClusterTopology.WithCausef("cluster topology may already exist, clusterID:%d, key:%s, resp:%v", clusterTopology.ClusterId, key, resp)
 	}
 	return clusterTopology, nil
 }
@@ -224,7 +224,7 @@ func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 		return errors.Wrapf(err, "fail to put cluster topology, clusterID:%d, key:%s", clusterID, key)
 	}
 	if !resp.Succeeded {
-		return ErrParsePutClusterTopology.WithCausef("cluster topology may have been modified, clusterID:%d, resp:%v", clusterID, resp)
+		return ErrParsePutClusterTopology.WithCausef("cluster topology may have been modified, clusterID:%d, key:%s, resp:%v", clusterID, key, resp)
 	}
 
 	return nil
@@ -295,7 +295,7 @@ func (s *metaStorageImpl) CreateSchema(ctx context.Context, clusterID uint32, sc
 		return nil, errors.Wrapf(err, "fail to create schema, clusterID:%d, schemaID:%d, key:%s", clusterID, schema.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParsePutCluster.WithCausef("schema may already exist, clusterID:%d, schemaID:%d, resp:%v", clusterID, schema.Id, resp)
+		return nil, ErrParseCreateSchema.WithCausef("schema may already exist, clusterID:%d, schemaID:%d, key:%s, resp:%v", clusterID, schema.Id, key, resp)
 	}
 	return schema, nil
 }
@@ -342,7 +342,7 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 		return nil, errors.Wrapf(err, "fail to create table, clusterID:%d, schemaID:%d, tableID:%d, key:%s", clusterID, schemaID, table.Id, key)
 	}
 	if !resp.Succeeded {
-		return nil, ErrParseCreateTable.WithCausef("table may already exist, clusterID:%d, schemaID:%d, tableID:%d, resp:%v", clusterID, schemaID, table.Id, resp)
+		return nil, ErrParseCreateTable.WithCausef("table may already exist, clusterID:%d, schemaID:%d, tableID:%d, key:%s, resp:%v", clusterID, schemaID, table.Id, key, resp)
 	}
 	return table, nil
 }
@@ -483,7 +483,7 @@ func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID u
 			return nil, errors.Wrapf(err, "fail to create shard topology, clusterID:%d, shardID:%d, key:%s", clusterID, shardTopology.ShardId, key)
 		}
 		if !resp.Succeeded {
-			return nil, ErrParseCreateClusterTopology.WithCausef("shard topology may already exist, clusterID:%d, shardID:%d, resp:%v", clusterID, shardTopology.ShardId, resp)
+			return nil, ErrParseCreateClusterTopology.WithCausef("shard topology may already exist, clusterID:%d, shardID:%d, key:%s, resp:%v", clusterID, shardTopology.ShardId, key, resp)
 		}
 	}
 	return shardTopologies, nil
@@ -539,7 +539,7 @@ func (s *metaStorageImpl) PutShardTopologies(ctx context.Context, clusterID uint
 			return errors.Wrapf(err, "fail to put shard topology, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
 		if !resp.Succeeded {
-			return ErrParsePutShardTopology.WithCausef("shard topology may have been modified, clusterID:%d, shardID:%d, resp:%v", clusterID, shardID, resp)
+			return ErrParsePutShardTopology.WithCausef("shard topology may have been modified, clusterID:%d, shardID:%d, key:%s, resp:%v", clusterID, shardID, key, resp)
 		}
 	}
 	return nil

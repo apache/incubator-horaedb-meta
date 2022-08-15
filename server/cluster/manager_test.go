@@ -36,6 +36,8 @@ const (
 	tableID3                 uint64 = 2
 	tableID4                 uint64 = 3
 	testRootPath                    = "/rootPath"
+	num1                            = 0
+	num2                            = 1
 )
 
 func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, func()) {
@@ -90,6 +92,8 @@ func TestManagerSingleThread(t *testing.T) {
 	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
 	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
 
+	testGetTables(ctx, re, manager, node1, cluster1, num1)
+
 	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
 	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
 
@@ -102,13 +106,13 @@ func TestManagerSingleThread(t *testing.T) {
 	testDropTable(ctx, re, manager, cluster1, defaultSchema, table1, tableID1)
 	testDropTable(ctx, re, manager, cluster1, defaultSchema, table3, tableID3)
 
-	testGetTables(ctx, re, manager, node1, cluster1)
-	testGetTables(ctx, re, manager, node2, cluster1)
+	testGetTables(ctx, re, manager, node1, cluster1, num2)
+	testGetTables(ctx, re, manager, node2, cluster1, num2)
 
 	manager, err = newClusterManagerWithStorage(storage)
 	re.NoError(err)
-	testGetTables(ctx, re, manager, node1, cluster1)
-	testGetTables(ctx, re, manager, node2, cluster1)
+	testGetTables(ctx, re, manager, node1, cluster1, num2)
+	testGetTables(ctx, re, manager, node2, cluster1, num2)
 }
 
 func TestManagerMultiThread(t *testing.T) {
@@ -163,19 +167,20 @@ func testAllocTableID(ctx context.Context, re *require.Assertions, manager Manag
 	re.Equal(tableID, table.GetID())
 }
 
-func testGetTables(ctx context.Context, re *require.Assertions, manager Manager, node, cluster string) {
+func testGetTables(ctx context.Context, re *require.Assertions, manager Manager, node, cluster string, num int) {
 	shardIDs, err := manager.GetShards(ctx, cluster, node)
 	re.NoError(err)
 
 	shardTables, err := manager.GetTables(ctx, cluster, node, shardIDs)
 	re.NoError(err)
+	re.Equal(4, len(shardTables))
 
 	tableNum := 0
 	for _, tables := range shardTables {
 		re.Equal(clusterpb.ShardRole_LEADER, tables.ShardRole)
 		tableNum += len(tables.Tables)
 	}
-	re.Equal(1, tableNum)
+	re.Equal(num, tableNum)
 }
 
 func testDropTable(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, schemaName string, tableName string, tableID uint64) {

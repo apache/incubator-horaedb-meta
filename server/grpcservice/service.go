@@ -226,27 +226,17 @@ func (s *Service) GetTables(ctx context.Context, req *metaservicepb.GetTablesReq
 
 	tableMap := make(map[uint32]*metaservicepb.ShardTables, len(tables))
 	for shardID, shardTables := range tables {
+		tableMap[shardID] = &metaservicepb.ShardTables{
+			Role: shardTables.ShardRole,
+		}
 		for _, table := range shardTables.Tables {
-			shardTablesPb, ok := tableMap[shardID]
-			if ok {
-				shardTablesPb.Tables = append(shardTablesPb.Tables, &metaservicepb.TableInfo{
-					Id:         table.ID,
-					Name:       table.Name,
-					SchemaId:   table.SchemaID,
-					SchemaName: table.SchemaName,
-				})
-			} else {
-				tableMap[shardID] = &metaservicepb.ShardTables{
-					Tables: []*metaservicepb.TableInfo{
-						{
-							Id:         table.ID,
-							Name:       table.Name,
-							SchemaId:   table.SchemaID,
-							SchemaName: table.SchemaName,
-						},
-					},
-				}
-			}
+			shardTablesPb := tableMap[shardID]
+			shardTablesPb.Tables = append(shardTablesPb.Tables, &metaservicepb.TableInfo{
+				Id:         table.ID,
+				Name:       table.Name,
+				SchemaId:   table.SchemaID,
+				SchemaName: table.SchemaName,
+			})
 		}
 	}
 

@@ -123,6 +123,19 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
 
+	shardTopologies := make([]*clusterpb.ShardTopology, 0, clusterPb.ShardTotal)
+	for i := uint32(0); i < clusterPb.ShardTotal; i++ {
+		shardTopologies = append(shardTopologies, &clusterpb.ShardTopology{
+			ShardId:  i,
+			TableIds: make([]uint64, 0),
+			Version:  0,
+		})
+	}
+	if shardTopologies, err := m.storage.CreateShardTopologies(ctx, clusterID, shardTopologies); err != nil {
+		m.lock.Unlock()
+		return nil, errors.Wrapf(err, "clusters manager CreateCluster, shardTopologies:%v", shardTopologies)
+	}
+
 	cluster := NewCluster(clusterPb, m.storage, m.hbstreams, m.rootPath)
 	m.clusters[clusterName] = cluster
 
