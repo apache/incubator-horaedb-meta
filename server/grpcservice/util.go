@@ -31,8 +31,12 @@ func okResponseHeader() *commonpb.ResponseHeader {
 
 func responseHeader(err error, errMsg string) *commonpb.ResponseHeader {
 	code, b := coderr.GetCauseCode(err)
-	if !b {
+	if !b && err != nil {
 		code = coderr.Internal
 	}
-	return &commonpb.ResponseHeader{Code: uint32(code), Error: errMsg + err.Error()}
+
+	if err != nil {
+		return &commonpb.ResponseHeader{Code: uint32(code), Error: errMsg + err.Error()}
+	}
+	return &commonpb.ResponseHeader{Code: uint32(code), Error: errMsg}
 }
