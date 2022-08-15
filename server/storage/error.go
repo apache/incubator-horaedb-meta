@@ -5,21 +5,29 @@ package storage
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
 var (
-	ErrParseGetSchemas = coderr.NewCodeError(coderr.Internal, "meta storage get schemas")
-	ErrParsePutSchemas = coderr.NewCodeError(coderr.Internal, "meta storage put schemas")
+	ErrParseListSchemas  = coderr.NewCodeError(coderr.Internal, "meta storage list schemas")
+	ErrParseCreateSchema = coderr.NewCodeError(coderr.Internal, "meta storage create schemas")
+	ErrParsePutSchemas   = coderr.NewCodeError(coderr.Internal, "meta storage put schemas")
 
-	ErrParseGetCluster = coderr.NewCodeError(coderr.Internal, "meta storage get cluster")
-	ErrParsePutCluster = coderr.NewCodeError(coderr.Internal, "meta storage put cluster")
+	ErrParseListClusters  = coderr.NewCodeError(coderr.Internal, "meta storage list cluster")
+	ErrParseCreateCluster = coderr.NewCodeError(coderr.Internal, "meta storage create cluster")
+	ErrParseGetCluster    = coderr.NewCodeError(coderr.Internal, "meta storage get cluster")
+	ErrParsePutCluster    = coderr.NewCodeError(coderr.Internal, "meta storage put cluster")
 
-	ErrParseGetClusterTopology = coderr.NewCodeError(coderr.Internal, "meta storage get cluster topology")
-	ErrParsePutClusterTopology = coderr.NewCodeError(coderr.Internal, "meta storage put cluster topology")
+	ErrParseCreateClusterTopology = coderr.NewCodeError(coderr.Internal, "meta storage create cluster topology")
+	ErrParseGetClusterTopology    = coderr.NewCodeError(coderr.Internal, "meta storage get cluster topology")
+	ErrParsePutClusterTopology    = coderr.NewCodeError(coderr.Internal, "meta storage put cluster topology")
 
-	ErrParseGetTables = coderr.NewCodeError(coderr.Internal, "meta storage get tables")
-	ErrParsePutTables = coderr.NewCodeError(coderr.Internal, "meta storage put tables")
+	ErrParseCreateTable = coderr.NewCodeError(coderr.Internal, "meta storage create tables")
+	ErrParseGetTable    = coderr.NewCodeError(coderr.Internal, "meta storage get tables")
+	ErrParseListTables  = coderr.NewCodeError(coderr.Internal, "meta storage list tables")
+	ErrParsePutTables   = coderr.NewCodeError(coderr.Internal, "meta storage put tables")
+	ErrParseDeleteTable = coderr.NewCodeError(coderr.Internal, "meta storage delete table")
 
-	ErrParseGetShardTopology = coderr.NewCodeError(coderr.Internal, "meta storage get shard topology")
-	ErrParsePutShardTopology = coderr.NewCodeError(coderr.Internal, "meta storage put shard topology")
+	ErrParseCreateShardTopology = coderr.NewCodeError(coderr.Internal, "meta storage create shard topology")
+	ErrParseListShardTopology   = coderr.NewCodeError(coderr.Internal, "meta storage list shard topology")
+	ErrParsePutShardTopology    = coderr.NewCodeError(coderr.Internal, "meta storage put shard topology")
 
-	ErrParseGetNodes = coderr.NewCodeError(coderr.Internal, "meta storage get nodes")
-	ErrParsePutNodes = coderr.NewCodeError(coderr.Internal, "meta storage put nodes")
+	ErrParseCreateOrUpdateNode = coderr.NewCodeError(coderr.Internal, "meta storage create or update nodes")
+	ErrParseListNodes          = coderr.NewCodeError(coderr.Internal, "meta storage list nodes")
 )
