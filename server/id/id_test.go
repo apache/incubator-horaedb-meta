@@ -42,6 +42,6 @@ func TestAlloc(t *testing.T) {
 	for i := 0; i < 2010; i++ {
 		value, err := alloc.Alloc(ctx)
 		re.NoError(err)
-		re.Equal(uint64(i+1), value)
+		re.Equal(uint64(i), value)
 	}
 }
