@@ -61,11 +61,11 @@ func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
 		return errors.Wrapf(err, "get end id failed, key:%v", alloc.key)
 	}
 
-	if currEnd != "" {
-		return alloc.doRebase(ctx, decodeID(currEnd))
+	if currEnd == "" {
+		return ErrGetEndID.WithCausef("fail to get current end id, key not exist, key:%s", alloc.key)
 	}
 
-	return alloc.doRebase(ctx, 0)
+	return alloc.doRebase(ctx, decodeID(currEnd))
 }
 
 func (alloc *AllocatorImpl) fastRebaseLocked(ctx context.Context) error {
@@ -97,10 +97,10 @@ func (alloc *AllocatorImpl) doRebase(ctx context.Context, currEnd uint64) error 
 		return ErrTxnPutEndID.WithCausef("txn put end id failed, resp:%v", resp)
 	}
 
-	log.Info("Allocator allocates a new id", zap.Uint64(alloc.key, newEnd))
-
 	alloc.end = newEnd
 	alloc.base = newEnd - defaultAllocStep
+
+	log.Info("Allocator allocates a new base id", zap.String("id-type", alloc.key), zap.Uint64("alloc-id", alloc.base))
 
 	return nil
 }

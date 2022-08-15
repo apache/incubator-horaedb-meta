@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
+	"path"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
@@ -39,8 +40,8 @@ func NewCluster(meta *clusterpb.Cluster, storage storage.Storage, hbstream *sche
 		shardsCache:   make(map[uint32]*Shard),
 		schemasCache:  make(map[string]*Schema),
 		nodesCache:    make(map[string]*Node),
-		schemaIDAlloc: id.NewAllocatorImpl(storage, rootPath, meta.Name+AllocSchemaIDPrefix),
-		tableIDAlloc:  id.NewAllocatorImpl(storage, rootPath, meta.Name+AllocTableIDPrefix),
+		schemaIDAlloc: id.NewAllocatorImpl(storage, rootPath, path.Join(meta.Name, AllocSchemaIDPrefix)),
+		tableIDAlloc:  id.NewAllocatorImpl(storage, rootPath, path.Join(meta.Name, AllocTableIDPrefix)),
 
 		storage:  storage,
 		hbstream: hbstream,

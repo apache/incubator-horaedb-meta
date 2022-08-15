@@ -6,6 +6,10 @@ import (
 	"context"
 	"sync"
 
+	"go.uber.org/zap"
+
+	"github.com/CeresDB/ceresmeta/pkg/log"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/schedule"
@@ -65,6 +69,7 @@ func NewManagerImpl(ctx context.Context, storage storage.Storage, hbstream *sche
 func (m *managerImpl) Load(ctx context.Context) error {
 	clusters, err := m.storage.ListClusters(ctx)
 	if err != nil {
+		log.Error("fail to list clusters", zap.Error(err))
 		return errors.Wrap(err, "clusters manager Load")
 	}
 
@@ -75,6 +80,7 @@ func (m *managerImpl) Load(ctx context.Context) error {
 	for _, clusterPb := range clusters {
 		cluster := NewCluster(clusterPb, m.storage, m.hbstreams, m.rootPath)
 		if err := cluster.Load(ctx); err != nil {
+			log.Error("fail to load cluster", zap.Error(err))
 			return errors.Wrapf(err, "clusters manager Load, clusters:%v", cluster)
 		}
 		m.clusters[cluster.Name()] = cluster
@@ -86,6 +92,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	replicationFactor, shardTotal uint32,
 ) (*Cluster, error) {
 	if nodeCount < 1 {
+		log.Error("cluster's nodeCount must > 0", zap.String("clusterName", clusterName))
 		return nil, ErrCreateCluster.WithCausef("nodeCount must > 0")
 	}
 
@@ -94,12 +101,14 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	_, ok := m.clusters[clusterName]
 	if ok {
 		m.lock.Unlock()
+		log.Error("cluster already exists", zap.String("clusterName", clusterName))
 		return nil, ErrClusterAlreadyExists
 	}
 
 	clusterID, err := m.allocClusterID(ctx)
 	if err != nil {
 		m.lock.Unlock()
+		log.Error("fail to alloc cluster id", zap.Error(err))
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterName:%s", clusterName)
 	}
 
@@ -110,6 +119,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	clusterPb, err = m.storage.CreateCluster(ctx, clusterPb)
 	if err != nil {
 		m.lock.Unlock()
+		log.Error("fail to create cluster", zap.Error(err))
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusters:%v", clusterPb)
 	}
 
@@ -120,6 +130,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	}
 	if clusterTopologyPb, err := m.storage.CreateClusterTopology(ctx, clusterTopologyPb); err != nil {
 		m.lock.Unlock()
+		log.Error("fail to create cluster topology", zap.Error(err))
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterTopology:%v", clusterTopologyPb)
 	}
 
@@ -133,6 +144,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	}
 	if shardTopologies, err := m.storage.CreateShardTopologies(ctx, clusterID, shardTopologies); err != nil {
 		m.lock.Unlock()
+		log.Error("fail to create shard topology", zap.Error(err))
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, shardTopologies:%v", shardTopologies)
 	}
 
@@ -142,6 +154,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 	m.lock.Unlock()
 
 	if err := cluster.Load(ctx); err != nil {
+		log.Error("fail to load cluster", zap.Error(err))
 		return nil, errors.Wrapf(err, "clusters manager CreateCluster, clusterName:%s", clusterName)
 	}
 
@@ -151,12 +164,14 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, nod
 func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName string) (uint32, error) {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
+		log.Error("cluster not found", zap.Error(err))
 		return 0, errors.Wrap(err, "clusters manager AllocSchemaID")
 	}
 
 	// create new schema
 	schema, err := cluster.CreateSchema(ctx, schemaName)
 	if err != nil {
+		log.Error("fail to create schema", zap.Error(err))
 		return 0, errors.Wrapf(err, "clusters manager AllocSchemaID, "+
 			"clusterName:%s, schemaName:%s", clusterName, schemaName)
 	}
@@ -166,11 +181,13 @@ func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName, tableName, nodeName string) (*Table, error) {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
+		log.Error("cluster not found", zap.Error(err))
 		return nil, errors.Wrap(err, "clusters manager AllocTableID")
 	}
 
 	table, err := cluster.CreateTable(ctx, nodeName, schemaName, tableName)
 	if err != nil {
+		log.Error("fail to create table", zap.Error(err))
 		return nil, errors.Wrapf(err, "clusters manager AllocTableID, "+
 			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
@@ -180,6 +197,7 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error) {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
+		log.Error("cluster not found", zap.Error(err))
 		return nil, errors.Wrap(err, "clusters manager GetTables")
 	}
 
@@ -207,6 +225,7 @@ func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName strin
 func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
+		log.Error("cluster not found", zap.Error(err))
 		return errors.Wrap(err, "clusters manager DropTable")
 	}
 
@@ -221,6 +240,7 @@ func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 func (m *managerImpl) RegisterNode(ctx context.Context, clusterName, nodeName string, lease uint32) error {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
+		log.Error("cluster not found", zap.Error(err))
 		return errors.Wrap(err, "clusters manager RegisterNode")
 	}
 	err = cluster.RegisterNode(ctx, nodeName, lease)
@@ -238,6 +258,7 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName, nodeName st
 func (m *managerImpl) GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error) {
 	cluster, err := m.getCluster(ctx, clusterName)
 	if err != nil {
+		log.Error("cluster not found", zap.Error(err))
 		return nil, errors.Wrap(err, "clusters manager GetShards")
 	}
 
