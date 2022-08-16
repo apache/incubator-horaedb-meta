@@ -6,5 +6,5 @@ import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
 var (
 	ErrTxnPutEndID = coderr.NewCodeError(coderr.Internal, "put end id in txn")
-	ErrGetEndID    = coderr.NewCodeError(coderr.Internal, "alloc id")
+	ErrAllocID     = coderr.NewCodeError(coderr.Internal, "alloc id")
 )
