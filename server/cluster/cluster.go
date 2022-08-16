@@ -4,12 +4,12 @@ package cluster
 
 import (
 	"context"
-	"crypto/rand"
-	"math/big"
+	"math/rand"
 	"path"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -19,7 +19,7 @@ import (
 type Cluster struct {
 	clusterID uint32
 
-	// RWMutex is used to project following fields.
+	// RWMutex is used to protect following fields.
 	lock         sync.RWMutex
 	metaData     *metaData
 	shardsCache  map[uint32]*Shard  // shard_id -> shard
@@ -46,6 +46,7 @@ func NewCluster(meta *clusterpb.Cluster, storage storage.Storage, hbstream *sche
 		storage:  storage,
 		hbstream: hbstream,
 	}
+
 	cluster.coordinator = newCoordinator(cluster, cluster.hbstream)
 	go cluster.coordinator.runBgJob()
 
@@ -56,6 +57,34 @@ func (c *Cluster) Name() string {
 	return c.metaData.cluster.Name
 }
 
+// Initialize the cluster topology and shard topology of the cluster.
+// It will be used when we create the cluster.
+func (c *Cluster) init(ctx context.Context) error {
+	clusterTopologyPb := &clusterpb.ClusterTopology{
+		ClusterId: c.clusterID, DataVersion: 0,
+		State: clusterpb.ClusterTopology_EMPTY,
+	}
+	if clusterTopologyPb, err := c.storage.CreateClusterTopology(ctx, clusterTopologyPb); err != nil {
+		return errors.Wrapf(err, "cluster init cluster topology, clusterTopology:%v", clusterTopologyPb)
+	}
+
+	c.metaData.clusterTopology = clusterTopologyPb
+
+	shardTopologies := make([]*clusterpb.ShardTopology, 0, c.metaData.cluster.ShardTotal)
+	for i := uint32(0); i < c.metaData.cluster.ShardTotal; i++ {
+		shardTopologies = append(shardTopologies, &clusterpb.ShardTopology{
+			ShardId:  i,
+			TableIds: make([]uint64, 0),
+			Version:  0,
+		})
+	}
+	if shardTopologies, err := c.storage.CreateShardTopologies(ctx, c.clusterID, shardTopologies); err != nil {
+		return errors.Wrapf(err, "cluster init shard topolgies, shardTopologies:%v", shardTopologies)
+	}
+	return nil
+}
+
+// Load data from storage to memory.
 func (c *Cluster) Load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -98,7 +127,7 @@ func (c *Cluster) loadCacheLocked(
 	nodesLoaded map[string]*clusterpb.Node,
 	tablesLoaded map[string]map[uint64]*clusterpb.Table,
 ) error {
-	// Load schema data into schema cache
+	// Load schema data into schema cache.
 	for schemaName, tables := range tablesLoaded {
 		for _, table := range tables {
 			_, ok := c.schemasCache[schemaName]
@@ -119,19 +148,19 @@ func (c *Cluster) loadCacheLocked(
 		}
 	}
 
-	// Load node data into node cache
+	// Load node data into node cache.
 	for shardID, shardPbs := range shards {
 		for _, shard := range shardPbs {
-			if _, ok := c.nodesCache[shard.GetNode()]; ok {
-				c.nodesCache[shard.GetNode()].shardIDs = append(c.nodesCache[shard.GetNode()].shardIDs, shardID)
-			} else {
-				// TODO: check node not found by node name
-				c.nodesCache[shard.GetNode()] = &Node{meta: nodesLoaded[shard.GetNode()], shardIDs: []uint32{shardID}}
+			node, ok := c.nodesCache[shard.GetNode()]
+			if !ok {
+				node = &Node{meta: nodesLoaded[shard.GetNode()]}
+				c.nodesCache[shard.GetNode()] = node
 			}
+			node.shardIDs = append(node.shardIDs, shardID)
 		}
 	}
 
-	// Load shard data into shard cache
+	// Load shard data into shard cache.
 	for shardID, shardTopology := range shardTopologies {
 		tables := make(map[uint64]*Table, len(shardTopology.TableIds))
 
@@ -149,15 +178,15 @@ func (c *Cluster) loadCacheLocked(
 		// TODO: assert shardID
 		// TODO: check shard not found by shardID
 		shardMetaList := shards[shardID]
-		var nodes []*clusterpb.Node
+		var nodeMetas []*clusterpb.Node
 		for _, shardMeta := range shardMetaList {
 			if node := c.nodesCache[shardMeta.Node]; node != nil {
-				nodes = append(nodes, node.meta)
+				nodeMetas = append(nodeMetas, node.meta)
 			}
 		}
 		c.shardsCache[shardID] = &Shard{
 			meta:    shards[shardID],
-			nodes:   nodes,
+			nodes:   nodeMetas,
 			tables:  tables,
 			version: 0,
 		}
@@ -188,7 +217,7 @@ func (c *Cluster) getTableShardIDLocked(tableID uint64) (uint32, error) {
 	return 0, ErrShardNotFound.WithCausef("get table shardID, tableID:%d", tableID)
 }
 
-func (c *Cluster) GetTables(ctx context.Context, shardIDs []uint32, nodeName string) (map[uint32]*ShardTablesWithRole, error) {
+func (c *Cluster) GetTables(_ context.Context, shardIDs []uint32, nodeName string) (map[uint32]*ShardTablesWithRole, error) {
 	// TODO: refactor more fine-grained locks
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -244,7 +273,7 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, t
 	return nil
 }
 
-func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (*Schema, error) {
+func (c *Cluster) GetOrCreateSchema(ctx context.Context, schemaName string) (*Schema, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -272,7 +301,7 @@ func (c *Cluster) CreateSchema(ctx context.Context, schemaName string) (*Schema,
 	return schema, nil
 }
 
-func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName string, tableName string) (*Table, error) {
+func (c *Cluster) GetOrCreateTable(ctx context.Context, nodeName string, schemaName string, tableName string) (*Table, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -291,15 +320,13 @@ func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName s
 	// create new schemasCache
 	shardID, err := c.pickOneShardOnNode(nodeName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "clusters AllocTableID, "+
-			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", c.Name(), schemaName, tableName, nodeName)
+		return nil, errors.Wrapf(err, "clusters AllocTableID, clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", c.Name(), schemaName, tableName, nodeName)
 	}
 
 	// alloc table id
 	tableID, err := c.allocTableID(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cluster AllocTableID, "+
-			"schemaName:%s, tableName:%s", schemaName, tableName)
+		return nil, errors.Wrapf(err, "cluster AllocTableID, schemaName:%s, tableName:%s", schemaName, tableName)
 	}
 
 	// Save table in storage.
@@ -311,8 +338,11 @@ func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName s
 
 	// Update shardTopology in storage.
 	shardTopologies, err := c.storage.ListShardTopologies(ctx, c.clusterID, []uint32{shardID})
+	if err != nil {
+		return nil, errors.Wrap(err, "get or create table")
+	}
 	if len(shardTopologies) != 1 {
-		return nil, errors.Wrapf(err, "clusters CreateTable, shard has more than one shardTopology, shardID:%d, shardTopologies:%v",
+		return nil, ErrGetShardTopology.WithCausef("clusters CreateTable, shard has more than one shardTopology, shardID:%d, shardTopologies:%v",
 			shardID, shardTopologies)
 	}
 
@@ -500,11 +530,8 @@ func (c *Cluster) pickOneShardOnNode(nodeName string) (uint32, error) {
 			return 0, ErrNodeShardsIsEmpty.WithCausef("nodeName:%s", nodeName)
 		}
 
-		id, err := rand.Int(rand.Reader, big.NewInt(int64(len(node.shardIDs))))
-		if err != nil {
-			return 0, errors.Wrapf(err, "pick one shard id on node failed, nodeName:%s", nodeName)
-		}
-		return node.shardIDs[uint32(id.Uint64())], nil
+		idx := rand.Int31n(int32(len(node.shardIDs))) //#nosec G404
+		return node.shardIDs[idx], nil
 	}
 	return 0, ErrNodeNotFound.WithCausef("nodeName:%s", nodeName)
 }

@@ -16,23 +16,24 @@ const (
 	node          = "node"
 	topology      = "topo"
 	latestVersion = "latest_version"
+	info          = "info"
 )
 
 // makeSchemaKey returns the key path to the schema meta info.
 // example:
-// cluster 1: v1/cluster/1/schema/schema/1 -> pb.Schema
-//            v1/cluster/1/schema/schema/2 -> pb.Schema
-//            v1/cluster/1/schema/schema/3 -> pb.Schema
+// cluster 1: v1/cluster/1/schema/info/1 -> pb.Schema
+//            v1/cluster/1/schema/info/2 -> pb.Schema
+//            v1/cluster/1/schema/info/3 -> pb.Schema
 func makeSchemaKey(clusterID uint32, schemaID uint32) string {
-	return path.Join(version, cluster, fmtID(uint64(clusterID)), schema, schema, fmtID(uint64(schemaID)))
+	return path.Join(version, cluster, fmtID(uint64(clusterID)), schema, info, fmtID(uint64(schemaID)))
 }
 
 // makeClusterKey returns the cluster meta info key path.
-// example: v1/cluster/cluster/1 -> pb.Cluster
-//          v1/cluster/cluster/2 -> pb.Cluster
-//          v1/cluster/cluster/3 -> pb.Cluster
+// example: v1/cluster/info/1 -> pb.Cluster
+//          v1/cluster/info/2 -> pb.Cluster
+//          v1/cluster/info/3 -> pb.Cluster
 func makeClusterKey(clusterID uint32) string {
-	return path.Join(version, cluster, cluster, fmtID(uint64(clusterID)))
+	return path.Join(version, cluster, info, fmtID(uint64(clusterID)))
 }
 
 // makeTableKey returns the table meta info key path.

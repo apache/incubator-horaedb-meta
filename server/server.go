@@ -139,7 +139,7 @@ func (srv *Server) startEtcd(ctx context.Context) error {
 func (srv *Server) startServer(ctx context.Context) error {
 	srv.hbStreams = schedule.NewHeartbeatStreams(ctx)
 
-	if srv.cfg.MaxScanLimit < 2 {
+	if srv.cfg.MaxScanLimit <= 1 {
 		return ErrStartServer.WithCausef("scan limit must be greater than 1")
 	}
 

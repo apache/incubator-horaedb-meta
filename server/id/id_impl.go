@@ -31,7 +31,6 @@ type AllocatorImpl struct {
 	key      string
 }
 
-// TODO: existed bug when rootPath = "/"
 func NewAllocatorImpl(kv storage.KV, rootPath string, key string) *AllocatorImpl {
 	return &AllocatorImpl{kv: kv, rootPath: rootPath, key: key}
 }
@@ -42,7 +41,7 @@ func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
 
 	if alloc.base == alloc.end {
 		if err := alloc.fastRebaseLocked(ctx); err != nil {
-			log.Debug("fast rebase failed", zap.Error(err))
+			log.Info("fast rebase failed", zap.Error(err))
 
 			if err := alloc.rebaseLocked(ctx); err != nil {
 				return 0, err
@@ -50,9 +49,8 @@ func (alloc *AllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
 		}
 	}
 
-	ret := alloc.base
 	alloc.base++
-	return ret, nil
+	return alloc.base, nil
 }
 
 func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
@@ -61,11 +59,11 @@ func (alloc *AllocatorImpl) rebaseLocked(ctx context.Context) error {
 		return errors.Wrapf(err, "get end id failed, key:%v", alloc.key)
 	}
 
-	if currEnd == "" {
-		return ErrGetEndID.WithCausef("fail to get current end id, key not exist, key:%s", alloc.key)
+	if currEnd != "" {
+		return alloc.doRebase(ctx, decodeID(currEnd))
 	}
 
-	return alloc.doRebase(ctx, decodeID(currEnd))
+	return alloc.doRebase(ctx, 0)
 }
 
 func (alloc *AllocatorImpl) fastRebaseLocked(ctx context.Context) error {
@@ -84,9 +82,6 @@ func (alloc *AllocatorImpl) doRebase(ctx context.Context, currEnd uint64) error 
 	}
 	opPutEndID := clientv3.OpPut(key, encodeID(newEnd))
 
-	// Check whether the currEnd id is existed in etcd, if not, create end id
-	// Check whether the currEnd id is equal to that in etcd. If it is equal，update end id
-	// otherwise return error
 	resp, err := alloc.kv.Txn(ctx).
 		If(cmp).
 		Then(opPutEndID).
@@ -97,10 +92,10 @@ func (alloc *AllocatorImpl) doRebase(ctx context.Context, currEnd uint64) error 
 		return ErrTxnPutEndID.WithCausef("txn put end id failed, resp:%v", resp)
 	}
 
+	log.Info("Allocator allocates a new id", zap.Uint64("alloc-id", newEnd))
+
 	alloc.end = newEnd
 	alloc.base = newEnd - defaultAllocStep
-
-	log.Info("Allocator allocates a new base id", zap.String("id-type", alloc.key), zap.Uint64("alloc-id", alloc.base))
 
 	return nil
 }

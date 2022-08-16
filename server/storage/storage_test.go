@@ -169,7 +169,7 @@ func TestSchemes(t *testing.T) {
 func TestTables(t *testing.T) {
 	re := require.New(t)
 	s := NewStorage(t)
-	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout*100)
 	defer cancel()
 
 	// Test to create tables.
