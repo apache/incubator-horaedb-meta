@@ -24,11 +24,11 @@ type AllocatorImpl struct {
 
 	kv            clientv3.KV
 	key           string
-	allocStep     uint64
+	allocStep     uint
 	isInitialized bool
 }
 
-func NewAllocatorImpl(kv clientv3.KV, key string, allocStep uint64) *AllocatorImpl {
+func NewAllocatorImpl(kv clientv3.KV, key string, allocStep uint) *AllocatorImpl {
 	return &AllocatorImpl{kv: kv, key: key, allocStep: allocStep}
 }
 
@@ -89,7 +89,7 @@ func (a *AllocatorImpl) firstDoRebaseLocked(ctx context.Context) error {
 	newEnd := a.allocStep
 
 	keyMissing := clientv3util.KeyMissing(a.key)
-	opPutEnd := clientv3.OpPut(a.key, encodeID(newEnd))
+	opPutEnd := clientv3.OpPut(a.key, encodeID(uint64(newEnd)))
 
 	resp, err := a.kv.Txn(ctx).
 		If(keyMissing).
@@ -101,7 +101,7 @@ func (a *AllocatorImpl) firstDoRebaseLocked(ctx context.Context) error {
 		return ErrTxnPutEndID.WithCausef("txn put end id failed, key is exist, key:%s, resp:%v", a.key, resp)
 	}
 
-	a.end = newEnd
+	a.end = uint64(newEnd)
 
 	log.Info("Allocator allocates a new base id", zap.String("key", a.key), zap.Uint64("id", a.base))
 	return nil
@@ -112,7 +112,7 @@ func (a *AllocatorImpl) doRebaseLocked(ctx context.Context, currEnd uint64) erro
 		return ErrAllocID.WithCausef("ID in storage can't less than memory, base:%d, end:%d", a.base, currEnd)
 	}
 
-	newEnd := currEnd + a.allocStep
+	newEnd := currEnd + uint64(a.allocStep)
 
 	endEquals := clientv3.Compare(clientv3.Value(a.key), "=", encodeID(currEnd))
 	opPutEnd := clientv3.OpPut(a.key, encodeID(newEnd))
