@@ -67,12 +67,9 @@ func (a *AllocatorImpl) slowRebaseLocked(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "get end id failed, key:%s", a.key)
 	}
-	var currEnd string
 
 	if n := len(resp.Kvs); n > 1 {
 		return etcdutil.ErrEtcdKVGetResponse.WithCausef("%v", resp.Kvs)
-	} else if n == 1 {
-		currEnd = string(resp.Kvs[0].Value)
 	}
 
 	// Key is not exist, create key in kv storage.
@@ -80,6 +77,7 @@ func (a *AllocatorImpl) slowRebaseLocked(ctx context.Context) error {
 		return a.firstDoRebaseLocked(ctx)
 	}
 
+	currEnd := string(resp.Kvs[0].Value)
 	return a.doRebaseLocked(ctx, decodeID(currEnd))
 }
 
@@ -90,12 +88,12 @@ func (a *AllocatorImpl) fastRebaseLocked(ctx context.Context) error {
 func (a *AllocatorImpl) firstDoRebaseLocked(ctx context.Context) error {
 	newEnd := a.allocStep
 
-	cmp := clientv3util.KeyMissing(a.key)
-	op := clientv3.OpPut(a.key, encodeID(newEnd))
+	keyMissing := clientv3util.KeyMissing(a.key)
+	opPutEnd := clientv3.OpPut(a.key, encodeID(newEnd))
 
 	resp, err := a.kv.Txn(ctx).
-		If(cmp).
-		Then(op).
+		If(keyMissing).
+		Then(opPutEnd).
 		Commit()
 	if err != nil {
 		return errors.Wrapf(err, "put end id failed, key:%s", a.key)
@@ -116,17 +114,17 @@ func (a *AllocatorImpl) doRebaseLocked(ctx context.Context, currEnd uint64) erro
 
 	newEnd := currEnd + a.allocStep
 
-	cmp := clientv3.Compare(clientv3.Value(a.key), "=", encodeID(currEnd))
-	op := clientv3.OpPut(a.key, encodeID(newEnd))
+	endEquals := clientv3.Compare(clientv3.Value(a.key), "=", encodeID(currEnd))
+	opPutEnd := clientv3.OpPut(a.key, encodeID(newEnd))
 
 	resp, err := a.kv.Txn(ctx).
-		If(cmp).
-		Then(op).
+		If(endEquals).
+		Then(opPutEnd).
 		Commit()
 	if err != nil {
 		return errors.Wrapf(err, "put end id failed, key:%s, old value:%d, new value:%d", a.key, currEnd, newEnd)
 	} else if !resp.Succeeded {
-		return ErrTxnPutEndID.WithCausef("txn put end id failed, cmp failed, key:%s, value:%d, resp:%v", a.key, currEnd, resp)
+		return ErrTxnPutEndID.WithCausef("txn put end id failed, endEquals failed, key:%s, value:%d, resp:%v", a.key, currEnd, resp)
 	}
 
 	a.base = currEnd

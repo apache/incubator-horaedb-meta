@@ -4,7 +4,6 @@ package id
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -37,28 +36,13 @@ func newTestKV(t *testing.T) clientv3.KV {
 	return client
 }
 
-func TestAllocMultiThread(t *testing.T) {
+func TestMultipleAllocBasedOnKV(t *testing.T) {
 	start := 0
 	size := 201
 	kv := newTestKV(t)
 
-	// Two goroutines allocate ids concurrently.
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		time.Sleep(time.Second)
-		testAllocIDValue(t, kv, ((start+size)/defaultStep+1)*defaultStep, size)
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		testAllocIDValue(t, kv, start, size)
-	}()
-	wg.Wait()
+	testAllocIDValue(t, kv, start, size)
+	testAllocIDValue(t, kv, ((start+size)/defaultStep+1)*defaultStep, size)
 }
 
 func testAllocIDValue(t *testing.T, kv clientv3.KV, start, size int) {
