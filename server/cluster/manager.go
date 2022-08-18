@@ -64,6 +64,7 @@ func NewManagerImpl(ctx context.Context, storage storage.Storage, kv clientv3.KV
 
 	manager := &managerImpl{
 		storage:         storage,
+		kv:              kv,
 		alloc:           alloc,
 		clusters:        make(map[string]*Cluster, 0),
 		hbstreams:       hbstream,

@@ -4,6 +4,7 @@ package cluster
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
@@ -30,11 +31,11 @@ const (
 	table2                          = "table2"
 	table3                          = "table3"
 	table4                          = "table4"
-	defaultSchemaID          uint32 = 1
-	tableID1                 uint64 = 1
-	tableID2                 uint64 = 2
-	tableID3                 uint64 = 3
-	tableID4                 uint64 = 4
+	defaultSchemaID          uint32 = 0
+	tableID1                 uint64 = 0
+	tableID2                 uint64 = 1
+	tableID3                 uint64 = 2
+	tableID4                 uint64 = 3
 	testRootPath                    = "/rootPath"
 	num1                            = 0
 	num2                            = 1
@@ -190,6 +191,12 @@ func testDropTable(ctx context.Context, re *require.Assertions, manager Manager,
 }
 
 func testAllocTableIDWithMultiThread(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, tableID uint64) {
-	go testAllocTableID(ctx, re, manager, node1, clusterName, defaultSchema, table1, tableID)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		testAllocTableID(ctx, re, manager, node1, clusterName, defaultSchema, table1, tableID)
+		wg.Done()
+	}()
 	testAllocTableID(ctx, re, manager, node2, clusterName, defaultSchema, table1, tableID)
+	wg.Wait()
 }
