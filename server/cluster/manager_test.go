@@ -40,6 +40,7 @@ const (
 	num1                            = 0
 	num2                            = 1
 	defaultIDAllocatorStep          = 20
+	defaultThreadNum                = 20
 )
 
 func prepareEtcdServerAndClient(t *testing.T) (*embed.Etcd, *clientv3.Client, func()) {
@@ -192,11 +193,14 @@ func testDropTable(ctx context.Context, re *require.Assertions, manager Manager,
 
 func testAllocTableIDWithMultiThread(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, tableID uint64) {
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		testAllocTableID(ctx, re, manager, node1, clusterName, defaultSchema, table1, tableID)
-		wg.Done()
-	}()
+	wg.Add(defaultThreadNum)
+	for i := 0; i < defaultThreadNum; i++ {
+		go func() {
+			testAllocTableID(ctx, re, manager, node1, clusterName, defaultSchema, table1, tableID)
+			wg.Done()
+		}()
+	}
+
 	testAllocTableID(ctx, re, manager, node2, clusterName, defaultSchema, table1, tableID)
 	wg.Wait()
 }
