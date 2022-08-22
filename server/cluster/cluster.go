@@ -259,10 +259,10 @@ func (c *Cluster) GetTables(_ context.Context, shardIDs []uint32, nodeName strin
 }
 
 func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, tableID uint64) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	schema, exists := c.getSchemaLocked(schemaName)
+	schema, exists, err := c.getSchema(ctx, schemaName)
+	if err != nil {
+		return err
+	}
 	if !exists {
 		return ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 	}
@@ -272,23 +272,28 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string, t
 			c.clusterID, schema, tableName)
 	}
 
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	schema.dropTableLocked(tableName)
 	for _, shard := range c.shardsCache {
 		shard.dropTableLocked(tableID)
 	}
+
 	return nil
 }
 
 func (c *Cluster) GetOrCreateSchema(ctx context.Context, schemaName string) (*Schema, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	// Check if provided schema exists.
-	schema, exists := c.getSchemaLocked(schemaName)
+	schema, exists, err := c.getSchema(ctx, schemaName)
+	if err != nil {
+		return nil, err
+	}
 	if exists {
 		return schema, nil
 	}
 
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	// alloc schema id
 	schemaID, err := c.allocSchemaID(ctx)
 	if err != nil {
@@ -308,17 +313,20 @@ func (c *Cluster) GetOrCreateSchema(ctx context.Context, schemaName string) (*Sc
 }
 
 func (c *Cluster) GetOrCreateTable(ctx context.Context, nodeName string, schemaName string, tableName string) (*Table, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	// Check provided schema if exists.
-	schema, exists := c.getSchemaLocked(schemaName)
+	schema, exists, err := c.getSchema(ctx, schemaName)
+	if err != nil {
+		return nil, err
+	}
 	if !exists {
 		return nil, ErrSchemaNotFound.WithCausef("schemaName", schemaName)
 	}
 
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	// check if exists
-	table, exists := c.getTableLocked(schemaName, tableName)
+	table, exists := c.getTableInCacheLocked(schemaName, tableName)
 	if exists {
 		return table, nil
 	}
@@ -441,12 +449,30 @@ func (c *Cluster) loadTableLocked(ctx context.Context, schemas map[string]*clust
 	return tables, nil
 }
 
-func (c *Cluster) getSchemaLocked(schemaName string) (*Schema, bool) {
+// getSchema gets schema by name, search from cache and storage.
+func (c *Cluster) getSchema(ctx context.Context, schemaName string) (*Schema, bool, error) {
+	c.lock.RLock()
 	schema, ok := c.schemasCache[schemaName]
-	return schema, ok
+	if ok {
+		c.lock.RUnlock()
+		return schema, ok, nil
+	}
+	c.lock.RUnlock()
+
+	c.lock.Lock()
+	if _, err := c.loadSchemaLocked(ctx); err != nil {
+		return nil, false, errors.Wrap(err, "get schema")
+	}
+	c.lock.Unlock()
+
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	schema, ok = c.schemasCache[schemaName]
+	return schema, ok, nil
 }
 
-func (c *Cluster) getTableLocked(schemaName string, tableName string) (*Table, bool) {
+func (c *Cluster) getTableInCacheLocked(schemaName string, tableName string) (*Table, bool) {
 	table, ok := c.schemasCache[schemaName].tableMap[tableName]
 	return table, ok
 }

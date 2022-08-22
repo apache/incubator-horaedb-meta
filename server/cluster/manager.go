@@ -242,13 +242,38 @@ func (m *managerImpl) GetShards(ctx context.Context, clusterName, nodeName strin
 	return shardIDs, nil
 }
 
-func (m *managerImpl) getCluster(_ context.Context, clusterName string) (*Cluster, error) {
+func (m *managerImpl) getCluster(ctx context.Context, clusterName string) (*Cluster, error) {
 	m.lock.RLock()
 	cluster, ok := m.clusters[clusterName]
 	m.lock.RUnlock()
-	if !ok {
+	if ok {
+		return cluster, nil
+	}
+
+	clusters, err := m.storage.ListClusters(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "get cluster")
+	}
+	exists := false
+	var clusterPb *clusterpb.Cluster
+	for _, cluster := range clusters {
+		if cluster.GetName() == clusterName {
+			clusterPb = cluster
+			exists = true
+			break
+		}
+	}
+
+	if !exists {
 		return nil, ErrClusterNotFound.WithCausef("cluster manager getCluster, clusterName:%s", clusterName)
 	}
+
+	m.lock.Lock()
+	if err = m.openClusterLocked(ctx, clusterPb); err != nil {
+		return nil, errors.Wrap(err, "get cluster")
+	}
+	m.lock.Unlock()
+
 	return cluster, nil
 }
 
@@ -277,15 +302,23 @@ func (m *managerImpl) Start(ctx context.Context) error {
 
 	m.clusters = make(map[string]*Cluster, len(clusters))
 	for _, clusterPb := range clusters {
-		cluster := NewCluster(clusterPb, m.storage, m.kv, m.hbstreams, m.rootPath, m.idAllocatorStep)
-		if err := cluster.Load(ctx); err != nil {
-			log.Error("cluster manager fail to start, fail to load cluster", zap.Error(err))
-			return errors.Wrapf(err, "cluster manager start, clusters:%v", cluster)
+		if err = m.openClusterLocked(ctx, clusterPb); err != nil {
+			return errors.Wrapf(err, "cluster manager start, cluster:%v", clusterPb)
 		}
-		m.clusters[cluster.Name()] = cluster
 	}
 	m.running = true
 
+	return nil
+}
+
+func (m *managerImpl) openClusterLocked(ctx context.Context, clusterPb *clusterpb.Cluster) error {
+	cluster := NewCluster(clusterPb, m.storage, m.kv, m.hbstreams, m.rootPath, m.idAllocatorStep)
+	if err := cluster.Load(ctx); err != nil {
+		log.Error("cluster manager fail to open cluster, fail to load cluster", zap.Error(err))
+		return errors.Wrapf(err, "cluster manager fail to open cluster, cluster:%v", cluster)
+	}
+
+	m.clusters[cluster.Name()] = cluster
 	return nil
 }
 
