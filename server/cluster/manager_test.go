@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/schedule"
@@ -172,7 +174,10 @@ func testCreateCluster(ctx context.Context, re *require.Assertions, manager Mana
 func testRegisterNode(ctx context.Context, re *require.Assertions, manager Manager,
 	cluster, node string, lease uint32,
 ) {
-	err := manager.RegisterNode(ctx, cluster, node, lease)
+	err := manager.RegisterNode(ctx, cluster, &metaservicepb.NodeInfo{
+		Endpoint: node,
+		Lease:    lease,
+	})
 	re.NoError(err)
 }
 
