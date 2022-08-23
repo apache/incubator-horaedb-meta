@@ -217,7 +217,6 @@ func testRouteTables(ctx context.Context, re *require.Assertions, manager Manage
 		re.Equal(1, len(entry.NodeShards))
 		re.Equal(clusterpb.ShardRole_LEADER, entry.NodeShards[0].ShardInfo.ShardRole)
 	}
-
 }
 
 func testDropTable(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, schemaName string, tableName string, tableID uint64) {
