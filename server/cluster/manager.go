@@ -7,9 +7,8 @@ import (
 	"path"
 	"sync"
 
-	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
-
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/schedule"

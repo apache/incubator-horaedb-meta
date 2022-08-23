@@ -77,6 +77,8 @@ func (c *coordinator) Close() {
 
 // TODO: consider ReplicationFactor
 func (c *coordinator) scatterShard(ctx context.Context, nodeInfo *metaservicepb.NodeInfo) error {
+	// TODO: The following logic is used for static topology, which is a bit simple and violent.
+	// It needs to be modified when supporting dynamic topology.
 	if c.cluster.metaData.clusterTopology.State == clusterpb.ClusterTopology_STABLE {
 		shardIDs, err := c.cluster.GetShardIDs(nodeInfo.GetEndpoint())
 		if err != nil {

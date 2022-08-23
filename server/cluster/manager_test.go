@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
-
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
