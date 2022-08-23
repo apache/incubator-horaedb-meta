@@ -64,6 +64,7 @@ type Manager interface {
 	DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error
 	RegisterNode(ctx context.Context, clusterName, nodeName string, lease uint32) error
 	GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error)
+	// RouteTables result: (TableName->RouteEntry, topology_version, error)
 	RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (map[string]*RouteEntry, uint64, error)
 }
 
