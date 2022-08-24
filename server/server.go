@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -182,7 +183,7 @@ func (srv *Server) watchLeader(ctx context.Context) {
 	}
 	watcher := member.NewLeaderWatcher(watchCtx, srv.member, srv.cfg.LeaseTTLSec)
 
-	watcher.Watch(ctx, nil)
+	watcher.Watch(ctx, srv)
 }
 
 func (srv *Server) watchEtcdLeaderPriority(_ context.Context) {
@@ -203,7 +204,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) {
 		if err != nil {
 			log.Warn("create default cluster failed", zap.Error(err))
 		} else {
-			log.Info("create default cluster succeed", zap.Any("cluster", cluster))
+			log.Info("create default cluster succeed", zap.String("cluster", cluster.Name()))
 		}
 	}
 }
@@ -240,4 +241,18 @@ func (srv *Server) UnbindHeartbeatStream(_ context.Context, node string) error {
 
 func (srv *Server) ProcessHeartbeat(ctx context.Context, req *metaservicepb.NodeHeartbeatRequest) error {
 	return srv.clusterManager.RegisterNode(ctx, req.GetHeader().GetClusterName(), req.GetInfo().GetNode(), req.GetInfo().GetLease())
+}
+
+func (srv *Server) AfterElected(ctx context.Context) {
+	srv.createDefaultCluster(ctx)
+
+	if err := srv.clusterManager.Start(ctx); err != nil {
+		panic(fmt.Sprintf("cluster manager fail to start, err:%v", err))
+	}
+}
+
+func (srv *Server) BeforeTransfer(ctx context.Context) {
+	if err := srv.clusterManager.Stop(ctx); err != nil {
+		panic(fmt.Sprintf("cluster manager fail to stop, err:%v", err))
+	}
 }
