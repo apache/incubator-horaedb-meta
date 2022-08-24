@@ -73,12 +73,12 @@ func (l *lease) Grant(ctx context.Context) error {
 }
 
 func (l *lease) Close(ctx context.Context) error {
-	// check whether the lease was granted.
+	// Check whether the lease was granted.
 	if l.ID == 0 {
 		return nil
 	}
 
-	// release and reset all the resources.
+	// Release and reset all the resources.
 	l.setExpireTime(time.Time{})
 	ctx, cancel := context.WithTimeout(ctx, l.timeout)
 	defer cancel()
@@ -94,10 +94,10 @@ func (l *lease) Close(ctx context.Context) error {
 
 // KeepAlive renews the lease until timeout for renewing lease.
 func (l *lease) KeepAlive(ctx context.Context) {
-	// used to receive the renewed event.
+	// Used to receive the renewed event.
 	renewed := make(chan bool, 1)
 	ctx1, cancelRenewBg := context.WithCancel(ctx)
-	// used to join with the renew goroutine in the background.
+	// Used to join with the renew goroutine in the background.
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -139,7 +139,7 @@ func (l *lease) setExpireTime(newExpireTime time.Time) {
 	l.expireTime = newExpireTime
 }
 
-// setExpireTimeIfNewer updates the l.expireTime only if the newExpireTime is after l.expireTime.
+// `setExpireTimeIfNewer` updates the l.expireTime only if the newExpireTime is after l.expireTime.
 // Returns true if l.expireTime is updated.
 func (l *lease) setExpireTimeIfNewer(newExpireTime time.Time) bool {
 	l.expireTimeL.Lock()
@@ -160,7 +160,7 @@ func (l *lease) getExpireTime() time.Time {
 	return l.expireTime
 }
 
-// renewLeaseBg keeps the lease alive by periodically call `lease.KeepAliveOnce`.
+// `renewLeaseBg` keeps the lease alive by periodically call `lease.KeepAliveOnce`.
 // The l.expireTime will be updated during renewing and the renew lease result (whether alive) will be told to caller by `renewed` channel.
 func (l *lease) renewLeaseBg(ctx context.Context, interval time.Duration, renewed chan<- bool) {
 	l.logger.Info("start renewing lease background", zap.Duration("interval", interval))
@@ -190,11 +190,11 @@ L:
 
 		renewRes := renewOnce()
 
-		// init the timer for next keep alive action.
+		// Init the timer for next keep alive action.
 		t := time.After(interval)
 
 		if !renewRes.failed() {
-			// notify result of the renew.
+			// Notify result of the renew.
 			select {
 			case renewed <- renewRes.alive():
 			case <-ctx.Done():
@@ -202,7 +202,7 @@ L:
 			}
 		}
 
-		// wait for next keep alive action.
+		// Wait for next keep alive action.
 		select {
 		case <-t:
 		case <-ctx.Done():

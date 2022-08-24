@@ -100,7 +100,7 @@ func (m *Member) WaitForLeaderChange(ctx context.Context, revision int64) {
 	for {
 		wch := watcher.Watch(ctx, m.leaderKey, clientv3.WithRev(revision))
 		for resp := range wch {
-			// meet compacted error, use the compact revision.
+			// Meet compacted error, use the compact revision.
 			if resp.CompactRevision != 0 {
 				m.logger.Warn("required revision has been compacted, use the compact revision",
 					zap.Int64("required-revision", revision),
@@ -182,7 +182,7 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, c
 		}()
 	}
 
-	// keep the leadership by renewing the lease periodically after success in campaigning leader.
+	// Keep the leadership by renewing the lease periodically after success in campaigning leader.
 	closeLeaseWg.Add(1)
 	go func() {
 		newLease.KeepAlive(ctx)
@@ -190,7 +190,7 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, c
 		closeLeaseOnce.Do(closeLease)
 	}()
 
-	// check the leadership periodically and exit if it changes.
+	// Check the leadership periodically and exit if it changes.
 	leaderCheckTicker := time.NewTicker(leaderCheckInterval)
 	defer leaderCheckTicker.Stop()
 

@@ -53,7 +53,7 @@ func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64) *Leader
 //	 - The leader keeps the leadership lease alive.
 //   - The other members keeps waiting for the leader changes.
 //
-// The LeadershipCallbacks callback will be triggered when specific events occur.
+// The LeadershipCallbacks `callbacks` will be triggered when specific events occur.
 func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCallbacks) {
 	var wait string
 	logger := log.With(zap.String("self", l.self.Name))
@@ -77,7 +77,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 			wait = waitReasonNoWait
 		}
 
-		// check whether leader exists.
+		// Check whether leader exists.
 		leaderResp, err := l.self.GetLeader(ctx)
 		if err != nil {
 			logger.Error("fail to get leader", zap.Error(err))
@@ -90,7 +90,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 			// Leader does not exist.
 			// A new leader should be elected and the etcd leader should be elected as the new leader.
 			if l.self.ID == etcdLeaderID {
-				// campaign the leader and block until leader changes.
+				// Campaign the leader and block until leader changes.
 				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, callbacks); err != nil {
 					logger.Error("fail to campaign and keep leader", zap.Error(err))
 					wait = waitReasonFailEtcd
@@ -100,7 +100,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 				continue
 			}
 
-			// for other nodes that is not etcd leader, just wait for the new leader elected.
+			// For other nodes that is not etcd leader, just wait for the new leader elected.
 			wait = waitReasonElectLeader
 		} else {
 			// Leader does exist.
@@ -113,7 +113,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 				continue
 			}
 
-			// the leader is not etcd leader and this node is leader so reset it.
+			// The leader is not etcd leader and this node is leader so reset it.
 			if leaderResp.Leader.Id == l.self.ID {
 				if err := l.self.ResetLeader(ctx); err != nil {
 					logger.Error("fail to reset leader", zap.Error(err))
@@ -122,7 +122,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 				continue
 			}
 
-			// the leader is not etcd leader and this node is not the leader so just wait a moment and check leader again.
+			// The leader is not etcd leader and this node is not the leader so just wait a moment and check leader again.
 			wait = waitReasonResetLeader
 		}
 	}
