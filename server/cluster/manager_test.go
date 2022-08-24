@@ -117,13 +117,20 @@ func TestManagerSingleThread(t *testing.T) {
 }
 
 func TestManagerMultiThread(t *testing.T) {
+	wg := sync.WaitGroup{}
 	re := require.New(t)
 	manager := newTestClusterManager(t)
 
 	ctx := context.Background()
 
-	go testCluster(ctx, re, manager, cluster1)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		testCluster(ctx, re, manager, cluster1)
+	}()
 	testCluster(ctx, re, manager, cluster2)
+
+	wg.Wait()
 }
 
 func testCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
@@ -132,13 +139,13 @@ func testCluster(ctx context.Context, re *require.Assertions, manager Manager, c
 	testRegisterNode(ctx, re, manager, clusterName, node1, defaultLease)
 	testRegisterNode(ctx, re, manager, clusterName, node2, defaultLease)
 
-	testAllocSchemaIDWithMultiThread(ctx, re, manager, clusterName, defaultSchema, defaultSchemaID)
+	testAllocSchemaIDMultiThread(ctx, re, manager, clusterName, defaultSchema, defaultSchemaID)
 
-	testAllocTableIDWithMultiThread(ctx, re, manager, clusterName, tableID1)
+	testAllocTableIDMultiThread(ctx, re, manager, clusterName, tableID1)
 
 	testDropTable(ctx, re, manager, clusterName, defaultSchema, table1, tableID1)
 
-	testAllocTableIDWithMultiThread(ctx, re, manager, clusterName, tableID2)
+	testAllocTableIDMultiThread(ctx, re, manager, clusterName, tableID2)
 }
 
 func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
@@ -190,7 +197,7 @@ func testDropTable(ctx context.Context, re *require.Assertions, manager Manager,
 	re.NoError(err)
 }
 
-func testAllocSchemaIDWithMultiThread(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, schemaName string, schemaID uint32) {
+func testAllocSchemaIDMultiThread(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, schemaName string, schemaID uint32) {
 	wg := sync.WaitGroup{}
 	for i := 0; i < defaultThreadNum; i++ {
 		wg.Add(1)
@@ -203,7 +210,7 @@ func testAllocSchemaIDWithMultiThread(ctx context.Context, re *require.Assertion
 	wg.Wait()
 }
 
-func testAllocTableIDWithMultiThread(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, tableID uint64) {
+func testAllocTableIDMultiThread(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, tableID uint64) {
 	wg := sync.WaitGroup{}
 	for i := 0; i < defaultThreadNum; i++ {
 		wg.Add(1)
