@@ -31,7 +31,7 @@ type LeaderWatcher struct {
 	leaseTTLSec int64
 }
 
-type LeadershipEventCallback interface {
+type LeadershipEventCallbacks interface {
 	AfterElected(ctx context.Context)
 	BeforeTransfer(ctx context.Context)
 }
@@ -53,8 +53,8 @@ func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64) *Leader
 //	 - The leader keeps the leadership lease alive.
 //   - The other members keeps waiting for the leader changes.
 //
-// The LeadershipCallback callback will be triggered when specific events occur.
-func (l *LeaderWatcher) Watch(ctx context.Context, callback LeadershipEventCallback) {
+// The LeadershipCallbacks callback will be triggered when specific events occur.
+func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCallbacks) {
 	var wait string
 	logger := log.With(zap.String("self", l.self.Name))
 
@@ -91,7 +91,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callback LeadershipEventCallb
 			// A new leader should be elected and the etcd leader should be elected as the new leader.
 			if l.self.ID == etcdLeaderID {
 				// campaign the leader and block until leader changes.
-				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, callback); err != nil {
+				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, callbacks); err != nil {
 					logger.Error("fail to campaign and keep leader", zap.Error(err))
 					wait = waitReasonFailEtcd
 				} else {

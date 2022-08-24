@@ -130,7 +130,7 @@ func (m *Member) WaitForLeaderChange(ctx context.Context, revision int64) {
 	}
 }
 
-func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, callback LeadershipEventCallback) error {
+func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, callbacks LeadershipEventCallbacks) error {
 	leaderVal, err := m.Marshal()
 	if err != nil {
 		return err
@@ -173,12 +173,12 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, c
 
 	m.logger.Info("succeed to set leader", zap.String("leader-key", m.leaderKey), zap.String("leader", m.Name))
 
-	if callback != nil {
-		// The leader has been elected and trigger the callback.
-		callback.AfterElected(ctx)
+	if callbacks != nil {
+		// The leader has been elected and trigger the callbacks.
+		callbacks.AfterElected(ctx)
 		// The leader will be transferred after exit this method.
 		defer func() {
-			callback.BeforeTransfer(ctx)
+			callbacks.BeforeTransfer(ctx)
 		}()
 	}
 
