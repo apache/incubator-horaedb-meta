@@ -41,7 +41,7 @@ func newLease(rawLease clientv3.Lease, ttlSec int64) *lease {
 type renewLeaseResult int
 
 const (
-	renewLeaseSuccessful renewLeaseResult = iota
+	renewLeaseAlive renewLeaseResult = iota
 	renewLeaseFailed
 	renewLeaseExpired
 )
@@ -50,8 +50,8 @@ func (r renewLeaseResult) failed() bool {
 	return r == renewLeaseFailed
 }
 
-func (r renewLeaseResult) successful() bool {
-	return r == renewLeaseSuccessful
+func (r renewLeaseResult) alive() bool {
+	return r == renewLeaseAlive
 }
 
 func (l *lease) Grant(ctx context.Context) error {
@@ -108,9 +108,9 @@ func (l *lease) KeepAlive(ctx context.Context) {
 L:
 	for {
 		select {
-		case inTTL := <-renewed:
-			l.logger.Debug("received renew result", zap.Bool("renew-in-ttl", inTTL))
-			if !inTTL {
+		case alive := <-renewed:
+			l.logger.Debug("received renew result", zap.Bool("renew-alive", alive))
+			if !alive {
 				break L
 			}
 		case <-time.After(l.timeout):
@@ -161,7 +161,7 @@ func (l *lease) getExpireTime() time.Time {
 }
 
 // renewLeaseBg keeps the lease alive by periodically call `lease.KeepAliveOnce`.
-// The l.expireTime will be updated during renewing and the renew lease result (whether in ttl) will be told to caller by `renewed` channel.
+// The l.expireTime will be updated during renewing and the renew lease result (whether alive) will be told to caller by `renewed` channel.
 func (l *lease) renewLeaseBg(ctx context.Context, interval time.Duration, renewed chan<- bool) {
 	l.logger.Info("start renewing lease background", zap.Duration("interval", interval))
 	defer l.logger.Info("stop renewing lease background", zap.Duration("interval", interval))
@@ -185,7 +185,7 @@ L:
 			expireAt := start.Add(time.Duration(resp.TTL) * time.Second)
 			updated := l.setExpireTimeIfNewer(expireAt)
 			l.logger.Debug("got next expired time", zap.Time("expired-at", expireAt), zap.Bool("updated", updated))
-			return renewLeaseSuccessful
+			return renewLeaseAlive
 		}
 
 		renewRes := renewOnce()
@@ -196,7 +196,7 @@ L:
 		if !renewRes.failed() {
 			// notify result of the renew.
 			select {
-			case renewed <- renewRes.successful():
+			case renewed <- renewRes.alive():
 			case <-ctx.Done():
 				break L
 			}
