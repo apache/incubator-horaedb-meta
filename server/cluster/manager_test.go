@@ -37,8 +37,8 @@ const (
 	tableID3                 uint64 = 2
 	tableID4                 uint64 = 3
 	testRootPath                    = "/rootPath"
-	num1                            = 0
-	num2                            = 1
+	tableNum1                       = 0
+	tableNum2                       = 1
 	defaultIDAllocatorStep          = 20
 	defaultThreadNum                = 20
 )
@@ -95,7 +95,7 @@ func TestManagerSingleThread(t *testing.T) {
 	testRegisterNode(ctx, re, manager, cluster1, node1, defaultLease)
 	testRegisterNode(ctx, re, manager, cluster1, node2, defaultLease)
 
-	testGetTables(ctx, re, manager, node1, cluster1, num1)
+	testGetTables(ctx, re, manager, node1, cluster1, tableNum1)
 
 	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
 	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
@@ -109,13 +109,13 @@ func TestManagerSingleThread(t *testing.T) {
 	testDropTable(ctx, re, manager, cluster1, defaultSchema, table1, tableID1)
 	testDropTable(ctx, re, manager, cluster1, defaultSchema, table3, tableID3)
 
-	testGetTables(ctx, re, manager, node1, cluster1, num2)
-	testGetTables(ctx, re, manager, node2, cluster1, num2)
+	testGetTables(ctx, re, manager, node1, cluster1, tableNum2)
+	testGetTables(ctx, re, manager, node2, cluster1, tableNum2)
 
 	manager, err = newClusterManagerWithStorage(storage, kv)
 	re.NoError(err)
-	testGetTables(ctx, re, manager, node1, cluster1, num2)
-	testGetTables(ctx, re, manager, node2, cluster1, num2)
+	testGetTables(ctx, re, manager, node1, cluster1, tableNum2)
+	testGetTables(ctx, re, manager, node2, cluster1, tableNum2)
 }
 
 func TestManagerMultiThread(t *testing.T) {
@@ -193,11 +193,11 @@ func testDropTable(ctx context.Context, re *require.Assertions, manager Manager,
 
 func testAllocTableIDWithMultiThread(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, tableID uint64) {
 	wg := sync.WaitGroup{}
-	wg.Add(defaultThreadNum)
 	for i := 0; i < defaultThreadNum; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			testAllocTableID(ctx, re, manager, node1, clusterName, defaultSchema, table1, tableID)
-			wg.Done()
 		}()
 	}
 
