@@ -209,11 +209,11 @@ func testGetTables(ctx context.Context, re *require.Assertions, manager Manager,
 }
 
 func testRouteTables(ctx context.Context, re *require.Assertions, manager Manager, cluster, schema string, tableNames []string) {
-	entries, version, err := manager.RouteTables(ctx, cluster, schema, tableNames)
+	ret, err := manager.RouteTables(ctx, cluster, schema, tableNames)
 	re.NoError(err)
-	re.Equal(uint64(0), version)
-	re.Equal(len(tableNames), len(entries))
-	for _, entry := range entries {
+	re.Equal(uint64(0), ret.Version)
+	re.Equal(len(tableNames), len(ret.RouteEntries))
+	for _, entry := range ret.RouteEntries {
 		re.Equal(1, len(entry.NodeShards))
 		re.Equal(clusterpb.ShardRole_LEADER, entry.NodeShards[0].ShardInfo.ShardRole)
 	}

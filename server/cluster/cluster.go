@@ -547,16 +547,16 @@ func (c *Cluster) pickOneShardOnNode(nodeName string) (uint32, error) {
 	return 0, ErrNodeNotFound.WithCausef("nodeName:%s", nodeName)
 }
 
-func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames []string) (map[string]*RouteEntry, uint64, error) {
+func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames []string) (*RouteTablesResult, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
 	schema, ok := c.schemasCache[schemaName]
 	if !ok {
-		return nil, 0, ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
+		return nil, ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 	}
 
-	ret := make(map[string]*RouteEntry, len(tableNames))
+	routeEntries := make(map[string]*RouteEntry, len(tableNames))
 	for _, tableName := range tableNames {
 		table, exists := schema.getTable(tableName)
 		if exists {
@@ -573,7 +573,7 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 				})
 			}
 
-			ret[tableName] = &RouteEntry{
+			routeEntries[tableName] = &RouteEntry{
 				Table: &TableInfo{
 					ID:         table.GetID(),
 					Name:       table.GetName(),
@@ -585,5 +585,8 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 		}
 	}
 
-	return ret, c.metaData.clusterTopology.Version, nil
+	return &RouteTablesResult{
+		Version:      c.metaData.clusterTopology.Version,
+		RouteEntries: routeEntries,
+	}, nil
 }

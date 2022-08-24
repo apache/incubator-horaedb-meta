@@ -51,6 +51,11 @@ type RouteEntry struct {
 	NodeShards []*NodeShard
 }
 
+type RouteTablesResult struct {
+	Version      uint64
+	RouteEntries map[string]*RouteEntry
+}
+
 type Manager interface {
 	// Start must be called before manager is used.
 	Start(ctx context.Context) error
@@ -64,8 +69,7 @@ type Manager interface {
 	DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error
 	RegisterNode(ctx context.Context, clusterName, nodeName string, lease uint32) error
 	GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error)
-	// RouteTables result: (TableName->RouteEntry, topology_version, error)
-	RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (map[string]*RouteEntry, uint64, error)
+	RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (*RouteTablesResult, error)
 }
 
 type managerImpl struct {
@@ -322,18 +326,18 @@ func (m *managerImpl) Stop(_ context.Context) error {
 	return nil
 }
 
-func (m *managerImpl) RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (map[string]*RouteEntry, uint64, error) {
+func (m *managerImpl) RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (*RouteTablesResult, error) {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
-		return nil, 0, errors.Wrap(err, "cluster manager routeTables")
+		return nil, errors.Wrap(err, "cluster manager routeTables")
 	}
 
-	entries, version, err := cluster.RouteTables(ctx, schemaName, tableNames)
+	ret, err := cluster.RouteTables(ctx, schemaName, tableNames)
 	if err != nil {
 		log.Error("cluster manager RouteTables", zap.Error(err))
-		return nil, 0, errors.Wrap(err, "cluster manager routeTables")
+		return nil, errors.Wrap(err, "cluster manager routeTables")
 	}
 
-	return entries, version, nil
+	return ret, nil
 }

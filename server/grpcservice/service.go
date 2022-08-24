@@ -281,40 +281,12 @@ func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTable
 		return ceresmetaClient.RouteTables(ctx, req)
 	}
 
-	tables, version, err := s.h.GetClusterManager().RouteTables(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetTableNames())
+	routeTableResult, err := s.h.GetClusterManager().RouteTables(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetTableNames())
 	if err != nil {
 		return &metaservicepb.RouteTablesResponse{Header: responseHeader(err, "grpc routeTables")}, nil
 	}
 
-	entries := make(map[string]*metaservicepb.RouteEntry, len(tables))
-	for tableName, entry := range tables {
-		nodeShards := make([]*metaservicepb.NodeShard, 0, len(entry.NodeShards))
-		for _, nodeShard := range entry.NodeShards {
-			nodeShards = append(nodeShards, &metaservicepb.NodeShard{
-				Endpoint: nodeShard.Endpoint,
-				ShardInfo: &metaservicepb.ShardInfo{
-					ShardId: nodeShard.ShardInfo.ShardID,
-					Role:    nodeShard.ShardInfo.ShardRole,
-				},
-			})
-		}
-
-		entries[tableName] = &metaservicepb.RouteEntry{
-			Table: &metaservicepb.TableInfo{
-				Id:         entry.Table.ID,
-				Name:       entry.Table.Name,
-				SchemaId:   entry.Table.SchemaID,
-				SchemaName: entry.Table.SchemaName,
-			},
-			NodeShards: nodeShards,
-		}
-	}
-
-	return &metaservicepb.RouteTablesResponse{
-		Header:                 okResponseHeader(),
-		ClusterTopologyVersion: version,
-		Entries:                entries,
-	}, nil
+	return convertRouteTableResult(routeTableResult), nil
 }
 
 type forwarder struct {
@@ -378,4 +350,36 @@ func (f *forwarder) maybeInitForwardedStream(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func convertRouteTableResult(routeTablesResult *cluster.RouteTablesResult) *metaservicepb.RouteTablesResponse {
+	entries := make(map[string]*metaservicepb.RouteEntry, len(routeTablesResult.RouteEntries))
+	for tableName, entry := range routeTablesResult.RouteEntries {
+		nodeShards := make([]*metaservicepb.NodeShard, 0, len(entry.NodeShards))
+		for _, nodeShard := range entry.NodeShards {
+			nodeShards = append(nodeShards, &metaservicepb.NodeShard{
+				Endpoint: nodeShard.Endpoint,
+				ShardInfo: &metaservicepb.ShardInfo{
+					ShardId: nodeShard.ShardInfo.ShardID,
+					Role:    nodeShard.ShardInfo.ShardRole,
+				},
+			})
+		}
+
+		entries[tableName] = &metaservicepb.RouteEntry{
+			Table: &metaservicepb.TableInfo{
+				Id:         entry.Table.ID,
+				Name:       entry.Table.Name,
+				SchemaId:   entry.Table.SchemaID,
+				SchemaName: entry.Table.SchemaName,
+			},
+			NodeShards: nodeShards,
+		}
+	}
+
+	return &metaservicepb.RouteTablesResponse{
+		Header:                 okResponseHeader(),
+		ClusterTopologyVersion: routeTablesResult.Version,
+		Entries:                entries,
+	}
 }
