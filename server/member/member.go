@@ -130,7 +130,7 @@ func (m *Member) WaitForLeaderChange(ctx context.Context, revision int64) {
 	}
 }
 
-func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64) error {
+func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, callback LeadershipEventCallback) error {
 	leaderVal, err := m.Marshal()
 	if err != nil {
 		return err
@@ -173,7 +173,16 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64) e
 
 	m.logger.Info("succeed to set leader", zap.String("leader-key", m.leaderKey), zap.String("leader", m.Name))
 
-	// keep the leadership after success in campaigning leader.
+	if callback != nil {
+		// The leader has been elected and trigger the callback.
+		callback.AfterElected(ctx)
+		// The leader will be transferred after exit this method.
+		defer func() {
+			callback.BeforeTransfer(ctx)
+		}()
+	}
+
+	// keep the leadership by renewing the lease periodically after success in campaigning leader.
 	closeLeaseWg.Add(1)
 	go func() {
 		newLease.KeepAlive(ctx)
