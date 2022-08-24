@@ -29,14 +29,15 @@ func okResponseHeader() *commonpb.ResponseHeader {
 	return responseHeader(nil, "")
 }
 
-func responseHeader(err error, errMsg string) *commonpb.ResponseHeader {
-	code, b := coderr.GetCauseCode(err)
-	if !b && err != nil {
-		code = coderr.Internal
+func responseHeader(err error, msg string) *commonpb.ResponseHeader {
+	if err == nil {
+		return &commonpb.ResponseHeader{Code: coderr.Ok, Error: msg}
 	}
 
-	if err != nil {
-		return &commonpb.ResponseHeader{Code: uint32(code), Error: errMsg + err.Error()}
+	code, ok := coderr.GetCauseCode(err)
+	if ok {
+		return &commonpb.ResponseHeader{Code: uint32(code), Error: msg + err.Error()}
 	}
-	return &commonpb.ResponseHeader{Code: uint32(code), Error: errMsg}
+
+	return &commonpb.ResponseHeader{Code: coderr.Internal, Error: msg + err.Error()}
 }
