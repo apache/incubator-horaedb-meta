@@ -183,7 +183,10 @@ func (srv *Server) watchLeader(ctx context.Context) {
 	}
 	watcher := member.NewLeaderWatcher(watchCtx, srv.member, srv.cfg.LeaseTTLSec)
 
-	watcher.Watch(ctx, srv)
+	callbacks := &leadershipEventCallbacks{
+		srv: srv,
+	}
+	watcher.Watch(ctx, callbacks)
 }
 
 func (srv *Server) watchEtcdLeaderPriority(_ context.Context) {
@@ -243,16 +246,20 @@ func (srv *Server) ProcessHeartbeat(ctx context.Context, req *metaservicepb.Node
 	return srv.clusterManager.RegisterNode(ctx, req.GetHeader().GetClusterName(), req.GetInfo().GetNode(), req.GetInfo().GetLease())
 }
 
-func (srv *Server) AfterElected(ctx context.Context) {
-	srv.createDefaultCluster(ctx)
+type leadershipEventCallbacks struct {
+	srv *Server
+}
 
-	if err := srv.clusterManager.Start(ctx); err != nil {
+func (c *leadershipEventCallbacks) AfterElected(ctx context.Context) {
+	c.srv.createDefaultCluster(ctx)
+
+	if err := c.srv.clusterManager.Start(ctx); err != nil {
 		panic(fmt.Sprintf("cluster manager fail to start, err:%v", err))
 	}
 }
 
-func (srv *Server) BeforeTransfer(ctx context.Context) {
-	if err := srv.clusterManager.Stop(ctx); err != nil {
+func (c *leadershipEventCallbacks) BeforeTransfer(ctx context.Context) {
+	if err := c.srv.clusterManager.Stop(ctx); err != nil {
 		panic(fmt.Sprintf("cluster manager fail to stop, err:%v", err))
 	}
 }
