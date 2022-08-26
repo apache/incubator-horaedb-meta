@@ -593,10 +593,11 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 }
 
 func (c *Cluster) GetNodes(_ context.Context) (*GetNodesResult, error) {
+	nodeShards := make([]*NodeShard, 0, len(c.nodesCache))
+
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	nodeShards := make([]*NodeShard, 0, len(c.nodesCache))
 	for nodeName, node := range c.nodesCache {
 		for _, shardID := range node.shardIDs {
 			shard, ok := c.shardsCache[shardID]

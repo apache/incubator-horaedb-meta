@@ -306,6 +306,7 @@ func (s *Service) GetNodes(ctx context.Context, req *metaservicepb.GetNodesReque
 
 	nodesResult, err := s.h.GetClusterManager().GetNodes(ctx, req.GetHeader().GetClusterName())
 	if err != nil {
+		log.Error("fail to get nodes", zap.Error(err))
 		return &metaservicepb.GetNodesResponse{Header: responseHeader(err, "grpc get nodes")}, nil
 	}
 

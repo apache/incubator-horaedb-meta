@@ -354,13 +354,11 @@ func (m *managerImpl) RouteTables(ctx context.Context, clusterName, schemaName s
 func (m *managerImpl) GetNodes(ctx context.Context, clusterName string) (*GetNodesResult, error) {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
-		log.Error("cluster not found", zap.Error(err))
 		return nil, errors.Wrap(err, "cluster manager GetNodes")
 	}
 
 	ret, err := cluster.GetNodes(ctx)
 	if err != nil {
-		log.Error("cluster manager GetNodes", zap.Error(err))
 		return nil, errors.Wrap(err, "cluster manager GetNodes")
 	}
 
