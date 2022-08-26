@@ -23,6 +23,7 @@ const leaderCheckInterval = time.Duration(100) * time.Millisecond
 type Member struct {
 	ID               uint64
 	Name             string
+	Endpoint         string
 	rootPath         string
 	leaderKey        string
 	etcdCli          *clientv3.Client
@@ -36,12 +37,13 @@ func formatLeaderKey(rootPath string) string {
 	return fmt.Sprintf("%s/members/leader", rootPath)
 }
 
-func NewMember(rootPath string, id uint64, name string, etcdCli *clientv3.Client, etcdLeaderGetter etcdutil.EtcdLeaderGetter, rpcTimeout time.Duration) *Member {
+func NewMember(rootPath string, id uint64, name, endpoint string, etcdCli *clientv3.Client, etcdLeaderGetter etcdutil.EtcdLeaderGetter, rpcTimeout time.Duration) *Member {
 	leaderKey := formatLeaderKey(rootPath)
 	logger := log.With(zap.String("node-name", name), zap.Uint64("node-id", id))
 	return &Member{
 		ID:               id,
 		Name:             name,
+		Endpoint:         endpoint,
 		rootPath:         rootPath,
 		leaderKey:        leaderKey,
 		etcdCli:          etcdCli,
@@ -100,7 +102,7 @@ func (m *Member) WaitForLeaderChange(ctx context.Context, revision int64) {
 	for {
 		wch := watcher.Watch(ctx, m.leaderKey, clientv3.WithRev(revision))
 		for resp := range wch {
-			// meet compacted error, use the compact revision.
+			// Meet compacted error, use the compact revision.
 			if resp.CompactRevision != 0 {
 				m.logger.Warn("required revision has been compacted, use the compact revision",
 					zap.Int64("required-revision", revision),
@@ -130,7 +132,7 @@ func (m *Member) WaitForLeaderChange(ctx context.Context, revision int64) {
 	}
 }
 
-func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64) error {
+func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, callbacks LeadershipEventCallbacks) error {
 	leaderVal, err := m.Marshal()
 	if err != nil {
 		return err
@@ -173,7 +175,16 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64) e
 
 	m.logger.Info("succeed to set leader", zap.String("leader-key", m.leaderKey), zap.String("leader", m.Name))
 
-	// keep the leadership after success in campaigning leader.
+	if callbacks != nil {
+		// The leader has been elected and trigger the callbacks.
+		callbacks.AfterElected(ctx)
+		// The leader will be transferred after exit this method.
+		defer func() {
+			callbacks.BeforeTransfer(ctx)
+		}()
+	}
+
+	// Keep the leadership by renewing the lease periodically after success in campaigning leader.
 	closeLeaseWg.Add(1)
 	go func() {
 		newLease.KeepAlive(ctx)
@@ -181,7 +192,7 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64) e
 		closeLeaseOnce.Do(closeLease)
 	}()
 
-	// check the leadership periodically and exit if it changes.
+	// Check the leadership periodically and exit if it changes.
 	leaderCheckTicker := time.NewTicker(leaderCheckInterval)
 	defer leaderCheckTicker.Stop()
 
@@ -206,8 +217,9 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64) e
 
 func (m *Member) Marshal() (string, error) {
 	memPb := &metastoragepb.Member{
-		Name: m.Name,
-		Id:   m.ID,
+		Name:     m.Name,
+		Id:       m.ID,
+		Endpoint: m.Endpoint,
 	}
 	bs, err := proto.Marshal(memPb)
 	if err != nil {

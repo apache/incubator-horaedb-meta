@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/schedule"
@@ -36,6 +37,26 @@ type ShardTables struct {
 	Version   uint64
 }
 
+type ShardInfo struct {
+	ShardID   uint32
+	ShardRole clusterpb.ShardRole
+}
+
+type NodeShard struct {
+	Endpoint  string
+	ShardInfo *ShardInfo
+}
+
+type RouteEntry struct {
+	Table      *TableInfo
+	NodeShards []*NodeShard
+}
+
+type RouteTablesResult struct {
+	Version      uint64
+	RouteEntries map[string]*RouteEntry
+}
+
 type Manager interface {
 	// Start must be called before manager is used.
 	Start(ctx context.Context) error
@@ -47,12 +68,13 @@ type Manager interface {
 	AllocTableID(ctx context.Context, clusterName, schemaName, tableName, nodeName string) (*Table, error)
 	GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error)
 	DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error
-	RegisterNode(ctx context.Context, clusterName, nodeName string, lease uint32) error
+	RegisterNode(ctx context.Context, clusterName string, nodeInfo *metaservicepb.NodeInfo) error
 	GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error)
+	RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (*RouteTablesResult, error)
 }
 
 type managerImpl struct {
-	// RWMutex is used to protect clusters when creating new cluster
+	// RWMutex is used to protect clusters when creating new cluster.
 	lock     sync.RWMutex
 	running  bool
 	clusters map[string]*Cluster
@@ -135,7 +157,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 }
 
 func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName string) (uint32, error) {
-	cluster, err := m.getCluster(ctx, clusterName)
+	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
 		return 0, errors.Wrap(err, "cluster manager AllocSchemaID")
@@ -152,7 +174,7 @@ func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 }
 
 func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName, tableName, nodeName string) (*Table, error) {
-	cluster, err := m.getCluster(ctx, clusterName)
+	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
 		return nil, errors.Wrap(err, "cluster manager AllocTableID")
@@ -168,7 +190,7 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 }
 
 func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error) {
-	cluster, err := m.getCluster(ctx, clusterName)
+	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
 		return nil, errors.Wrap(err, "cluster manager GetTables")
@@ -196,7 +218,7 @@ func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName strin
 }
 
 func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error {
-	cluster, err := m.getCluster(ctx, clusterName)
+	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
 		return errors.Wrap(err, "cluster manager DropTable")
@@ -210,26 +232,26 @@ func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 	return nil
 }
 
-func (m *managerImpl) RegisterNode(ctx context.Context, clusterName, nodeName string, lease uint32) error {
-	cluster, err := m.getCluster(ctx, clusterName)
+func (m *managerImpl) RegisterNode(ctx context.Context, clusterName string, nodeInfo *metaservicepb.NodeInfo) error {
+	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
 		return errors.Wrap(err, "cluster manager RegisterNode")
 	}
-	err = cluster.RegisterNode(ctx, nodeName, lease)
+	err = cluster.RegisterNode(ctx, nodeInfo)
 	if err != nil {
 		return errors.Wrap(err, "cluster manager RegisterNode")
 	}
 
 	// TODO: refactor coordinator
-	if err := cluster.coordinator.scatterShard(ctx); err != nil {
+	if err := cluster.coordinator.scatterShard(ctx, nodeInfo); err != nil {
 		return errors.Wrap(err, "RegisterNode")
 	}
 	return nil
 }
 
-func (m *managerImpl) GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error) {
-	cluster, err := m.getCluster(ctx, clusterName)
+func (m *managerImpl) GetShards(_ context.Context, clusterName, nodeName string) ([]uint32, error) {
+	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
 		return nil, errors.Wrap(err, "cluster manager GetShards")
@@ -242,7 +264,7 @@ func (m *managerImpl) GetShards(ctx context.Context, clusterName, nodeName strin
 	return shardIDs, nil
 }
 
-func (m *managerImpl) getCluster(_ context.Context, clusterName string) (*Cluster, error) {
+func (m *managerImpl) getCluster(clusterName string) (*Cluster, error) {
 	m.lock.RLock()
 	cluster, ok := m.clusters[clusterName]
 	m.lock.RUnlock()
@@ -277,6 +299,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 
 	m.clusters = make(map[string]*Cluster, len(clusters))
 	for _, clusterPb := range clusters {
+		log.Info("cluster manager start, new cluster", zap.String("cluster", clusterPb.GetName()))
 		cluster := NewCluster(clusterPb, m.storage, m.kv, m.hbstreams, m.rootPath, m.idAllocatorStep)
 		if err := cluster.Load(ctx); err != nil {
 			log.Error("cluster manager fail to start, fail to load cluster", zap.Error(err))
@@ -303,4 +326,20 @@ func (m *managerImpl) Stop(_ context.Context) error {
 	m.clusters = make(map[string]*Cluster)
 	m.running = false
 	return nil
+}
+
+func (m *managerImpl) RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (*RouteTablesResult, error) {
+	cluster, err := m.getCluster(clusterName)
+	if err != nil {
+		log.Error("cluster not found", zap.Error(err))
+		return nil, errors.Wrap(err, "cluster manager routeTables")
+	}
+
+	ret, err := cluster.RouteTables(ctx, schemaName, tableNames)
+	if err != nil {
+		log.Error("cluster manager RouteTables", zap.Error(err))
+		return nil, errors.Wrap(err, "cluster manager routeTables")
+	}
+
+	return ret, nil
 }

@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -130,7 +131,8 @@ func (srv *Server) startEtcd(ctx context.Context) error {
 
 	srv.etcdCli = client
 	etcdLeaderGetter := &etcdutil.LeaderGetterWrapper{Server: etcdSrv.Server}
-	srv.member = member.NewMember("", uint64(etcdSrv.Server.ID()), srv.cfg.NodeName, client, etcdLeaderGetter, srv.cfg.EtcdCallTimeout())
+
+	srv.member = member.NewMember("", uint64(etcdSrv.Server.ID()), srv.cfg.NodeName, endpoints[0], client, etcdLeaderGetter, srv.cfg.EtcdCallTimeout())
 	srv.etcdSrv = etcdSrv
 	return nil
 }
@@ -182,7 +184,10 @@ func (srv *Server) watchLeader(ctx context.Context) {
 	}
 	watcher := member.NewLeaderWatcher(watchCtx, srv.member, srv.cfg.LeaseTTLSec)
 
-	watcher.Watch(ctx)
+	callbacks := &leadershipEventCallbacks{
+		srv: srv,
+	}
+	watcher.Watch(ctx, callbacks)
 }
 
 func (srv *Server) watchEtcdLeaderPriority(_ context.Context) {
@@ -203,7 +208,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) {
 		if err != nil {
 			log.Warn("create default cluster failed", zap.Error(err))
 		} else {
-			log.Info("create default cluster succeed", zap.Any("cluster", cluster))
+			log.Info("create default cluster succeed", zap.String("cluster", cluster.Name()))
 		}
 	}
 }
@@ -239,5 +244,22 @@ func (srv *Server) UnbindHeartbeatStream(_ context.Context, node string) error {
 }
 
 func (srv *Server) ProcessHeartbeat(ctx context.Context, req *metaservicepb.NodeHeartbeatRequest) error {
-	return srv.clusterManager.RegisterNode(ctx, req.GetHeader().GetClusterName(), req.GetInfo().GetNode(), req.GetInfo().GetLease())
+	return srv.clusterManager.RegisterNode(ctx, req.GetHeader().GetClusterName(), req.GetInfo())
+}
+
+type leadershipEventCallbacks struct {
+	srv *Server
+}
+
+func (c *leadershipEventCallbacks) AfterElected(ctx context.Context) {
+	if err := c.srv.clusterManager.Start(ctx); err != nil {
+		panic(fmt.Sprintf("cluster manager fail to start, err:%v", err))
+	}
+	c.srv.createDefaultCluster(ctx)
+}
+
+func (c *leadershipEventCallbacks) BeforeTransfer(ctx context.Context) {
+	if err := c.srv.clusterManager.Stop(ctx); err != nil {
+		panic(fmt.Sprintf("cluster manager fail to stop, err:%v", err))
+	}
 }
