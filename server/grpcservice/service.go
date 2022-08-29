@@ -4,7 +4,6 @@ package grpcservice
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -177,8 +176,6 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "grpc alloc schema id")}, nil
 	}
 
-	log.Debug(fmt.Sprintf("grpc AllocSchemaID succeed, req:%v, schemaID:%v", req, schemaID))
-
 	return &metaservicepb.AllocSchemaIdResponse{
 		Header: okResponseHeader(),
 		Name:   req.GetName(),
@@ -202,8 +199,6 @@ func (s *Service) AllocTableID(ctx context.Context, req *metaservicepb.AllocTabl
 	if err != nil {
 		return &metaservicepb.AllocTableIdResponse{Header: responseHeader(err, "grpc alloc table id")}, nil
 	}
-
-	log.Debug(fmt.Sprintf("grpc AllocTableID succeed, req:%v, tableID:%v", req, table.GetID()))
 
 	return &metaservicepb.AllocTableIdResponse{
 		Header:     okResponseHeader(),
@@ -271,8 +266,6 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 	if err != nil {
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "grpc drop table")}, nil
 	}
-
-	log.Info(fmt.Sprintf("grpc DropTable succeed, req:%v", req))
 
 	return &metaservicepb.DropTableResponse{
 		Header: okResponseHeader(),
