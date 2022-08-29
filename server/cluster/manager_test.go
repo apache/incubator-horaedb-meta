@@ -234,8 +234,7 @@ func testAllocTableIDWithMultiThread(ctx context.Context, re *require.Assertions
 	testAllocTableID(ctx, re, manager, node2, clusterName, defaultSchema, table1, tableID)
 }
 
-func testGetNodes(ctx context.Context, re *require.Assertions, manager Manager,
-	cluster string) {
+func testGetNodes(ctx context.Context, re *require.Assertions, manager Manager, cluster string) {
 	getNodesResult, err := manager.GetNodes(ctx, cluster)
 	re.NoError(err)
 	re.Equal(defaultShardTotal, len(getNodesResult.NodeShards))
