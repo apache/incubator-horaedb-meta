@@ -10,12 +10,50 @@ Obviously, it is not feasible to use the stand-alone data processing method in c
 Ceresmeta is the "brain" we use. Ceresmeta is the central control module of CeresDB, responsible for the management and scheduling of the entire CeresDB cluster.
 
 ## 2. CeresDB distributed architecture
-<div align="center"><img src="./images/ceresDB.png" title="zoom:50%;" style="zoom:50%;" /></div>
+
+                                    ┌─────────────┐
+                                    │   client    │                   
+                                    └─────────────┘
+                                           │                                         
+                                           │                                         
+                                           ▼          
+                              ┌──────────────────────────┐                
+                              │   ┌──────┐    ┌──────┐   │        
+                              │   │ node │    │ node │   │          ┌─────────────┐
+                      CeresDB │   └──────┘    └──────┘   │ ───────▶ │  Ceresmeta  │
+                      cluster │   ┌──────┐    ┌──────┐   │          └─────────────┘
+                              │   │ node │    │ node │   │             
+                              │   └──────┘    └──────┘   │
+                              └──────────────────────────┘   
+                                           │                                         
+                                           │                                         
+                                           ▼     
+                                    ┌─────────────┐
+                                    │ storage:OSS │                   
+                                    └─────────────┘ 
 
 When CeresDB is in a cluster mode, an important issue we need to consider is how to ensure the load balance of the cluster. As shown in the overall CeresDB distributed architecture schematic diagram above, our Ceresmeta component here is the "brain" responsible for managing our CeresDB cluster.
 
 ## 3. Ceresmeta Architecture
-<div align="center"><img src="./images/ceresmeta.png" style="zoom:50%;" /></div>
+
+                                     ┌────────────────────────────────┐
+                                     │ ┌────────────────────────────┐ │
+                                     │ │           Server           │ │                  
+                                     │ └────────────────────────────┘ │
+                                     │ ┌─────────────┐┌─────────────┐ │
+                                     │ │   Election  ││ Grpc server │ │
+                                     │ └─────────────┘└─────────────┘ │
+                                     │ ┌────────────────────────────┐ │
+                                     │ │          Manager           │ │
+                                     │ └────────────────────────────┘ │
+                                     │ ┌────────┐┌────────┐┌────────┐ │
+                                     │ │ Cluster││ Cluster││ Cluster│ │
+                                     │ └────────┘└────────┘└────────┘ │
+                                     │ ┌─────────────┐┌─────────────┐ │
+                                     │ │   Storage   ││   Schedule  │ │
+                                     │ └─────────────┘└─────────────┘ │
+                                     └────────────────────────────────┘ 
+                                                  Ceresmeta
 
 The above figure is the overall design architecture of Ceresmeta. Ceresmeta communicates with CeresDB through grpc stream, CeresDB reports its own node information to Ceresmeta, and Ceresmeta controls the CeresDB cluster as a whole based on this information. These modules are described in detail below.
 
@@ -31,7 +69,17 @@ To ensure the stability of Ceresmeta's own services, we also adopt a distributed
 
 This module is responsible for selecting the leader node on all nodes. Here we are based on the data consistency guaranteed by the underlying storage service ETCD, and select the leader through distributed locks.
 
-<div align="center"><img src="./images/ceresmeta_cluster.jpg" style="zoom:50%;" /></div>
+                                              ┌──────────────────────────┐                
+                                              │         ┌──────┐         │        
+                                              │         │  L   │         │     
+                                              │         └──────┘         │ 
+                                              │   ┌──────┐    ┌──────┐   │          
+                                              │   │  F   │    │  F   │   │             
+                                              │   └──────┘    └──────┘   │
+                                              └──────────────────────────┘ 
+                                                       Ceresmeta
+                                                        cluster                                      
+
 
 ### 3.3 grpc server module
 Ceresmate conducts two-way asynchronous communication with CeresDB through grpc stream. We divide the interactive information into three categories:
@@ -40,11 +88,24 @@ Ceresmate conducts two-way asynchronous communication with CeresDB through grpc 
 - the request command uploaded by CeresDB;
 -  the scheduling command issued by Ceresmeta.
 
-<div align="center"><img src="./images/grpc_stream.png" style="zoom:50%;" /></div>
+                               ┌─────────────┐   Grpc stream    ┌─────────────┐
+                               │   CeresDB   │ ◀──────────────▶ │  Ceresmeta  │
+                               └─────────────┘                  └─────────────┘
+
 
 In addition, because we adopt a distributed architecture for Ceresmate, we need to ensure that the request is processed by the leader node. Therefore, under the grpc server module, we also implement the request forwarding function. If the Follower node receives a request from CeresDB, it will forward the request to the Leader node for processing. The processed result is sent to the original Follower node, and the Follower node sends the processed result to CeresDB.
 
-<div align="center"><img src="./images/request_forward.jpg" style="zoom:50%;" /></div>
+                                          ┌──────────────────────────────────┐                
+                                          │             ┌──────┐             │        
+                                          │             │  F   │             │     
+                                          │             └──────┘             │ 
+                                   request│   ┌──────┐  request   ┌──────┐   │          
+                                 ◀────────│──▶│  F   │ ◀────────▶ │  L   │   │             
+                                   reponse│   └──────┘  response  └──────┘   │
+                                          └──────────────────────────────────┘ 
+                                                       Ceresmeta
+                                                        cluster
+
 
 ### 3.4 manager module
 A Ceresmeta service can manage multiple CeresDB clusters, so we abstracted the manager module, which is responsible for managing multiple CeresDB clusters. The manager module provides the grpc module with an interface for processing requests, and calls down the specific implementation of the cluster module to complete the processing of these requests. 

@@ -11,13 +11,49 @@
 Ceresmeta 就是我们使用的“大脑”，Ceresmeta 是 CeresDB 的中心总控模块，负责整个 CeresDB 集群的管理、调度。
 
 ## 2.CeresDB 分布式架构
-<div align="center"><img src="./images/ceresDB.png" title="zoom:50%;" style="zoom:50%;" align="center;"/></div>
+                                    ┌─────────────┐
+                                    │   client    │                   
+                                    └─────────────┘
+                                           │                                         
+                                           │                                         
+                                           ▼          
+                              ┌──────────────────────────┐                
+                              │   ┌──────┐    ┌──────┐   │        
+                              │   │ node │    │ node │   │          ┌─────────────┐
+                      CeresDB │   └──────┘    └──────┘   │ ───────▶ │  Ceresmeta  │
+                      cluster │   ┌──────┐    ┌──────┐   │          └─────────────┘
+                              │   │ node │    │ node │   │             
+                              │   └──────┘    └──────┘   │
+                              └──────────────────────────┘   
+                                           │                                         
+                                           │                                         
+                                           ▼     
+                                    ┌─────────────┐
+                                    │ storage:OSS │                   
+                                    └─────────────┘
 
 当 CeresDB 是以集群的方式进行部署时，我们所需要考虑的一个重要问题就是就是如何保证集群的负载均衡。
 如上图所展示的整体的 CeresDB 分布式架构示意图，我们这里的 Ceresmeta 组件，就是作为“大脑”，负责管理我们的 CeresDB 集群。
 
 ## 3.Ceresmeta 架构
-<div align="center"><img src="./images/ceresmeta.png" style="zoom:50%;" /></div>
+                                     ┌────────────────────────────────┐
+                                     │ ┌────────────────────────────┐ │
+                                     │ │           Server           │ │                  
+                                     │ └────────────────────────────┘ │
+                                     │ ┌─────────────┐┌─────────────┐ │
+                                     │ │   Election  ││ Grpc server │ │
+                                     │ └─────────────┘└─────────────┘ │
+                                     │ ┌────────────────────────────┐ │
+                                     │ │          Manager           │ │
+                                     │ └────────────────────────────┘ │
+                                     │ ┌────────┐┌────────┐┌────────┐ │
+                                     │ │ Cluster││ Cluster││ Cluster│ │
+                                     │ └────────┘└────────┘└────────┘ │
+                                     │ ┌─────────────┐┌─────────────┐ │
+                                     │ │   Storage   ││   Schedule  │ │
+                                     │ └─────────────┘└─────────────┘ │
+                                     └────────────────────────────────┘ 
+                                                  Ceresmeta
 
 上图是 Ceresmeta  的整体设计架构图，Ceresmeta 通过 grpc stream 与 CeresDB 进行数据通信，CeresDB 将自身 node 信息上报给 Ceresmeta，Ceresmeta 根据这些信息对 CeresDB 集群进行整体上的控制。下面对这些模块做一下详细说明。
 
@@ -32,7 +68,16 @@ server 模块负责 Ceresmate 服务的启动，初始化。当我们启动 Cere
 为保证 Ceresmeta 自身服务的稳定性，我们对 Ceresmeta 也采用分布式架构。分布式的情况下我们需要保证 Ceresmeta 调度的一致性，这里我们采用的是 Leader/Follower 模型，Ceresmeta 集群中只有一个 node 是Leader，负责进行调度，其他 node 为 Follower。
 而本模块就是负责在所有的 node 上选出 Leader node（选主），我们这里是基于底层存储服务 ETCD 保证的数据一致性，通过分布式锁进行选主。
 
-<div align="center"><img src="./images/ceresmeta_cluster.jpg" style="zoom:50%;" /></div>
+                                          ┌──────────────────────────┐                
+                                          │         ┌──────┐         │        
+                                          │         │  L   │         │     
+                                          │         └──────┘         │ 
+                                          │   ┌──────┐    ┌──────┐   │          
+                                          │   │  F   │    │  F   │   │             
+                                          │   └──────┘    └──────┘   │
+                                          └──────────────────────────┘ 
+                                                   Ceresmeta
+                                                    cluster
 
 ### 3.3 grpc server 模块
 Ceresmate 通过 grpc stream 与 CeresDB 进行双向异步通信，我们把交互的信息分成三类：
@@ -41,11 +86,22 @@ Ceresmate 通过 grpc stream 与 CeresDB 进行双向异步通信，我们把交
 - CeresDB 上传的请求命令；
 - Ceresmeta 下发的调度命令。
 
-<div align="center"><img src="./images/grpc_stream.png" style="zoom:50%;" /></div>
+                               ┌─────────────┐   Grpc stream    ┌─────────────┐
+                               │   CeresDB   │ ◀──────────────▶ │  Ceresmeta  │
+                               └─────────────┘                  └─────────────┘
 
 除此之外，由于我们对 Ceresmate 采用分布式的架构，对于来着 CeresDB 的请求命令，我们需要保证命令是 Leader node 进行处理的，因此在 grpc server 模块下我们还实现了命令的请求转发功能，若是 Follower node 接收到来自 CeresDB 的命令请求，则会将请求转发给 Leader node 进行处理。处理得到的结果发送给原来的 Follower node，由 Follower node 将处理结果发送给 CeresDB。
 
-<div align="center"><img src="./images/request_forward.jpg" style="zoom:50%;" /></div>
+                                          ┌──────────────────────────────────┐                
+                                          │             ┌──────┐             │        
+                                          │             │  F   │             │     
+                                          │             └──────┘             │ 
+                                   request│   ┌──────┐  request   ┌──────┐   │          
+                                 ◀────────│──▶│  F   │ ◀────────▶ │  L   │   │             
+                                   reponse│   └──────┘  response  └──────┘   │
+                                          └──────────────────────────────────┘ 
+                                                       Ceresmeta
+                                                        cluster
 
 ### 3.4 manager 模块
 一个 Ceresmeta 服务可以管理多个 CeresDB 集群，因此我们抽象出了 manager 模块，负责对多个 CeresDB 集群进行管理，manager 模块向上向 grpc 模块提供处理请求的接口，向下调用 cluster 模块的具体实现来完成对这些请求的处理。
