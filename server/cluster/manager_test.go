@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -117,11 +118,14 @@ func TestManagerSingleThread(t *testing.T) {
 	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table3, tableID3)
 	testAllocTableID(ctx, re, manager, node2, cluster1, defaultSchema, table4, tableID4)
 
+	testRouteTables(ctx, re, manager, cluster1, defaultSchema, []string{table1, table2, table3, table4})
+
 	testDropTable(ctx, re, manager, cluster1, defaultSchema, table1, tableID1)
 	testDropTable(ctx, re, manager, cluster1, defaultSchema, table3, tableID3)
 
 	testGetTables(ctx, re, manager, node1, cluster1, 1)
 	testGetTables(ctx, re, manager, node2, cluster1, 1)
+	testGetNodes(ctx, re, manager, cluster1)
 
 	re.NoError(manager.Stop(ctx))
 
@@ -178,7 +182,10 @@ func testCreateCluster(ctx context.Context, re *require.Assertions, manager Mana
 func testRegisterNode(ctx context.Context, re *require.Assertions, manager Manager,
 	cluster, node string, lease uint32,
 ) {
-	err := manager.RegisterNode(ctx, cluster, node, lease)
+	err := manager.RegisterNode(ctx, cluster, &metaservicepb.NodeInfo{
+		Endpoint: node,
+		Lease:    lease,
+	})
 	re.NoError(err)
 }
 
@@ -214,6 +221,17 @@ func testGetTables(ctx context.Context, re *require.Assertions, manager Manager,
 	re.Equal(num, tableNum)
 }
 
+func testRouteTables(ctx context.Context, re *require.Assertions, manager Manager, cluster, schema string, tableNames []string) {
+	ret, err := manager.RouteTables(ctx, cluster, schema, tableNames)
+	re.NoError(err)
+	re.Equal(uint64(0), ret.Version)
+	re.Equal(len(tableNames), len(ret.RouteEntries))
+	for _, entry := range ret.RouteEntries {
+		re.Equal(1, len(entry.NodeShards))
+		re.Equal(clusterpb.ShardRole_LEADER, entry.NodeShards[0].ShardInfo.ShardRole)
+	}
+}
+
 func testDropTable(ctx context.Context, re *require.Assertions, manager Manager, clusterName string, schemaName string, tableName string, tableID uint64) {
 	err := manager.DropTable(ctx, clusterName, schemaName, tableName, tableID)
 	re.NoError(err)
@@ -244,4 +262,10 @@ func testAllocTableIDMultiThread(ctx context.Context, re *require.Assertions, ma
 
 	testAllocTableID(ctx, re, manager, node2, clusterName, defaultSchema, table1, tableID)
 	wg.Wait()
+}
+
+func testGetNodes(ctx context.Context, re *require.Assertions, manager Manager, cluster string) {
+	getNodesResult, err := manager.GetNodes(ctx, cluster)
+	re.NoError(err)
+	re.Equal(defaultShardTotal, len(getNodesResult.NodeShards))
 }
