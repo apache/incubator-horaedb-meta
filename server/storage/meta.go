@@ -12,8 +12,6 @@ import (
 type MetaStorage interface {
 	ListClusters(ctx context.Context) ([]*clusterpb.Cluster, error)
 	CreateCluster(ctx context.Context, cluster *clusterpb.Cluster) (*clusterpb.Cluster, error)
-	GetCluster(ctx context.Context, clusterID uint32) (*clusterpb.Cluster, error)
-	PutCluster(ctx context.Context, clusterID uint32, cluster *clusterpb.Cluster) error
 
 	CreateClusterTopology(ctx context.Context, clusterTopology *clusterpb.ClusterTopology) (*clusterpb.ClusterTopology, error)
 	GetClusterTopology(ctx context.Context, clusterID uint32) (*clusterpb.ClusterTopology, error)
@@ -26,7 +24,6 @@ type MetaStorage interface {
 	CreateTable(ctx context.Context, clusterID uint32, schemaID uint32, table *clusterpb.Table) (*clusterpb.Table, error)
 	GetTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) (*clusterpb.Table, bool, error)
 	ListTables(ctx context.Context, clusterID uint32, schemaID uint32) ([]*clusterpb.Table, error)
-	PutTables(ctx context.Context, clusterID uint32, schemaID uint32, tables []*clusterpb.Table) error
 	DeleteTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) error
 
 	CreateShardTopologies(ctx context.Context, clusterID uint32, shardTopologies []*clusterpb.ShardTopology) ([]*clusterpb.ShardTopology, error)
