@@ -70,10 +70,10 @@ mkdir /tmp/ceresmeta1
 # ceresmeta2
 mkdir /tmp/ceresmeta2
 ./ceresmeta -etcd-start-timeout-ms 30000 \
-            -peer-urls "http://${HostIP2}:12380" \
-            -advertise-client-urls "http://${HostIP2}:12379" \
-            -advertise-peer-urls "http://${HostIP2}:12380" \
-            -client-urls "http://${HostIP2}:12379" \
+            -peer-urls "http://${HostIP2}:22380" \
+            -advertise-client-urls "http://${HostIP2}:22379" \
+            -advertise-peer-urls "http://${HostIP2}:22380" \
+            -client-urls "http://${HostIP2}:22379" \
             -wal-dir /tmp/ceresmeta2/wal \
             -data-dir /tmp/ceresmeta2/data \
             -node-name "meta2" \
