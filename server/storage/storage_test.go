@@ -43,7 +43,7 @@ func TestCluster(t *testing.T) {
 	clusters := make([]*clusterpb.Cluster, 0)
 	for i := 0; i < defaultCount; i++ {
 		cluster := &clusterpb.Cluster{
-			Id:                uint32(i + 10),
+			Id:                uint32(i),
 			Name:              name1,
 			MinNodeCount:      uint32(i),
 			ReplicationFactor: uint32(i),
