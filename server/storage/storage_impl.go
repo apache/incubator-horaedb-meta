@@ -417,7 +417,7 @@ func (s *metaStorageImpl) DeleteTable(ctx context.Context, clusterID uint32, sch
 func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID uint32, shardTopologies []*clusterpb.ShardTopology) ([]*clusterpb.ShardTopology, error) {
 	now := time.Now()
 
-	KeysMissing := make([]clientv3.Cmp, 0)
+	keysMissing := make([]clientv3.Cmp, 0)
 	opCreateShardTopologiesAndLatestVersion := make([]clientv3.Op, 0)
 
 	for _, shardTopology := range shardTopologies {
@@ -432,11 +432,11 @@ func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID u
 		latestVersionKey := makeShardLatestVersionKey(s.rootPath, clusterID, shardTopology.GetShardId())
 
 		// Check if the key and latest version key exists, if not，create shard topology and latest version; Otherwise, the shard topology already exists and return an error.
-		KeysMissing = append(KeysMissing, clientv3util.KeyMissing(key), clientv3util.KeyMissing(latestVersionKey))
+		keysMissing = append(keysMissing, clientv3util.KeyMissing(key), clientv3util.KeyMissing(latestVersionKey))
 		opCreateShardTopologiesAndLatestVersion = append(opCreateShardTopologiesAndLatestVersion, clientv3.OpPut(key, string(value)), clientv3.OpPut(latestVersionKey, fmtID(shardTopology.Version)))
 	}
 	resp, err := s.client.Txn(ctx).
-		If(KeysMissing...).
+		If(keysMissing...).
 		Then(opCreateShardTopologiesAndLatestVersion...).
 		Commit()
 	if err != nil {
