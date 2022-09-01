@@ -147,15 +147,21 @@ func (s *metaStorageImpl) CreateClusterTopology(ctx context.Context, clusterTopo
 func (s *metaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint32) (*clusterpb.ClusterTopology, error) {
 	key := makeClusterTopologyLatestVersionKey(s.rootPath, clusterID)
 	resp, err := s.client.Get(ctx, key)
-	if err != nil || len(resp.Kvs) != 1 {
+	if err != nil {
 		return nil, errors.Wrapf(err, "fail to get cluster topology latest version, clusterID:%d, key:%s", clusterID, key)
+	}
+	if len(resp.Kvs) != 1 {
+		return nil, ErrEtcdKVGetResponse.WithCausef("get cluster topology latest version response not only one, clusterID:%d, key:%s", clusterID, key)
 	}
 
 	version := string(resp.Kvs[0].Value)
 	key = makeClusterTopologyKey(s.rootPath, clusterID, version)
 	resp, err = s.client.Get(ctx, key)
-	if err != nil || len(resp.Kvs) != 1 {
+	if err != nil {
 		return nil, errors.Wrapf(err, "fail to get cluster topology, clusterID:%d, key:%s", clusterID, key)
+	}
+	if len(resp.Kvs) != 1 {
+		return nil, ErrEtcdKVGetResponse.WithCausef("get cluster topology response not only one, clusterID:%d, key:%s", clusterID, key)
 	}
 
 	clusterTopology := &clusterpb.ClusterTopology{}
@@ -298,8 +304,11 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 
 func (s *metaStorageImpl) GetTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) (*clusterpb.Table, bool, error) {
 	resp, err := s.client.Get(ctx, makeNameToIDKey(s.rootPath, clusterID, schemaID, tableName))
-	if err != nil || len(resp.Kvs) != 1 {
+	if err != nil {
 		return nil, false, errors.Wrapf(err, "fail to get table id, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
+	}
+	if len(resp.Kvs) != 1 {
+		return nil, false, ErrEtcdKVGetResponse.WithCausef("get tableID response not only one, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
 	}
 
 	tableID, err := strconv.ParseUint(string(resp.Kvs[0].Value), 10, 64)
@@ -309,8 +318,11 @@ func (s *metaStorageImpl) GetTable(ctx context.Context, clusterID uint32, schema
 
 	key := makeTableKey(s.rootPath, clusterID, schemaID, tableID)
 	resp, err = s.client.Get(ctx, key)
-	if err != nil || len(resp.Kvs) != 1 {
+	if err != nil {
 		return nil, false, errors.Wrapf(err, "fail to get table, clusterID:%d, schemaID:%d, tableID:%d, key:%s", clusterID, schemaID, tableID, key)
+	}
+	if len(resp.Kvs) != 1 {
+		return nil, false, ErrEtcdKVGetResponse.WithCausef("get table response not only one, clusterID:%d, schemaID:%d, table name:%s, key:%s", clusterID, schemaID, tableName, key)
 	}
 
 	table := &clusterpb.Table{}
@@ -371,8 +383,9 @@ func (s *metaStorageImpl) DeleteTable(ctx context.Context, clusterID uint32, sch
 		return errors.Wrapf(err, "fail to get table id, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
 	}
 	if len(res.Kvs) != 1 {
-		return ErrTableIDNotFound.WithCausef("table id not found, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
+		return ErrEtcdKVGetResponse.WithCausef("get tableID response not only one, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
 	}
+
 	tableID, err := strconv.ParseUint(string(res.Kvs[0].Value), 10, 64)
 	if err != nil {
 		return errors.Wrapf(err, "string to int failed")
@@ -419,17 +432,13 @@ func (s *metaStorageImpl) CreateShardTopologies(ctx context.Context, clusterID u
 		latestVersionKey := makeShardLatestVersionKey(s.rootPath, clusterID, shardTopology.GetShardId())
 
 		// Check if the key and latest version key exists, if not，create shard topology and latest version; Otherwise, the shard topology already exists and return an error.
-		latestVersionKeyMissing := clientv3util.KeyMissing(latestVersionKey)
-		KeyMissing := clientv3util.KeyMissing(key)
-		opCreateShardTopology := clientv3.OpPut(key, string(value))
-		opCreateShardTopologyLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardTopology.Version))
-
-		KeysMissing = append(KeysMissing, KeyMissing)
-		KeysMissing = append(KeysMissing, latestVersionKeyMissing)
-		opCreateShardTopologiesAndLatestVersion = append(opCreateShardTopologiesAndLatestVersion, opCreateShardTopology)
-		opCreateShardTopologiesAndLatestVersion = append(opCreateShardTopologiesAndLatestVersion, opCreateShardTopologyLatestVersion)
+		KeysMissing = append(KeysMissing, clientv3util.KeyMissing(key), clientv3util.KeyMissing(latestVersionKey))
+		opCreateShardTopologiesAndLatestVersion = append(opCreateShardTopologiesAndLatestVersion, clientv3.OpPut(key, string(value)), clientv3.OpPut(latestVersionKey, fmtID(shardTopology.Version)))
 	}
-	resp, err := s.client.Txn(ctx).If(KeysMissing...).Then(opCreateShardTopologiesAndLatestVersion...).Commit()
+	resp, err := s.client.Txn(ctx).
+		If(KeysMissing...).
+		Then(opCreateShardTopologiesAndLatestVersion...).
+		Commit()
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail to create shard topology, clusterID:%d", clusterID)
 	}
@@ -445,15 +454,21 @@ func (s *metaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 	for _, shardID := range shardIDs {
 		key := makeShardLatestVersionKey(s.rootPath, clusterID, shardID)
 		resp, err := s.client.Get(ctx, key)
-		if err != nil || len(resp.Kvs) != 1 {
+		if err != nil {
 			return nil, errors.Wrapf(err, "fail to list shard topology latest version, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
+		}
+		if len(resp.Kvs) != 1 {
+			return nil, ErrEtcdKVGetResponse.WithCausef("get shard topology latest version response not only one, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
 
 		version := string(resp.Kvs[0].Value)
 		key = makeShardTopologyKey(s.rootPath, clusterID, shardID, version)
 		resp, err = s.client.Get(ctx, key)
-		if err != nil || len(resp.Kvs) != 1 {
+		if err != nil {
 			return nil, errors.Wrapf(err, "fail to list shard topology, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
+		}
+		if len(resp.Kvs) != 1 {
+			return nil, ErrEtcdKVGetResponse.WithCausef("get shard topology response not only one, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
 
 		shardTopology := &clusterpb.ShardTopology{}
