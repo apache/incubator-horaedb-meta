@@ -1,7 +1,7 @@
 # Ceresmeta
 
 ## 1. Introduction: Why do we need Ceresmeta
-When CeresDB is in stand-alone mode, it relies on local storage. The data is stored in local storage. when we create schema and create table, the interaction of data is only focused on the current stand-alone node; while in cluster mode, if each node still uses the stand-alone mode for data storage and data interaction, there are some problems:
+When CeresDB is in stand-alone mode, it relies on local storage. The data is stored in local storage. When we create schema and create table, the interaction of data is only focused on the current stand-alone node; while in cluster mode, if each node still uses the stand-alone mode for data storage and data interaction, there are some problems:
 
 - Some nodes have more operations to create schemas and tables, resulting in full physical storage. At this time, data migration needs to be performed. Data migration often occupies a large amount of network bandwidth, which may further affect online service. 
 - When data analysis and data processing are concentrated on a small number of nodes, the computing resources and memory resources of these nodes may be overloaded and cannot respond in time, while other nodes are often idle, and the access load is unbalanced, which affects the response of the service time.
@@ -29,7 +29,7 @@ Ceresmeta is the "brain" we use. Ceresmeta is the central control module of Cere
                                            │                                         
                                            ▼     
                                     ┌─────────────┐
-                                    │ storage:OSS │                   
+                                    │   storage   │                   
                                     └─────────────┘ 
 
 When CeresDB is in a cluster mode, an important issue we need to consider is how to ensure the load balance of the cluster. As shown in the overall CeresDB distributed architecture schematic diagram above, our Ceresmeta component here is the "brain" responsible for managing our CeresDB cluster.
@@ -86,7 +86,7 @@ Ceresmate conducts two-way asynchronous communication with CeresDB through grpc 
 
 - CeresDB reports its own node information to Ceresmeta through heartbeat; 
 - the request command uploaded by CeresDB;
--  the scheduling command issued by Ceresmeta.
+- the scheduling command issued by Ceresmeta.
 
                                ┌─────────────┐   Grpc stream    ┌─────────────┐
                                │   CeresDB   │ ◀──────────────▶ │  Ceresmeta  │
