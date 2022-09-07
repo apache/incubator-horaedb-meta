@@ -25,7 +25,8 @@ type ShardTablesWithRole struct {
 	version   uint64
 }
 
-// fsm const
+// Shard FSM Const Definition
+// It contains the event name and the state name
 const (
 	EventTransferLeader           = "TransferLeader"
 	EventTransferToFollowerFailed = "TransferToFollowerFailed"
@@ -58,7 +59,7 @@ const (
 ```
 */
 func NewFSM(role clusterpb.ShardRole) *fsm.FSM {
-	fsm := fsm.NewFSM(
+	shardFsm := fsm.NewFSM(
 		StateFollower,
 		fsm.Events{
 			{Name: EventTransferLeader, Src: []string{StatePendingLeader}, Dst: StateLeader},
@@ -71,10 +72,10 @@ func NewFSM(role clusterpb.ShardRole) *fsm.FSM {
 		fsm.Callbacks{},
 	)
 	if role == clusterpb.ShardRole_LEADER {
-		fsm.SetState(StateLeader)
+		shardFsm.SetState(StateLeader)
 	}
 	if role == clusterpb.ShardRole_FOLLOWER {
-		fsm.SetState(StateFollower)
+		shardFsm.SetState(StateFollower)
 	}
-	return fsm
+	return shardFsm
 }
