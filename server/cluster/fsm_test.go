@@ -2,13 +2,13 @@ package cluster
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestTransferLeader(t *testing.T) {
-
 	fsm := NewFSM(clusterpb.ShardRole_FOLLOWER)
 	fmt.Println(fsm.Current())
 
