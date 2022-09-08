@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/server/etcdutil"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
-	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/clientv3util"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -41,46 +41,26 @@ func newEtcdStorage(client *clientv3.Client, rootPath string, opts Options) Stor
 }
 
 func (s *metaStorageImpl) ListClusters(ctx context.Context) ([]*clusterpb.Cluster, error) {
-	clusters := make([]*clusterpb.Cluster, 0)
-	nextID := uint32(0)
-
+	startKey := makeClusterKey(s.rootPath, 0)
 	endKey := makeClusterKey(s.rootPath, math.MaxUint32)
-	withRange := clientv3.WithRange(endKey)
-
 	rangeLimit := s.opts.MaxScanLimit
-	withLimit := clientv3.WithLimit(int64(rangeLimit))
 
-	for {
-		startKey := makeClusterKey(s.rootPath, nextID)
-		resp, err := s.client.Get(ctx, startKey, withRange, withLimit)
-		if err != nil {
-			return nil, errors.Wrapf(err, "fail to list clusters, start key:%s, end key:%s, range limit:%d", startKey, endKey, rangeLimit)
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		for _, r := range resp.Kvs {
-			cluster := &clusterpb.Cluster{}
-			if err := proto.Unmarshal(r.Value, cluster); err != nil {
-				return nil, ErrEncodeCluster.WithCausef("fail to encode cluster, err:%v", err)
-			}
-
-			clusters = append(clusters, cluster)
-			if cluster.GetId() == math.MaxUint32 {
-				log.Warn("list clusters cluster_id has reached max value", zap.Uint32("cluster-id", cluster.GetId()))
-				return clusters, nil
-			}
-			nextID = cluster.GetId() + 1
-		}
-
-		if len(resp.Kvs) < rangeLimit {
-			return clusters, nil
-		}
+	clusterKVs, err := etcdutil.Scan(ctx, s.client, startKey, endKey, rangeLimit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "fail to list clusters, start key:%s, end key:%s, range limit:%d", startKey, endKey, rangeLimit)
 	}
+
+	clusters := make([]*clusterpb.Cluster, 0)
+	for _, r := range clusterKVs {
+		cluster := &clusterpb.Cluster{}
+		if err := proto.Unmarshal([]byte(r), cluster); err != nil {
+			return nil, ErrEncodeCluster.WithCausef("fail to encode cluster, err:%v", err)
+		}
+
+		clusters = append(clusters, cluster)
+	}
+
+	return clusters, nil
 }
 
 // Return error if the cluster already exists.
@@ -146,26 +126,19 @@ func (s *metaStorageImpl) CreateClusterTopology(ctx context.Context, clusterTopo
 
 func (s *metaStorageImpl) GetClusterTopology(ctx context.Context, clusterID uint32) (*clusterpb.ClusterTopology, error) {
 	key := makeClusterTopologyLatestVersionKey(s.rootPath, clusterID)
-	resp, err := s.client.Get(ctx, key)
+	version, err := etcdutil.Get(ctx, s.client, key)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail to get cluster topology latest version, clusterID:%d, key:%s", clusterID, key)
 	}
-	if len(resp.Kvs) != 1 {
-		return nil, ErrEtcdKVGetResponse.WithCausef("get cluster topology latest version response not only one, clusterID:%d, key:%s", clusterID, key)
-	}
 
-	version := string(resp.Kvs[0].Value)
 	key = makeClusterTopologyKey(s.rootPath, clusterID, version)
-	resp, err = s.client.Get(ctx, key)
+	value, err := etcdutil.Get(ctx, s.client, key)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail to get cluster topology, clusterID:%d, key:%s", clusterID, key)
 	}
-	if len(resp.Kvs) != 1 {
-		return nil, ErrEtcdKVGetResponse.WithCausef("get cluster topology response not only one, clusterID:%d, key:%s", clusterID, key)
-	}
 
 	clusterTopology := &clusterpb.ClusterTopology{}
-	if err = proto.Unmarshal(resp.Kvs[0].Value, clusterTopology); err != nil {
+	if err = proto.Unmarshal([]byte(value), clusterTopology); err != nil {
 		return nil, ErrEncodeClusterTopology.WithCausef("fail to encode cluster topology, clusterID:%d, err:%v", clusterID, err)
 	}
 	return clusterTopology, nil
@@ -200,45 +173,25 @@ func (s *metaStorageImpl) PutClusterTopology(ctx context.Context, clusterID uint
 }
 
 func (s *metaStorageImpl) ListSchemas(ctx context.Context, clusterID uint32) ([]*clusterpb.Schema, error) {
-	schemas := make([]*clusterpb.Schema, 0)
-	nextID := uint32(0)
+	startKey := makeSchemaKey(s.rootPath, clusterID, 0)
 	endKey := makeSchemaKey(s.rootPath, clusterID, math.MaxUint32)
-	withRange := clientv3.WithRange(endKey)
-
 	rangeLimit := s.opts.MaxScanLimit
-	withLimit := clientv3.WithLimit(int64(rangeLimit))
 
-	for {
-		startKey := makeSchemaKey(s.rootPath, clusterID, nextID)
-		resp, err := s.client.Get(ctx, startKey, withRange, withLimit)
-		if err != nil {
-			return nil, errors.Wrapf(err, "fail to list schemas, clusterID:%d, start key:%s, end key:%s, range limit:%d", clusterID, startKey, endKey, rangeLimit)
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		for _, r := range resp.Kvs {
-			schema := &clusterpb.Schema{}
-			if err := proto.Unmarshal(r.Value, schema); err != nil {
-				return nil, ErrEncodeSchema.WithCausef("fail to encode schema, clusterID:%d, err:%v", clusterID, err)
-			}
-
-			schemas = append(schemas, schema)
-			if schema.GetId() == math.MaxUint32 {
-				log.Warn("list schemas schema_id has reached max value", zap.Uint32("schema-id", schema.GetId()))
-				return schemas, nil
-			}
-			nextID = schema.GetId() + 1
-		}
-
-		if len(resp.Kvs) < rangeLimit {
-			return schemas, nil
-		}
+	schemaKVs, err := etcdutil.Scan(ctx, s.client, startKey, endKey, rangeLimit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "fail to list schemas, clusterID:%d, start key:%s, end key:%s, range limit:%d", clusterID, startKey, endKey, rangeLimit)
 	}
+
+	schemas := make([]*clusterpb.Schema, 0)
+	for _, r := range schemaKVs {
+		schema := &clusterpb.Schema{}
+		if err := proto.Unmarshal([]byte(r), schema); err != nil {
+			return nil, ErrEncodeSchema.WithCausef("fail to encode schema, clusterID:%d, err:%v", clusterID, err)
+		}
+
+		schemas = append(schemas, schema)
+	}
+	return schemas, nil
 }
 
 // Return error if the schema already exists.
@@ -303,30 +256,24 @@ func (s *metaStorageImpl) CreateTable(ctx context.Context, clusterID uint32, sch
 }
 
 func (s *metaStorageImpl) GetTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) (*clusterpb.Table, bool, error) {
-	resp, err := s.client.Get(ctx, makeNameToIDKey(s.rootPath, clusterID, schemaID, tableName))
+	value, err := etcdutil.Get(ctx, s.client, makeNameToIDKey(s.rootPath, clusterID, schemaID, tableName))
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "fail to get table id, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
 	}
-	if len(resp.Kvs) != 1 {
-		return nil, false, ErrEtcdKVGetResponse.WithCausef("get tableID response not only one, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
-	}
 
-	tableID, err := strconv.ParseUint(string(resp.Kvs[0].Value), 10, 64)
+	tableID, err := strconv.ParseUint(value, 10, 64)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "string to int failed")
 	}
 
 	key := makeTableKey(s.rootPath, clusterID, schemaID, tableID)
-	resp, err = s.client.Get(ctx, key)
+	value, err = etcdutil.Get(ctx, s.client, key)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "fail to get table, clusterID:%d, schemaID:%d, tableID:%d, key:%s", clusterID, schemaID, tableID, key)
 	}
-	if len(resp.Kvs) != 1 {
-		return nil, false, ErrEtcdKVGetResponse.WithCausef("get table response not only one, clusterID:%d, schemaID:%d, table name:%s, key:%s", clusterID, schemaID, tableName, key)
-	}
 
 	table := &clusterpb.Table{}
-	if err = proto.Unmarshal(resp.Kvs[0].Value, table); err != nil {
+	if err = proto.Unmarshal([]byte(value), table); err != nil {
 		return nil, false, ErrEncodeTable.WithCausef("fail to encode table, clusterID:%d, schemaID:%d, tableID:%d, err:%v", clusterID, schemaID, tableID, err)
 	}
 
@@ -334,59 +281,37 @@ func (s *metaStorageImpl) GetTable(ctx context.Context, clusterID uint32, schema
 }
 
 func (s *metaStorageImpl) ListTables(ctx context.Context, clusterID uint32, schemaID uint32) ([]*clusterpb.Table, error) {
-	tables := make([]*clusterpb.Table, 0)
-	nextID := uint64(0)
+	startKey := makeTableKey(s.rootPath, clusterID, schemaID, 0)
 	endKey := makeTableKey(s.rootPath, clusterID, schemaID, math.MaxUint64)
-	withRange := clientv3.WithRange(endKey)
-
 	rangeLimit := s.opts.MaxScanLimit
-	withLimit := clientv3.WithLimit(int64(rangeLimit))
 
-	for {
-		startKey := makeTableKey(s.rootPath, clusterID, schemaID, nextID)
-		resp, err := s.client.Get(ctx, startKey, withRange, withLimit)
-		if err != nil {
-			return nil, errors.Wrapf(err, "fail to list tables, clusterID:%d, schemaID:%d, start key:%s, end key:%s, range limit:%d", clusterID, schemaID, startKey, endKey, rangeLimit)
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		for _, r := range resp.Kvs {
-			table := &clusterpb.Table{}
-			if err := proto.Unmarshal(r.Value, table); err != nil {
-				return nil, ErrEncodeTable.WithCausef("fail to encode table, clusterID:%d, schemaID:%d, err:%v", clusterID, schemaID, err)
-			}
-
-			tables = append(tables, table)
-			if table.GetId() == math.MaxUint64 {
-				log.Warn("list table table_id has reached max value", zap.Uint64("table-id", table.GetId()))
-				return tables, nil
-			}
-			nextID = table.GetId() + 1
-		}
-
-		if len(resp.Kvs) < rangeLimit {
-			return tables, nil
-		}
+	tableKVs, err := etcdutil.Scan(ctx, s.client, startKey, endKey, rangeLimit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "fail to list tables, clusterID:%d, schemaID:%d, start key:%s, end key:%s, range limit:%d", clusterID, schemaID, startKey, endKey, rangeLimit)
 	}
+
+	tables := make([]*clusterpb.Table, 0)
+	for _, r := range tableKVs {
+		table := &clusterpb.Table{}
+		if err := proto.Unmarshal([]byte(r), table); err != nil {
+			return nil, ErrEncodeTable.WithCausef("fail to encode table, clusterID:%d, schemaID:%d, err:%v", clusterID, schemaID, err)
+		}
+
+		tables = append(tables, table)
+	}
+
+	return tables, nil
 }
 
 func (s *metaStorageImpl) DeleteTable(ctx context.Context, clusterID uint32, schemaID uint32, tableName string) error {
 	nameKey := makeNameToIDKey(s.rootPath, clusterID, schemaID, tableName)
 
-	res, err := s.client.Get(ctx, nameKey)
+	value, err := etcdutil.Get(ctx, s.client, nameKey)
 	if err != nil {
 		return errors.Wrapf(err, "fail to get table id, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
 	}
-	if len(res.Kvs) != 1 {
-		return ErrEtcdKVGetResponse.WithCausef("get tableID response not only one, clusterID:%d, schemaID:%d, table name:%s", clusterID, schemaID, tableName)
-	}
 
-	tableID, err := strconv.ParseUint(string(res.Kvs[0].Value), 10, 64)
+	tableID, err := strconv.ParseUint(value, 10, 64)
 	if err != nil {
 		return errors.Wrapf(err, "string to int failed")
 	}
@@ -453,26 +378,19 @@ func (s *metaStorageImpl) ListShardTopologies(ctx context.Context, clusterID uin
 
 	for _, shardID := range shardIDs {
 		key := makeShardLatestVersionKey(s.rootPath, clusterID, shardID)
-		resp, err := s.client.Get(ctx, key)
+		version, err := etcdutil.Get(ctx, s.client, key)
 		if err != nil {
 			return nil, errors.Wrapf(err, "fail to list shard topology latest version, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
-		if len(resp.Kvs) != 1 {
-			return nil, ErrEtcdKVGetResponse.WithCausef("get shard topology latest version response not only one, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
-		}
 
-		version := string(resp.Kvs[0].Value)
 		key = makeShardTopologyKey(s.rootPath, clusterID, shardID, version)
-		resp, err = s.client.Get(ctx, key)
+		value, err := etcdutil.Get(ctx, s.client, key)
 		if err != nil {
 			return nil, errors.Wrapf(err, "fail to list shard topology, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
 		}
-		if len(resp.Kvs) != 1 {
-			return nil, ErrEtcdKVGetResponse.WithCausef("get shard topology response not only one, clusterID:%d, shardID:%d, key:%s", clusterID, shardID, key)
-		}
 
 		shardTopology := &clusterpb.ShardTopology{}
-		if err = proto.Unmarshal(resp.Kvs[0].Value, shardTopology); err != nil {
+		if err = proto.Unmarshal([]byte(value), shardTopology); err != nil {
 			return nil, ErrEncodeShardTopology.WithCausef("fail to encode shard topology, clusterID:%d, shardID:%d, err:%v", clusterID, shardID, err)
 		}
 		shardTopologies = append(shardTopologies, shardTopology)
@@ -509,48 +427,25 @@ func (s *metaStorageImpl) PutShardTopology(ctx context.Context, clusterID uint32
 }
 
 func (s *metaStorageImpl) ListNodes(ctx context.Context, clusterID uint32) ([]*clusterpb.Node, error) {
-	nodes := make([]*clusterpb.Node, 0)
-	defaultStartNodeName := string([]byte{0})
-	defaultEndNodeName := string([]byte{255})
-
-	startKey := makeNodeKey(s.rootPath, clusterID, defaultStartNodeName)
-	endKey := makeNodeKey(s.rootPath, clusterID, defaultEndNodeName)
-	withRange := clientv3.WithRange(endKey)
-
+	startKey := makeNodeKey(s.rootPath, clusterID, string([]byte{0}))
+	endKey := makeNodeKey(s.rootPath, clusterID, string([]byte{255}))
 	rangeLimit := s.opts.MaxScanLimit
-	withLimit := clientv3.WithLimit(int64(rangeLimit))
 
-	for {
-		resp, err := s.client.Get(ctx, startKey, withRange, withLimit)
-		if err != nil {
-			return nil, errors.Wrapf(err, "fail to list nodes, clusterID:%d, start key:%s, end key:%s, range limit:%d", clusterID, startKey, endKey, rangeLimit)
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		if len(nodes) > 0 {
-			nodes = nodes[:len(nodes)-1]
-		}
-
-		for _, r := range resp.Kvs {
-			node := &clusterpb.Node{}
-			if err := proto.Unmarshal(r.Value, node); err != nil {
-				return nil, ErrEncodeNode.WithCausef("fail to encode node, clusterID:%d, err:%v", clusterID, err)
-			}
-
-			nodes = append(nodes, node)
-
-			startKey = string(r.Key)
-		}
-
-		if len(resp.Kvs) < rangeLimit {
-			return nodes, nil
-		}
+	nodeKVs, err := etcdutil.Scan(ctx, s.client, startKey, endKey, rangeLimit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "fail to list nodes, clusterID:%d, start key:%s, end key:%s, range limit:%d", clusterID, startKey, endKey, rangeLimit)
 	}
+
+	nodes := make([]*clusterpb.Node, 0)
+	for _, r := range nodeKVs {
+		node := &clusterpb.Node{}
+		if err := proto.Unmarshal([]byte(r), node); err != nil {
+			return nil, ErrEncodeNode.WithCausef("fail to encode node, clusterID:%d, err:%v", clusterID, err)
+		}
+
+		nodes = append(nodes, node)
+	}
+	return nodes, nil
 }
 
 func (s *metaStorageImpl) CreateOrUpdateNode(ctx context.Context, clusterID uint32, node *clusterpb.Node) (*clusterpb.Node, error) {
@@ -562,10 +457,12 @@ func (s *metaStorageImpl) CreateOrUpdateNode(ctx context.Context, clusterID uint
 	UpdateNode := node
 
 	key := makeNodeKey(s.rootPath, clusterID, node.Name)
+
 	CreateNodeValue, err := proto.Marshal(CreateNode)
 	if err != nil {
 		return nil, ErrDecodeNode.WithCausef("fail to decode node, clusterID:%d, node name:%s, err:%v", clusterID, node.Name, err)
 	}
+
 	UpdateNodeValue, err := proto.Marshal(UpdateNode)
 	if err != nil {
 		return nil, ErrDecodeNode.WithCausef("fail to decode node, clusterID:%d, node name:%s, err:%v", clusterID, node.Name, err)

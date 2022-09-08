@@ -26,5 +26,4 @@ var (
 	ErrDeleteTableAgain           = coderr.NewCodeError(coderr.Internal, "meta storage delete table")
 	ErrCreateShardTopologyAgain   = coderr.NewCodeError(coderr.Internal, "meta storage create shard topology")
 	ErrPutShardTopologyConflict   = coderr.NewCodeError(coderr.Internal, "meta storage put shard topology")
-	ErrEtcdKVGetResponse          = coderr.NewCodeError(coderr.Internal, "get value response must only one")
 )
