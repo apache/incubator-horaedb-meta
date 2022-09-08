@@ -28,16 +28,26 @@ type ShardTablesWithRole struct {
 // Shard FSM Const Definition
 // It contains the event name and the state name
 const (
-	EventTransferLeader           = "TransferLeader"
-	EventTransferToFollowerFailed = "TransferToFollowerFailed"
-	EventTransferFollower         = "TransferFollower"
-	EventTransferToLeaderFailed   = "TransferToLeaderFailed"
-	EventTransferFollowerStart    = "TransferFollowerStart"
-	EventTransferLeaderStart      = "TransferLeaderStart"
-	StateLeader                   = "LEADER"
-	StateFollower                 = "FOLLOWER"
-	StatePendingLeader            = "PENDING_LEADER"
-	StatePendingFollower          = "PENDING_FOLLOWER"
+	EventTransferLeader          = "TransferLeader"
+	EventTransferFollowerFailed  = "TransferFollowerFailed"
+	EventTransferFollower        = "TransferFollower"
+	EventTransferLeaderFailed    = "TransferLeaderFailed"
+	EventPrepareTransferFollower = "PrepareTransferFollower"
+	EventPrepareTransferLeader   = "PrepareTransferLeader"
+	StateLeader                  = "LEADER"
+	StateFollower                = "FOLLOWER"
+	StatePendingLeader           = "PENDING_LEADER"
+	StatePendingFollower         = "PENDING_FOLLOWER"
+)
+
+// Declare the source state array of FSM, avoid creating arrays repeatedly every time you create an FSM
+var (
+	EventTransferLeaderSrc          = []string{StatePendingLeader}
+	EventTransferFollowerFailedSrc  = []string{StatePendingFollower}
+	EventTransferFollowerSrc        = []string{StatePendingFollower}
+	EventTransferLeaderFailedSrc    = []string{StatePendingLeader}
+	EventPrepareTransferFollowerSrc = []string{StateLeader}
+	EventPrepareTransferLeaderSrc   = []string{StateFollower}
 )
 
 // NewFSM /**
@@ -62,12 +72,12 @@ func NewFSM(role clusterpb.ShardRole) *fsm.FSM {
 	shardFsm := fsm.NewFSM(
 		StateFollower,
 		fsm.Events{
-			{Name: EventTransferLeader, Src: []string{StatePendingLeader}, Dst: StateLeader},
-			{Name: EventTransferToFollowerFailed, Src: []string{StatePendingFollower}, Dst: StateLeader},
-			{Name: EventTransferFollower, Src: []string{StatePendingFollower}, Dst: StateFollower},
-			{Name: EventTransferToLeaderFailed, Src: []string{StatePendingLeader}, Dst: StateFollower},
-			{Name: EventTransferFollowerStart, Src: []string{StateLeader}, Dst: StatePendingFollower},
-			{Name: EventTransferLeaderStart, Src: []string{StateFollower}, Dst: StatePendingLeader},
+			{Name: EventTransferLeader, Src: EventTransferLeaderSrc, Dst: StateLeader},
+			{Name: EventTransferFollowerFailed, Src: EventTransferFollowerFailedSrc, Dst: StateLeader},
+			{Name: EventTransferFollower, Src: EventTransferFollowerSrc, Dst: StateFollower},
+			{Name: EventTransferLeaderFailed, Src: EventTransferLeaderFailedSrc, Dst: StateFollower},
+			{Name: EventPrepareTransferFollower, Src: EventPrepareTransferFollowerSrc, Dst: StatePendingFollower},
+			{Name: EventPrepareTransferLeader, Src: EventPrepareTransferLeaderSrc, Dst: StatePendingLeader},
 		},
 		fsm.Callbacks{},
 	)
