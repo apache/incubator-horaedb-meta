@@ -5,12 +5,10 @@ package etcdutil
 import (
 	"context"
 
-	"go.uber.org/zap"
-
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	clientv3 "go.etcd.io/etcd/client/v3"
-
 	"go.etcd.io/etcd/server/v3/etcdserver"
+	"go.uber.org/zap"
 )
 
 type LeaderGetterWrapper struct {
@@ -35,40 +33,42 @@ func Get(ctx context.Context, client *clientv3.Client, key string) (string, erro
 	return string(resp.Kvs[0].Value), nil
 }
 
-func Scan(ctx context.Context, client *clientv3.Client, startKey, endKey string, limit int) ([]string, error) {
+func Scan(ctx context.Context, client *clientv3.Client, startKey, endKey string, limit int, encode func([]byte) error) error {
 	withRange := clientv3.WithRange(endKey)
 	withLimit := clientv3.WithLimit(int64(limit))
-	values := make([]string, 0)
 
 	for {
 		resp, err := client.Get(ctx, startKey, withRange, withLimit)
 		if err != nil {
-			return nil, ErrEtcdKVGet.WithCause(err)
+			return ErrEtcdKVGet.WithCause(err)
 		}
 
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err()
 		default:
 		}
 
-		if len(values) > 0 {
-			values = values[:len(values)-1]
-		}
+		for index, item := range resp.Kvs {
+			startKey = string(item.Key)
 
-		for _, item := range resp.Kvs {
-			values = append(values, string(item.Value))
+			if index == limit-1 {
+				continue
+			}
+
+			err := encode(item.Value)
+			if err != nil {
+				return err
+			}
 
 			if string(item.Key) == endKey {
 				log.Warn("scan value has reached end key", zap.String("endKey", endKey))
-				return values, nil
+				return nil
 			}
-
-			startKey = string(item.Key)
 		}
 
 		if len(resp.Kvs) < limit {
-			return values, nil
+			return nil
 		}
 	}
 }
