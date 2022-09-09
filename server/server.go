@@ -195,7 +195,6 @@ func (srv *Server) watchEtcdLeaderPriority(_ context.Context) {
 	defer srv.bgJobWg.Done()
 }
 
-// nolint
 func (srv *Server) createDefaultCluster(ctx context.Context) {
 	leaderResp, err := srv.member.GetLeader(ctx)
 	if err != nil {
