@@ -69,7 +69,8 @@ func (e *codeError) Code() Code {
 }
 
 func (e *codeError) WithCausef(format string, a ...any) CodeError {
-	causeWithStack := errors.WithStack(errors.New(fmt.Sprintf(format, a...)))
+	errMsg := fmt.Sprintf(format, a...)
+	causeWithStack := errors.WithStack(errors.New(errMsg))
 	return &codeError{
 		code:  e.code,
 		desc:  e.desc,
