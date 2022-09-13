@@ -6,6 +6,10 @@ import (
 	"go.etcd.io/etcd/server/v3/etcdserver"
 )
 
+type EtcdLeaderGetter interface {
+	EtcdLeaderID() uint64
+}
+
 type LeaderGetterWrapper struct {
 	Server *etcdserver.EtcdServer
 }
