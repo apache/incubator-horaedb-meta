@@ -54,7 +54,7 @@ var (
 	callbacks = fsm.Callbacks{}
 )
 
-// NewFSM /**
+// NewFSM
 /**
 ```
 ┌────┐                   ┌────┐
