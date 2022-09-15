@@ -22,6 +22,7 @@ const (
 	AllocClusterIDPrefix = "ClusterID"
 	AllocSchemaIDPrefix  = "SchemaID"
 	AllocTableIDPrefix   = "TableID"
+	AllocShardIDPrefix   = "ShardID"
 )
 
 type TableInfo struct {
