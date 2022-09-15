@@ -42,12 +42,16 @@ const (
 
 // Declare the source state array of FSM, avoid creating arrays repeatedly every time you create an FSM
 var (
-	EventTransferLeaderSrc          = []string{StatePendingLeader}
-	EventTransferFollowerFailedSrc  = []string{StatePendingFollower}
-	EventTransferFollowerSrc        = []string{StatePendingFollower}
-	EventTransferLeaderFailedSrc    = []string{StatePendingLeader}
-	EventPrepareTransferFollowerSrc = []string{StateLeader}
-	EventPrepareTransferLeaderSrc   = []string{StateFollower}
+	events = fsm.Events{
+		{Name: EventTransferLeader, Src: []string{StatePendingLeader}, Dst: StateLeader},
+		{Name: EventTransferFollowerFailed, Src: []string{StatePendingFollower}, Dst: StateLeader},
+		{Name: EventTransferFollower, Src: []string{StatePendingFollower}, Dst: StateFollower},
+		{Name: EventTransferLeaderFailed, Src: []string{StatePendingLeader}, Dst: StateFollower},
+		{Name: EventPrepareTransferFollower, Src: []string{StateLeader}, Dst: StatePendingFollower},
+		{Name: EventPrepareTransferLeader, Src: []string{StateFollower}, Dst: StatePendingLeader},
+	}
+
+	callbacks = fsm.Callbacks{}
 )
 
 // NewFSM /**
@@ -71,15 +75,8 @@ var (
 func NewFSM(role clusterpb.ShardRole) *fsm.FSM {
 	shardFsm := fsm.NewFSM(
 		StateFollower,
-		fsm.Events{
-			{Name: EventTransferLeader, Src: EventTransferLeaderSrc, Dst: StateLeader},
-			{Name: EventTransferFollowerFailed, Src: EventTransferFollowerFailedSrc, Dst: StateLeader},
-			{Name: EventTransferFollower, Src: EventTransferFollowerSrc, Dst: StateFollower},
-			{Name: EventTransferLeaderFailed, Src: EventTransferLeaderFailedSrc, Dst: StateFollower},
-			{Name: EventPrepareTransferFollower, Src: EventPrepareTransferFollowerSrc, Dst: StatePendingFollower},
-			{Name: EventPrepareTransferLeader, Src: EventPrepareTransferLeaderSrc, Dst: StatePendingLeader},
-		},
-		fsm.Callbacks{},
+		events,
+		callbacks,
 	)
 	if role == clusterpb.ShardRole_LEADER {
 		shardFsm.SetState(StateLeader)
