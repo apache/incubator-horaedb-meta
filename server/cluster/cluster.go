@@ -89,7 +89,7 @@ func NewCluster(meta *clusterpb.Cluster, storage storage.Storage, kv clientv3.KV
 		nodesCache:    make(map[string]*Node),
 		schemaIDAlloc: id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocSchemaIDPrefix), idAllocatorStep),
 		tableIDAlloc:  id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocTableIDPrefix), idAllocatorStep),
-		shardIDAlloc:  id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocShardIDPrefix), idAllocatorStep),
+		shardIDAlloc:  id.NewReusableAllocatorImpl(uint64(meta.ShardTotal)),
 
 		storage:  storage,
 		kv:       kv,
@@ -577,7 +577,7 @@ func (c *Cluster) allocTableID(ctx context.Context) (uint64, error) {
 func (c *Cluster) allocShardID(ctx context.Context) (uint32, error) {
 	id, err := c.shardIDAlloc.Alloc(ctx)
 	if err != nil {
-		return 0, errors.Wrap(err, "cluster alloc shard id failed")
+		return 0, errors.WithMessage(err, "cluster alloc shard id failed")
 	}
 	return uint32(id), nil
 }
