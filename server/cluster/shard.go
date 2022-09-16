@@ -3,8 +3,11 @@
 package cluster
 
 import (
+	"context"
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/looplab/fsm"
+	"github.com/pkg/errors"
 )
 
 type Shard struct {
@@ -51,7 +54,88 @@ var (
 		{Name: EventPrepareTransferLeader, Src: []string{StateFollower}, Dst: StatePendingLeader},
 	}
 
-	callbacks = fsm.Callbacks{}
+	callbacks = fsm.Callbacks{
+		EventTransferLeader: func(event *fsm.Event) {
+			ctx := event.Args[0].(context.Context)
+			c := event.Args[1].(*coordinator)
+			newLeaderNode := event.Args[2].(string)
+			oldLeaderShardId := event.Args[3].(uint32)
+			newLeaderShardId := event.Args[4].(uint32)
+
+			// Send event to CeresDB, waiting for response
+			if err := c.eventHandler.Dispatch(ctx, newLeaderNode, &schedule.TransferLeaderEvent{OldLeaderShardID: oldLeaderShardId, NewLeaderShardID: newLeaderShardId}); err != nil {
+				event.Cancel(errors.Wrap(err, EventTransferLeader))
+			}
+		},
+		EventTransferFollowerFailed: func(event *fsm.Event) {
+			ctx := event.Args[0].(context.Context)
+			c := event.Args[1].(*coordinator)
+			oldLeaderNode := event.Args[2].(string)
+			oldLeaderShardId := event.Args[3].(uint32)
+			newLeaderShardId := event.Args[4].(uint32)
+			// Transfer failed, stop transfer and reset state
+			if err := c.eventHandler.Dispatch(ctx, oldLeaderNode, &schedule.TransferLeaderFailedEvent{OldLeaderShardID: oldLeaderShardId, NewLeaderShardID: newLeaderShardId}); err != nil {
+				event.Cancel(errors.Wrap(err, EventTransferFollowerFailed))
+			}
+		},
+		EventTransferFollower: func(event *fsm.Event) {
+			ctx := event.Args[0].(context.Context)
+			c := event.Args[1].(*coordinator)
+			oldLeaderNode := event.Args[2].(string)
+			oldLeaderShardId := event.Args[3].(uint32)
+			newLeaderShardId := event.Args[4].(uint32)
+
+			if err := c.eventHandler.Dispatch(ctx, oldLeaderNode, &schedule.TransferLeaderEvent{OldLeaderShardID: oldLeaderShardId, NewLeaderShardID: newLeaderShardId}); err != nil {
+				event.Cancel(errors.Wrap(err, EventTransferFollower))
+			}
+		},
+		EventTransferLeaderFailed: func(event *fsm.Event) {
+			// Transfer failed, stop transfer and reset state
+			ctx := event.Args[0].(context.Context)
+			c := event.Args[1].(*coordinator)
+			newLeaderNode := event.Args[2].(string)
+			oldLeaderShardId := event.Args[3].(uint32)
+			newLeaderShardId := event.Args[4].(uint32)
+			// Transfer failed, stop transfer and reset state
+			if err := c.eventHandler.Dispatch(ctx, newLeaderNode, &schedule.TransferLeaderFailedEvent{OldLeaderShardID: oldLeaderShardId, NewLeaderShardID: newLeaderShardId}); err != nil {
+				event.Cancel(errors.Wrap(err, EventTransferLeaderFailed))
+			}
+		},
+		EventPrepareTransferFollower: func(event *fsm.Event) {
+			ctx := event.Args[0].(context.Context)
+			c := event.Args[1].(*coordinator)
+			oldLeaderShardId := event.Args[2].(uint32)
+			// Update Etcd
+			if clusterTopology, err := c.cluster.storage.GetClusterTopology(ctx, c.cluster.clusterID); err != nil {
+				event.Cancel(errors.Wrap(err, EventPrepareTransferFollower))
+			} else {
+				shardViews := clusterTopology.ShardView
+				for _, shard := range shardViews {
+					if shard.GetId() == oldLeaderShardId {
+						//shard.ShardRole = clusterpb.ShardRole_PENDING_FOLLOWER
+					}
+				}
+				c.cluster.storage.PutClusterTopology(ctx, c.cluster.clusterID, c.cluster.metaData.clusterTopology.Version, clusterTopology)
+			}
+		},
+		EventPrepareTransferLeader: func(event *fsm.Event) {
+			ctx := event.Args[0].(context.Context)
+			c := event.Args[1].(*coordinator)
+			newLeaderShardId := event.Args[2].(uint32)
+			// Update Etcd
+			if clusterTopology, err := c.cluster.storage.GetClusterTopology(ctx, c.cluster.clusterID); err != nil {
+				event.Cancel(errors.Wrap(err, EventPrepareTransferLeader))
+			} else {
+				shardViews := clusterTopology.ShardView
+				for _, shard := range shardViews {
+					if shard.GetId() == newLeaderShardId {
+						//shard.ShardRole = clusterpb.ShardRole_PENDING_LEADER
+					}
+				}
+				c.cluster.storage.PutClusterTopology(ctx, c.cluster.clusterID, c.cluster.metaData.clusterTopology.Version, clusterTopology)
+			}
+		},
+	}
 )
 
 // NewFSM
