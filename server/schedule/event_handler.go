@@ -35,6 +35,54 @@ func (open *OpenEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
 	}
 }
 
+type CloseEvent struct {
+	ShardIDs []uint32
+}
+
+func (open *CloseEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
+	return &metaservicepb.NodeHeartbeatResponse{
+		Timestamp: uint64(time.Now().UnixMilli()),
+		Cmd: &metaservicepb.NodeHeartbeatResponse_CloseCmd{
+			CloseCmd: &metaservicepb.CloseCmd{
+				ShardIds: open.ShardIDs,
+			},
+		},
+	}
+}
+
+type TransferLeaderEvent struct {
+	OldLeaderShardID uint32
+	NewLeaderShardID uint32
+}
+
+func (open *TransferLeaderEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
+	return &metaservicepb.NodeHeartbeatResponse{
+		Timestamp: uint64(time.Now().UnixMilli()),
+		Cmd: &metaservicepb.NodeHeartbeatResponse_ChangeRoleCmd{
+			ChangeRoleCmd: &metaservicepb.ChangeRoleCmd{
+				// TODO: fix params
+			},
+		},
+	}
+}
+
+type TransferLeaderFailedEvent struct {
+	OldLeaderShardID uint32
+	NewLeaderShardID uint32
+}
+
+func (open *TransferLeaderFailedEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
+	// TODO : Use the correct call
+	return &metaservicepb.NodeHeartbeatResponse{
+		Timestamp: uint64(time.Now().UnixMilli()),
+		Cmd: &metaservicepb.NodeHeartbeatResponse_ChangeRoleCmd{
+			ChangeRoleCmd: &metaservicepb.ChangeRoleCmd{
+				// TODO: fix params
+			},
+		},
+	}
+}
+
 type EventHandler struct {
 	hbstreams *HeartbeatStreams
 }
