@@ -11,7 +11,8 @@ type Write interface {
 // nolint
 type Meta struct {
 	id      uint64
-	typ     uint8
+	typ     procedureType
+	state   State
 	rawData []byte
 }
 

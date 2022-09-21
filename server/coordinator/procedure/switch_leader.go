@@ -8,7 +8,7 @@ func NewSwitchLeaderProcedure() *SwitchLeaderProcedure {
 	return nil
 }
 
-func LoadSwitchLeaderProcedure(_ []byte) *SwitchLeaderProcedure {
+func LoadSwitchLeaderProcedure(_ *Meta) *SwitchLeaderProcedure {
 	return nil
 }
 
