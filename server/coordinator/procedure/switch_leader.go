@@ -1,3 +1,5 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package procedure
 
 import (
@@ -21,7 +23,7 @@ func (s *SwitchLeaderProcedure) ID() uint64 {
 	return 0
 }
 
-func (s *SwitchLeaderProcedure) Type() procedureType {
+func (s *SwitchLeaderProcedure) Type() Typ {
 	return switchLeader
 }
 

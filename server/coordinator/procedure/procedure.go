@@ -13,10 +13,10 @@ const (
 	StateCancelled = "cancelled"
 )
 
-type procedureType = uint
+type Typ = uint
 
 const (
-	switchLeader procedureType = iota
+	switchLeader Typ = iota
 	mergeShard
 )
 
@@ -26,7 +26,7 @@ type Procedure interface {
 	ID() uint64
 
 	// Type of the procedure.
-	Type() procedureType
+	Type() Typ
 
 	// Start the procedure.
 	Start(ctx context.Context) error

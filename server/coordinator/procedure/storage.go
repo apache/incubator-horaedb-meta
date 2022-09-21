@@ -1,3 +1,5 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package procedure
 
 import (
@@ -10,13 +12,13 @@ type Write interface {
 
 // nolint
 type Meta struct {
-	id      uint64
-	typ     procedureType
-	state   State
-	rawData []byte
+	ID      uint64
+	Typ     Typ
+	State   State
+	RawData []byte
 }
 
 type Storage interface {
 	Write
-	List(ctx context.Context, state State) (*Meta, error)
+	Scan(ctx context.Context, batchSize uint, state State, meta []*Meta) error
 }
