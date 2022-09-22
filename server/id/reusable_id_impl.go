@@ -2,6 +2,7 @@ package id
 
 import (
 	"context"
+	"sort"
 	"sync"
 )
 
@@ -9,47 +10,44 @@ type ReusableAllocatorImpl struct {
 	// RWMutex is used to protect following fields.
 	lock sync.Mutex
 
-	idQueue     []uint64
-	maxShardNum uint64
+	minID    uint64
+	existIDs []uint64
 }
 
-func NewReusableAllocatorImpl(maxShardNum uint64) *ReusableAllocatorImpl {
-	// Init id queue
-	var queue []uint64
-	for i := uint64(0); i < maxShardNum; i++ {
-		queue = append(queue, i)
-	}
-
-	return &ReusableAllocatorImpl{
-		idQueue:     queue,
-		maxShardNum: maxShardNum,
-	}
-}
-
-func (a *ReusableAllocatorImpl) isExhausted() bool {
-	return len(a.idQueue) == 0
-}
-
-func (a *ReusableAllocatorImpl) Collect(id uint64) error {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-	if id >= a.maxShardNum {
-		return ErrCollectID.WithCausef("ID is invalid, id:%d can not greater than maxShardNum:%d", id, a.maxShardNum)
-	}
-	a.idQueue = append(a.idQueue, id)
-	return nil
+func NewReusableAllocatorImpl(existIDs []uint64, minID uint64) *ReusableAllocatorImpl {
+	return &ReusableAllocatorImpl{minID: minID, existIDs: existIDs}
 }
 
 func (a *ReusableAllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-
-	if a.isExhausted() {
-		return 0, ErrAllocID.WithCausef("ID is exhausted, maxShardNum:%d", a.maxShardNum)
+	var next uint64
+	// sort existIDs, find minimum number bigger than minID
+	sort.Slice(a.existIDs, func(i, j int) bool {
+		return a.existIDs[i] < a.existIDs[j]
+	})
+	if a.existIDs[0] > a.minID {
+		next = a.minID
+		a.existIDs = append(a.existIDs, next)
+		return next, nil
 	}
+	for i := 0; i < len(a.existIDs); i++ {
+		if i == len(a.existIDs)-1 || a.existIDs[i]+1 != a.existIDs[i+1] {
+			next = a.existIDs[i] + 1
+			break
+		}
+	}
+	a.existIDs = append(a.existIDs, next)
+	return next, nil
+}
 
-	ret := a.idQueue[0]
-	a.idQueue = a.idQueue[1:]
-
-	return ret, nil
+func (a *ReusableAllocatorImpl) Collect(ctx context.Context, id uint64) error {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	for i := 0; i < len(a.existIDs); i++ {
+		if a.existIDs[i] == id {
+			a.existIDs = append(a.existIDs[:i], a.existIDs[i+1:]...)
+		}
+	}
+	return nil
 }
