@@ -38,7 +38,7 @@ var (
 
 			// When `Replication_Factor` == 1, newLeader is nil, find a suitable node and create a newFollower as newLeader
 			if p.newLeader == nil {
-				targetNode, err := c.ClusterBalancer.SelectNode()
+				targetNode, err := c.GetClusterBalancer().SelectNode()
 				if err != nil {
 					event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
 				}
@@ -51,9 +51,9 @@ var (
 				newFollowerShard := &clusterpb.Shard{
 					Id:        shardId,
 					ShardRole: clusterpb.ShardRole_FOLLOWER,
-					Node:      targetNode.Meta.Name,
+					Node:      targetNode.GetMeta().Name,
 				}
-				if err := handler.Dispatch(ctx, targetNode.Meta.GetName(), &schedule.OpenEvent{ShardIDs: []uint32{shardId}}); err != nil {
+				if err := handler.Dispatch(ctx, targetNode.GetMeta().GetName(), &schedule.OpenEvent{ShardIDs: []uint32{shardId}}); err != nil {
 					event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
 				}
 				p.newLeader = newFollowerShard
@@ -126,7 +126,7 @@ var (
 			ctx := request.cxt
 
 			// Update cluster topology
-			currentTopology := c.MetaData.ClusterTopology
+			currentTopology := c.GetMetaData().GetClusterTopology()
 			for i := 0; i < len(currentTopology.ShardView); i++ {
 				shardId := currentTopology.ShardView[i].Id
 				if shardId == p.oldLeader.Id {
@@ -137,7 +137,7 @@ var (
 				}
 			}
 
-			if err := c.Storage.PutClusterTopology(ctx, c.ClusterID, c.MetaData.ClusterTopology.Version, c.MetaData.ClusterTopology); err != nil {
+			if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, c.GetMetaData().GetClusterTopology()); err != nil {
 				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
 			}
 

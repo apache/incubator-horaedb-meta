@@ -60,7 +60,7 @@ var (
 			c := request.C
 			oldLeaderShardId := request.OldLeaderShardId
 			// Update Etcd
-			if clusterTopology, err := c.Storage.GetClusterTopology(ctx, c.ClusterID); err != nil {
+			if clusterTopology, err := c.GetStorage().GetClusterTopology(ctx, c.clusterID); err != nil {
 				event.Cancel(errors.Wrap(err, EventPrepareTransferFollower))
 			} else {
 				shardViews := clusterTopology.ShardView
@@ -69,7 +69,7 @@ var (
 						//shard.ShardRole = clusterpb.ShardRole_PENDING_FOLLOWER
 					}
 				}
-				c.Storage.PutClusterTopology(ctx, c.ClusterID, c.MetaData.ClusterTopology.Version, clusterTopology)
+				c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, clusterTopology)
 			}
 		},
 		EventTransferFollower: func(event *fsm.Event) {
@@ -113,7 +113,7 @@ var (
 			newLeaderShardId := request.NewLeaderShardId
 
 			// Update Etcd
-			if clusterTopology, err := c.Storage.GetClusterTopology(ctx, c.ClusterID); err != nil {
+			if clusterTopology, err := c.GetStorage().GetClusterTopology(ctx, c.GetClusterID()); err != nil {
 				event.Cancel(errors.Wrap(err, EventPrepareTransferLeader))
 			} else {
 				shardViews := clusterTopology.ShardView
@@ -122,7 +122,7 @@ var (
 						//shard.ShardRole = clusterpb.ShardRole_PENDING_LEADER
 					}
 				}
-				c.Storage.PutClusterTopology(ctx, c.ClusterID, c.MetaData.ClusterTopology.Version, clusterTopology)
+				c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, clusterTopology)
 			}
 		},
 		EventTransferLeader: func(event *fsm.Event) {
