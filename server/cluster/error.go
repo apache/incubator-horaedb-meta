@@ -15,7 +15,4 @@ var (
 	ErrNodeNotFound            = coderr.NewCodeError(coderr.NotFound, "node not found")
 	ErrNodeShardsIsEmpty       = coderr.NewCodeError(coderr.Internal, "node's shard list is empty")
 	ErrGetShardTopology        = coderr.NewCodeError(coderr.Internal, "get shard topology")
-
-	ErrSplitShard = coderr.NewCodeError(coderr.Internal, "split shard")
-	ErrMergeShard = coderr.NewCodeError(coderr.Internal, "merge shard")
 )

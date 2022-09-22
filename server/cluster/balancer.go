@@ -16,7 +16,7 @@ const (
 	StrategyTableBalance = 2
 )
 
-func (balancer *clusterBalancer) selectNode() *Node {
+func (balancer *clusterBalancer) SelectNode() (*Node, error) {
 	// default impl is select a random node
 	switch balancer.balanceStrategy {
 	case StrategyRandom:
@@ -25,7 +25,7 @@ func (balancer *clusterBalancer) selectNode() *Node {
 		i := 0
 		for _, x := range nodeCache {
 			if i == k {
-				return x
+				return x, nil
 			}
 			i++
 		}
@@ -36,5 +36,5 @@ func (balancer *clusterBalancer) selectNode() *Node {
 		break
 	}
 
-	return nil
+	return nil, nil
 }

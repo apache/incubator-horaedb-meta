@@ -5,6 +5,6 @@ package cluster
 import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 
 type Node struct {
-	meta     *clusterpb.Node
+	Meta     *clusterpb.Node
 	shardIDs []uint32
 }
