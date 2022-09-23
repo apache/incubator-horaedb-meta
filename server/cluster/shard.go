@@ -3,9 +3,10 @@
 package cluster
 
 import (
-	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"sync"
 	"time"
+
+	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 )
 
 type Shard struct {
@@ -39,10 +40,8 @@ var (
 func getShardLock(shardID uint32) *ShardWithLock {
 	mapLock.Lock()
 	defer mapLock.Unlock()
-	lock, ok := shardLockMap[shardID]
-	if ok {
-		return lock
-	} else {
+	_, ok := shardLockMap[shardID]
+	if !ok {
 		shardLockMap[shardID] = &ShardWithLock{shardID: shardID, lock: sync.Mutex{}}
 	}
 	return shardLockMap[shardID]
@@ -59,12 +58,12 @@ func LockShardByIDWithRetry(shardID uint32, maxRetrySize int, waitDuration time.
 	if maxRetrySize == 0 {
 		return false
 	}
+	result := true
 	if !lockResult {
 		time.Sleep(waitDuration)
-		return LockShardByIDWithRetry(shardID, maxRetrySize-1, waitDuration)
-	} else {
-		return true
+		result = LockShardByIDWithRetry(shardID, maxRetrySize-1, waitDuration)
 	}
+	return result
 }
 
 func UnlockShardByID(shardID uint32) {

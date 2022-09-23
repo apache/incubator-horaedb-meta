@@ -4,6 +4,4 @@ package procedure
 
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
-var (
-	ErrLockShard = coderr.NewCodeError(coderr.Internal, "lock shard failed")
-)
+var ErrLockShard = coderr.NewCodeError(coderr.Internal, "lock shard failed")

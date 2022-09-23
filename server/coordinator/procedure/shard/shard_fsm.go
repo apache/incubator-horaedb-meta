@@ -7,7 +7,7 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
-	"github.com/CeresDB/ceresmeta/server/schedule"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
 )
@@ -39,45 +39,45 @@ var (
 	leaderFsmCallbacks = fsm.Callbacks{
 		EventPrepareTransferFollower: func(event *fsm.Event) {
 			request := event.Args[0].(*LeaderCallbackRequest)
-
 			ctx := request.Ctx
 			c := request.C
-			oldLeaderShardId := request.OldLeaderShardId
+			oldLeaderShardID := request.OldLeaderShardID
+
 			// Update Etcd
 			if clusterTopology, err := c.GetStorage().GetClusterTopology(ctx, c.GetClusterID()); err != nil {
 				event.Cancel(errors.Wrap(err, EventPrepareTransferFollower))
 			} else {
 				shardViews := clusterTopology.ShardView
 				for _, shard := range shardViews {
-					if shard.GetId() == oldLeaderShardId {
+					// nolint
+					if shard.GetId() == oldLeaderShardID {
+						// TODO: add ShardRole enum in clusterpb
 						// shard.ShardRole = clusterpb.ShardRole_PENDING_FOLLOWER
 					}
 				}
-				c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, clusterTopology)
+				if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, clusterTopology); err != nil {
+					event.Cancel(errors.Wrap(err, EventPrepareTransferFollower))
+				}
 			}
 		},
 		EventTransferFollower: func(event *fsm.Event) {
 			request := event.Args[0].(*LeaderCallbackRequest)
-
-			ctx := request.Ctx
-			handler := request.Handler
+			dispatch := request.Dispatch
 			oldLeaderNode := request.OldLeaderNode
-			oldLeaderShardId := request.OldLeaderShardId
+			oldLeaderShardID := request.OldLeaderShardID
 
-			if err := handler.Dispatch(ctx, oldLeaderNode, &schedule.CloseEvent{ShardIDs: []uint32{oldLeaderShardId}}); err != nil {
-				event.Cancel(errors.Wrap(err, EventTransferFollower))
+			if result, err := dispatch.SendCloseEvent([]uint32{oldLeaderShardID}, oldLeaderNode); err != nil || !result {
+				event.Cancel(errors.Wrap(err, EventTransferFollowerFailed))
 			}
 		},
 		EventTransferFollowerFailed: func(event *fsm.Event) {
 			request := event.Args[0].(*LeaderCallbackRequest)
-
-			ctx := request.Ctx
-			handler := request.Handler
+			disPatch := request.Dispatch
 			oldLeaderNode := request.OldLeaderNode
-			oldLeaderShardId := request.OldLeaderShardId
+			oldLeaderShardID := request.OldLeaderShardID
 
 			// Transfer failed, stop transfer and reset state
-			if err := handler.Dispatch(ctx, oldLeaderNode, &schedule.OpenEvent{ShardIDs: []uint32{oldLeaderShardId}}); err != nil {
+			if result, err := disPatch.SendOpenEvent([]uint32{oldLeaderShardID}, oldLeaderNode); err != nil || !result {
 				event.Cancel(errors.Wrap(err, EventTransferFollowerFailed))
 			}
 		},
@@ -91,10 +91,9 @@ var (
 	followerFsmCallbacks = fsm.Callbacks{
 		EventPrepareTransferLeader: func(event *fsm.Event) {
 			request := event.Args[0].(*FollowerCallbackRequest)
-
 			ctx := request.Ctx
 			c := request.C
-			newLeaderShardId := request.NewLeaderShardId
+			newLeaderShardID := request.NewLeaderShardID
 
 			// Update Etcd
 			if clusterTopology, err := c.GetStorage().GetClusterTopology(ctx, c.GetClusterID()); err != nil {
@@ -102,36 +101,36 @@ var (
 			} else {
 				shardViews := clusterTopology.ShardView
 				for _, shard := range shardViews {
-					if shard.GetId() == newLeaderShardId {
+					// nolint
+					if shard.GetId() == newLeaderShardID {
+						// TODO: add ShardRole enum in clusterpb
 						// shard.ShardRole = clusterpb.ShardRole_PENDING_LEADER
 					}
 				}
-				c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, clusterTopology)
+				if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, clusterTopology); err != nil {
+					event.Cancel(errors.Wrap(err, EventPrepareTransferLeader))
+				}
 			}
 		},
 		EventTransferLeader: func(event *fsm.Event) {
 			request := event.Args[0].(*FollowerCallbackRequest)
-
-			ctx := request.Ctx
-			handler := request.Handler
+			dispatch := request.Dispatch
 			newLeaderNode := request.NewLeaderNode
-			newLeaderShardId := request.NewLeaderShardId
+			newLeaderShardID := request.NewLeaderShardID
 
 			// Send event to CeresDB, waiting for response
-			if err := handler.Dispatch(ctx, newLeaderNode, &schedule.OpenEvent{ShardIDs: []uint32{newLeaderShardId}}); err != nil {
+			if result, err := dispatch.SendOpenEvent([]uint32{newLeaderShardID}, newLeaderNode); err != nil || !result {
 				event.Cancel(errors.Wrap(err, EventTransferLeader))
 			}
 		},
 		EventTransferLeaderFailed: func(event *fsm.Event) {
 			request := event.Args[0].(*FollowerCallbackRequest)
-
-			ctx := request.Ctx
-			handler := request.Handler
+			dispatch := request.Dispatch
 			newLeaderNode := request.NewLeaderNode
-			newLeaderShardId := request.NewLeaderShardId
+			newLeaderShardID := request.NewLeaderShardID
 
 			// Transfer failed, stop transfer and reset state
-			if err := handler.Dispatch(ctx, newLeaderNode, &schedule.CloseEvent{ShardIDs: []uint32{newLeaderShardId}}); err != nil {
+			if result, err := dispatch.SendCloseEvent([]uint32{newLeaderShardID}, newLeaderNode); err != nil || !result {
 				event.Cancel(errors.Wrap(err, EventTransferLeaderFailed))
 			}
 		},
@@ -139,21 +138,21 @@ var (
 )
 
 type LeaderCallbackRequest struct {
-	Ctx     context.Context
-	C       *cluster.Cluster
-	Handler *schedule.EventHandler
+	Ctx      context.Context
+	C        *cluster.Cluster
+	Dispatch dispatch.EventDispatch
 
 	OldLeaderNode    string
-	OldLeaderShardId uint32
+	OldLeaderShardID uint32
 }
 
 type FollowerCallbackRequest struct {
-	Ctx     context.Context
-	C       *cluster.Cluster
-	Handler *schedule.EventHandler
+	Ctx      context.Context
+	C        *cluster.Cluster
+	Dispatch dispatch.EventDispatch
 
 	NewLeaderNode    string
-	NewLeaderShardId uint32
+	NewLeaderShardID uint32
 }
 
 // NewShardFSM

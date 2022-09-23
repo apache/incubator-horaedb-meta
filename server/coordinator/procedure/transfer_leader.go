@@ -7,11 +7,15 @@ import (
 	"sort"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/pkg/log"
+	"go.uber.org/zap"
+
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
+
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/shard"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
-	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
 )
@@ -43,7 +47,7 @@ var (
 			request := event.Args[0].(*TransferLeaderCallbackRequest)
 			p := request.p
 			c := request.c
-			handler := request.handler
+			dispatch := request.dispatch
 			ctx := request.cxt
 			leaderFsm := request.leaderFsm
 			followerFsm := request.followerFsm
@@ -51,40 +55,39 @@ var (
 			leaderCallbackRequest := &shard.LeaderCallbackRequest{
 				Ctx:              ctx,
 				C:                c,
-				Handler:          handler,
-				OldLeaderShardId: p.oldLeader.Id,
+				Dispatch:         dispatch,
+				OldLeaderShardID: p.oldLeader.Id,
 				OldLeaderNode:    p.oldLeader.Node,
 			}
 
 			followerCallbackRequest := &shard.FollowerCallbackRequest{
 				Ctx:              ctx,
 				C:                c,
-				Handler:          handler,
-				NewLeaderShardId: p.newLeader.Id,
+				Dispatch:         dispatch,
+				NewLeaderShardID: p.newLeader.Id,
 				NewLeaderNode:    p.newLeader.Node,
 			}
 
 			if err := leaderFsm.Event(shard.EventPrepareTransferFollower, leaderCallbackRequest); err != nil {
-				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
+				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
 			}
 			if err := followerFsm.Event(shard.EventPrepareTransferLeader, followerCallbackRequest); err != nil {
-				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
+				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
 			}
 
 			// Leader transfer first, follower wait until leader transfer finish
 			if err := leaderFsm.Event(shard.EventTransferFollower, leaderCallbackRequest); err != nil {
-				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
+				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
 			}
 			if err := followerFsm.Event(shard.EventTransferLeader, followerCallbackRequest); err != nil {
-				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
+				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
 			}
-
 		},
 		EventTransferLeaderFailed: func(event *fsm.Event) {
 			request := event.Args[0].(*TransferLeaderCallbackRequest)
 			p := request.p
 			c := request.c
-			handler := request.handler
+			dispatch := request.dispatch
 			ctx := request.cxt
 			leaderFsm := request.leaderFsm
 			followerFsm := request.followerFsm
@@ -92,21 +95,25 @@ var (
 			leaderCallbackRequest := &shard.LeaderCallbackRequest{
 				Ctx:              ctx,
 				C:                c,
-				Handler:          handler,
-				OldLeaderShardId: p.oldLeader.Id,
+				Dispatch:         dispatch,
+				OldLeaderShardID: p.oldLeader.Id,
 				OldLeaderNode:    p.oldLeader.Node,
 			}
 
 			followerCallbackRequest := &shard.FollowerCallbackRequest{
 				Ctx:              ctx,
 				C:                c,
-				Handler:          handler,
-				NewLeaderShardId: p.newLeader.Id,
+				Dispatch:         dispatch,
+				NewLeaderShardID: p.newLeader.Id,
 				NewLeaderNode:    p.newLeader.Node,
 			}
 
-			leaderFsm.Event(shard.EventTransferFollowerFailed, leaderCallbackRequest)
-			followerFsm.Event(shard.EventTransferLeaderFailed, followerCallbackRequest)
+			if err := leaderFsm.Event(shard.EventTransferFollowerFailed, leaderCallbackRequest); err != nil {
+				log.Error("transfer follower rollback failed", zap.Error(err))
+			}
+			if err := followerFsm.Event(shard.EventTransferLeaderFailed, followerCallbackRequest); err != nil {
+				log.Error("transfer leader rollback failed", zap.Error(err))
+			}
 		},
 		EventTransferLeaderSuccess: func(event *fsm.Event) {
 			request := event.Args[0].(*TransferLeaderCallbackRequest)
@@ -117,21 +124,21 @@ var (
 			// Update cluster topology
 			currentTopology := c.GetMetaData().GetClusterTopology()
 			for i := 0; i < len(currentTopology.ShardView); i++ {
-				shardId := currentTopology.ShardView[i].Id
-				if shardId == p.oldLeader.Id {
+				shardID := currentTopology.ShardView[i].Id
+				if shardID == p.oldLeader.Id {
 					currentTopology.ShardView[i].ShardRole = clusterpb.ShardRole_FOLLOWER
 				}
-				if shardId == p.newLeader.Id {
+				if shardID == p.newLeader.Id {
 					currentTopology.ShardView[i].ShardRole = clusterpb.ShardRole_LEADER
 				}
 			}
 
 			if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, c.GetMetaData().GetClusterTopology()); err != nil {
-				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
+				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
 			}
 
 			if err := c.Load(ctx); err != nil {
-				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start "))
+				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
 			}
 		},
 	}
@@ -149,10 +156,10 @@ type TransferLeaderProcedure struct {
 
 // TransferLeaderCallbackRequest is fsm callbacks request param
 type TransferLeaderCallbackRequest struct {
-	p       *TransferLeaderProcedure
-	c       *cluster.Cluster
-	handler *schedule.EventHandler
-	cxt     context.Context
+	p        *TransferLeaderProcedure
+	c        *cluster.Cluster
+	dispatch dispatch.EventDispatch
+	cxt      context.Context
 
 	leaderFsm   *fsm.FSM
 	followerFsm *fsm.FSM
@@ -190,18 +197,21 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 			return ErrLockShard.WithCausef("lock shard failed, ShardID=%d ,MaxLockRetrySize=%d, LockWaitDuration=%s", ID, MaxLockRetrySize, LockWaitDuration)
 		}
 	}
-
 	transferLeaderRequest := &TransferLeaderCallbackRequest{
 		p:           p,
 		c:           p.c,
+		dispatch:    dispatch.NewEventDispatchImpl(),
 		cxt:         ctx,
 		leaderFsm:   shard.NewShardFSM(clusterpb.ShardRole_LEADER),
 		followerFsm: shard.NewShardFSM(clusterpb.ShardRole_FOLLOWER),
 	}
 
 	if err := p.fsm.Event(EventTransferLeaderPrepare, transferLeaderRequest); err != nil {
-		err := p.fsm.Event(EventTransferLeaderFailed, transferLeaderRequest)
 		p.state = StateFailed
+		if err := p.fsm.Event(EventTransferLeaderFailed, transferLeaderRequest); err != nil {
+			// TODO: EventTransferLeaderFailed event failed, how to process rollback invalid?
+			return errors.WithMessage(err, "coordinator transferLeaderShard")
+		}
 		return errors.WithMessage(err, "coordinator transferLeaderShard")
 	}
 
@@ -209,7 +219,9 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 		return errors.WithMessage(err, "coordinator transferLeaderShard")
 	}
 
-	for _, ID := range shardIDs {
+	// Unlock shard in reverse order
+	for i := len(shardIDs) - 1; i >= 0; i-- {
+		ID := shardIDs[i]
 		cluster.UnlockShardByID(ID)
 	}
 

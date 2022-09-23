@@ -2,19 +2,24 @@
 
 package dispatch
 
-import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+import (
+	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+)
 
-type EventDispatchImpl struct {
+type EventDispatchImpl struct{}
+
+func NewEventDispatchImpl() *EventDispatchImpl {
+	return &EventDispatchImpl{}
 }
 
-func (d *EventDispatchImpl) SendOpenEvent(ShardIDs []uint32, targetNode string) (bool, error) {
+func (d *EventDispatchImpl) SendOpenEvent(shardIDs []uint32, targetNode string) (bool, error) {
 	return false, nil
 }
 
-func (d *EventDispatchImpl) SendCloseEvent(ShardIDs []uint32, targetNode string) (bool, error) {
+func (d *EventDispatchImpl) SendCloseEvent(shardIDs []uint32, targetNode string) (bool, error) {
 	return false, nil
 }
 
-func (d *EventDispatchImpl) SendChangeRoleEvent(ShardID uint32, shardRole clusterpb.ShardRole, targetNode string) (bool, error) {
+func (d *EventDispatchImpl) SendChangeRoleEvent(shardID uint32, shardRole clusterpb.ShardRole, targetNode string) (bool, error) {
 	return false, nil
 }

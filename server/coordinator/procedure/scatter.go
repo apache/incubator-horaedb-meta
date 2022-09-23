@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"context"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -31,9 +32,9 @@ var (
 	}
 	ScatterCallbacks = fsm.Callbacks{
 		EventScatterPrepare: func(event *fsm.Event) {
-			request := event.Args[0].(*ScatterCallbackRequest)
 			// FIXME: The following logic is used for static topology, which is a bit simple and violent.
 			// It needs to be modified when supporting dynamic topology.
+			request := event.Args[0].(*ScatterCallbackRequest)
 			c := request.c
 			handler := request.handler
 			nodeInfo := request.nodeInfo
@@ -95,10 +96,10 @@ var (
 			}
 		},
 		EventScatterFailed: func(event *fsm.Event) {
-
+			// nolint
 		},
 		EventScatterSuccess: func(event *fsm.Event) {
-
+			// nolint
 		},
 	}
 )
@@ -126,14 +127,12 @@ func NewScatterProcedure(cluster *cluster.Cluster, nodeInfo *metaservicepb.NodeI
 }
 
 type ScatterCallbackRequest struct {
-	p       *TransferLeaderProcedure
+	p       *ScatterProcedure
 	c       *cluster.Cluster
 	handler *schedule.EventHandler
 	cxt     context.Context
 
-	leaderFsm   *fsm.FSM
-	followerFsm *fsm.FSM
-	nodeInfo    *metaservicepb.NodeInfo
+	nodeInfo *metaservicepb.NodeInfo
 }
 
 func (p *ScatterProcedure) ID() uint64 {
@@ -147,6 +146,25 @@ func (p *ScatterProcedure) Type() Type {
 func (p *ScatterProcedure) Start(ctx context.Context) error {
 	p.state = StateRunning
 
+	request := ScatterCallbackRequest{
+		p:        p,
+		c:        p.c,
+		handler:  p.handler,
+		cxt:      ctx,
+		nodeInfo: p.nodeInfo,
+	}
+	if err := p.fsm.Event(EventScatterPrepare); err != nil {
+		p.state = StateFailed
+		if err := p.fsm.Event(EventScatterFailed, request); err != nil {
+			// TODO: EventTransferLeaderFailed event failed, how to process rollback invalid?
+			return errors.WithMessage(err, "coordinator scatter shard")
+		}
+		return errors.WithMessage(err, "coordinator scatter shard")
+	}
+
+	if err := p.fsm.Event(EventScatterPrepare, request); err != nil {
+		return errors.WithMessage(err, "coordinator scatter shard")
+	}
 	p.state = StateFinished
 	return nil
 }
