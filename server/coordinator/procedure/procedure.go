@@ -17,15 +17,16 @@ const (
 	StateCancelled = "cancelled"
 )
 
-type ShardOperationType uint
+type Type uint
 
 const (
-	ShardOperationTypeCreate ShardOperationType = iota
-	ShardOperationTypeDelete
-	ShardOperationTypeTransferLeader
-	ShardOperationTypeMigrate
-	ShardOperationTypeSplit
-	ShardOperationTypeMerge
+	Create Type = iota
+	Delete
+	TransferLeader
+	Migrate
+	Split
+	Merge
+	Scatter
 )
 
 // Procedure is used to describe how to execute a set of operations from the scheduler, e.g. SwitchLeaderProcedure, MergeShardProcedure.
@@ -34,7 +35,7 @@ type Procedure interface {
 	ID() uint64
 
 	// Type of the procedure.
-	Type() ShardOperationType
+	Type() Type
 
 	// Start the procedure.
 	Start(ctx context.Context) error
@@ -52,20 +53,21 @@ type Manager struct {
 	procedures []Procedure
 }
 
-func NewProcedure(operationType ShardOperationType) *fsm.FSM {
+func NewProcedure(operationType Type) *fsm.FSM {
 	switch operationType {
-	case ShardOperationTypeCreate:
+	case Create:
 		return nil
-	case ShardOperationTypeDelete:
+	case Delete:
 		return nil
-	case ShardOperationTypeTransferLeader:
-		//NewTransferLeaderProcedure()
+	case TransferLeader:
 		return nil
-	case ShardOperationTypeMigrate:
+	case Migrate:
 		return nil
-	case ShardOperationTypeSplit:
+	case Split:
 		return nil
-	case ShardOperationTypeMerge:
+	case Merge:
+		return nil
+	case Scatter:
 		return nil
 	}
 

@@ -13,7 +13,7 @@ type Write interface {
 // nolint
 type Meta struct {
 	ID      uint64
-	Typ     ShardOperationType
+	Typ     Type
 	State   State
 	RawData []byte
 }

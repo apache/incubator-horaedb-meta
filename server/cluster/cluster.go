@@ -22,6 +22,10 @@ type metaData struct {
 	clusterTopology *clusterpb.ClusterTopology
 }
 
+func (m metaData) GetCluster() *clusterpb.Cluster {
+	return m.cluster
+}
+
 func (m metaData) GetClusterTopology() *clusterpb.ClusterTopology {
 	return m.clusterTopology
 }
@@ -39,19 +43,16 @@ type Cluster struct {
 	storage       storage.Storage
 	kv            clientv3.KV
 	hbstream      *schedule.HeartbeatStreams
-	coordinator   *coordinator
 	schemaIDAlloc id.Allocator
 	tableIDAlloc  id.Allocator
+}
 
-	clusterBalancer *clusterBalancer
+func (c *Cluster) GetNodesCache() map[string]*Node {
+	return c.nodesCache
 }
 
 func (c *Cluster) GetStorage() storage.Storage {
 	return c.storage
-}
-
-func (c *Cluster) GetClusterBalancer() *clusterBalancer {
-	return c.clusterBalancer
 }
 
 func (c *Cluster) GetMetaData() *metaData {
@@ -77,9 +78,6 @@ func NewCluster(meta *clusterpb.Cluster, storage storage.Storage, kv clientv3.KV
 		hbstream: hbstream,
 	}
 
-	cluster.coordinator = newCoordinator(cluster, cluster.hbstream)
-	go cluster.coordinator.runBgJob()
-
 	return cluster
 }
 
@@ -88,7 +86,6 @@ func (c *Cluster) Name() string {
 }
 
 func (c *Cluster) stop() {
-	c.coordinator.stop()
 }
 
 // Initialize the cluster topology and shard topology of the cluster.
@@ -565,7 +562,7 @@ func (c *Cluster) pickOneShardOnNode(nodeName string) (uint32, error) {
 			return 0, ErrNodeShardsIsEmpty.WithCausef("nodeName:%s", nodeName)
 		}
 
-		idx := rand.Int31n(int32(len(node.shardIDs))) //#nosec G404
+		idx := rand.Int31n(int32(len(node.shardIDs))) // #nosec G404
 		return node.shardIDs[idx], nil
 	}
 	return 0, ErrNodeNotFound.WithCausef("nodeName:%s", nodeName)
