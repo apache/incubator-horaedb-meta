@@ -1,3 +1,5 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package procedure
 
 import (
@@ -109,6 +111,18 @@ type ScatterProcedure struct {
 	c        *cluster.Cluster
 	nodeInfo *metaservicepb.NodeInfo
 	handler  *schedule.EventHandler
+}
+
+func NewScatterProcedure(cluster *cluster.Cluster, nodeInfo *metaservicepb.NodeInfo) *ScatterProcedure {
+	ScatterOperationFsm := fsm.NewFSM(
+		StateScatterBegin,
+		ScatterEvents,
+		ScatterCallbacks,
+	)
+
+	// TODO: fix id alloc
+	id := uint64(1)
+	return &ScatterProcedure{fsm: ScatterOperationFsm, id: id, state: StateInit, c: cluster, nodeInfo: nodeInfo}
 }
 
 type ScatterCallbackRequest struct {
