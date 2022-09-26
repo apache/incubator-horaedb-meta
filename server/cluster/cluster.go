@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
@@ -39,6 +40,7 @@ type Cluster struct {
 	shardsCache  map[uint32]*Shard  // shard_id -> shard
 	schemasCache map[string]*Schema // schema_name -> schema
 	nodesCache   map[string]*Node   // node_name -> node
+	shardLockMap map[uint32]*ShardWithLock
 
 	storage       storage.Storage
 	kv            clientv3.KV
@@ -665,4 +667,47 @@ func (c *Cluster) UpdateClusterTopology(ctx context.Context, shardView []*cluste
 	defer c.lock.Unlock()
 	c.metaData.clusterTopology.ShardView = shardView
 	return c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), c.metaData.clusterTopology)
+}
+
+type ShardWithLock struct {
+	shardID uint32
+	lock    sync.Mutex
+}
+
+func (c *Cluster) getShardLock(shardID uint32) *ShardWithLock {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	_, ok := c.shardLockMap[shardID]
+	if !ok {
+		c.shardLockMap[shardID] = &ShardWithLock{shardID: shardID, lock: sync.Mutex{}}
+	}
+	return c.shardLockMap[shardID]
+}
+
+func (c *Cluster) LockShardByID(shardID uint32) bool {
+	shardLock := c.getShardLock(shardID)
+	return shardLock.lock.TryLock()
+}
+
+func (c *Cluster) LockShardByIDWithRetry(shardID uint32, maxRetrySize int, waitDuration time.Duration) bool {
+	lockResult := c.LockShardByID(shardID)
+	// if lock failed, wait 1 seconds and retry
+	if maxRetrySize == 0 {
+		return false
+	}
+	result := true
+	if !lockResult {
+		time.Sleep(waitDuration)
+		result = c.LockShardByIDWithRetry(shardID, maxRetrySize-1, waitDuration)
+	}
+	return result
+}
+
+func (c *Cluster) UnlockShardByID(shardID uint32) {
+	shardLock := c.getShardLock(shardID)
+	if shardLock == nil {
+		return
+	}
+	shardLock.lock.Unlock()
+	delete(c.shardLockMap, shardID)
 }

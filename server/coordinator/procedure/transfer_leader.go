@@ -191,10 +191,10 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 	// Lock shard. To avoid deadlock, lock according ID from small to large.
 	shardIDs := []uint32{p.newLeader.Id, p.oldLeader.Id}
 	sort.Slice(shardIDs, func(i, j int) bool { return shardIDs[i] < shardIDs[j] })
-	for _, ID := range shardIDs {
-		lockResult := cluster.LockShardByIDWithRetry(ID, MaxLockRetrySize, LockWaitDuration)
+	for _, id := range shardIDs {
+		lockResult := p.c.LockShardByIDWithRetry(id, MaxLockRetrySize, LockWaitDuration)
 		if !lockResult {
-			return ErrLockShard.WithCausef("lock shard failed, ShardID=%d ,MaxLockRetrySize=%d, LockWaitDuration=%s", ID, MaxLockRetrySize, LockWaitDuration)
+			return ErrLockShard.WithCausef("lock shard failed, ShardID=%d ,MaxLockRetrySize=%d, LockWaitDuration=%s", id, MaxLockRetrySize, LockWaitDuration)
 		}
 	}
 	transferLeaderRequest := &TransferLeaderCallbackRequest{
@@ -222,7 +222,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 	// Unlock shard in reverse order.
 	for i := len(shardIDs) - 1; i >= 0; i-- {
 		ID := shardIDs[i]
-		cluster.UnlockShardByID(ID)
+		p.c.UnlockShardByID(ID)
 	}
 
 	p.state = StateFinished
