@@ -13,13 +13,16 @@ func NewEventDispatchImpl() *EventDispatchImpl {
 }
 
 func (d *EventDispatchImpl) SendOpenEvent(shardIDs []uint32, targetNode string) (bool, error) {
+	// TODO: impl later
 	return false, nil
 }
 
 func (d *EventDispatchImpl) SendCloseEvent(shardIDs []uint32, targetNode string) (bool, error) {
+	// TODO: impl later
 	return false, nil
 }
 
 func (d *EventDispatchImpl) SendChangeRoleEvent(shardID uint32, shardRole clusterpb.ShardRole, targetNode string) (bool, error) {
+	// TODO: impl later
 	return false, nil
 }
