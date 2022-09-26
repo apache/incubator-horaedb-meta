@@ -2,7 +2,9 @@
 
 package dispatch
 
-import "github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+import (
+	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+)
 
 type EventDispatch interface {
 	SendOpenEvent(ShardIDs []uint32, targetNode string) (bool, error)

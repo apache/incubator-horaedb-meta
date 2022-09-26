@@ -4,8 +4,6 @@ package procedure
 
 import (
 	"context"
-
-	"github.com/looplab/fsm"
 )
 
 type State string
@@ -54,7 +52,7 @@ type Manager struct {
 	procedures []Procedure
 }
 
-func NewProcedure(operationType Type) *fsm.FSM {
+func NewProcedure(operationType Type) *Procedure {
 	switch operationType {
 	case Create:
 		return nil

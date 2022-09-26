@@ -121,19 +121,19 @@ var (
 			c := request.c
 			ctx := request.cxt
 
-			// Update cluster topology
-			currentTopology := c.GetMetaData().GetClusterTopology()
-			for i := 0; i < len(currentTopology.ShardView); i++ {
-				shardID := currentTopology.ShardView[i].Id
+			// Update cluster topology.
+			shardView := c.GetClusterShardView()
+			for i := 0; i < len(shardView); i++ {
+				shardID := shardView[i].Id
 				if shardID == p.oldLeader.Id {
-					currentTopology.ShardView[i].ShardRole = clusterpb.ShardRole_FOLLOWER
+					shardView[i].ShardRole = clusterpb.ShardRole_FOLLOWER
 				}
 				if shardID == p.newLeader.Id {
-					currentTopology.ShardView[i].ShardRole = clusterpb.ShardRole_LEADER
+					shardView[i].ShardRole = clusterpb.ShardRole_LEADER
 				}
 			}
 
-			if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, c.GetMetaData().GetClusterTopology()); err != nil {
+			if err := c.UpdateClusterTopology(ctx, shardView); err != nil {
 				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
 			}
 
@@ -154,7 +154,7 @@ type TransferLeaderProcedure struct {
 	c         *cluster.Cluster
 }
 
-// TransferLeaderCallbackRequest is fsm callbacks request param
+// TransferLeaderCallbackRequest is fsm callbacks request param.
 type TransferLeaderCallbackRequest struct {
 	p        *TransferLeaderProcedure
 	c        *cluster.Cluster
@@ -188,7 +188,7 @@ func (p *TransferLeaderProcedure) Type() Type {
 func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 	p.state = StateRunning
 
-	// Lock shard. To avoid deadlock, lock according ID from small to large
+	// Lock shard. To avoid deadlock, lock according ID from small to large.
 	shardIDs := []uint32{p.newLeader.Id, p.oldLeader.Id}
 	sort.Slice(shardIDs, func(i, j int) bool { return shardIDs[i] < shardIDs[j] })
 	for _, ID := range shardIDs {
@@ -219,7 +219,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 		return errors.WithMessage(err, "coordinator transferLeaderShard")
 	}
 
-	// Unlock shard in reverse order
+	// Unlock shard in reverse order.
 	for i := len(shardIDs) - 1; i >= 0; i-- {
 		ID := shardIDs[i]
 		cluster.UnlockShardByID(ID)
@@ -231,6 +231,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 
 func (p *TransferLeaderProcedure) Cancel(ctx context.Context) error {
 	p.state = StateCancelled
+	// TODO: Add
 	return nil
 }
 

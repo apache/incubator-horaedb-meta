@@ -55,7 +55,7 @@ var (
 						// shard.ShardRole = clusterpb.ShardRole_PENDING_FOLLOWER
 					}
 				}
-				if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, clusterTopology); err != nil {
+				if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), clusterTopology); err != nil {
 					event.Cancel(errors.Wrap(err, EventPrepareTransferFollower))
 				}
 			}
@@ -107,7 +107,7 @@ var (
 						// shard.ShardRole = clusterpb.ShardRole_PENDING_LEADER
 					}
 				}
-				if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, clusterTopology); err != nil {
+				if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), clusterTopology); err != nil {
 					event.Cancel(errors.Wrap(err, EventPrepareTransferLeader))
 				}
 			}

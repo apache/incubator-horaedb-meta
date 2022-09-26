@@ -48,15 +48,13 @@ type Cluster struct {
 }
 
 func (c *Cluster) GetNodesCache() map[string]*Node {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	return c.nodesCache
 }
 
 func (c *Cluster) GetStorage() storage.Storage {
 	return c.storage
-}
-
-func (c *Cluster) GetMetaData() *MetaData {
-	return c.metaData
 }
 
 func (c *Cluster) GetClusterID() uint32 {
@@ -648,4 +646,23 @@ func (c *Cluster) GetNodes(_ context.Context) (*GetNodesResult, error) {
 		ClusterTopologyVersion: c.metaData.clusterTopology.GetVersion(),
 		NodeShards:             nodeShards,
 	}, nil
+}
+
+func (c *Cluster) GetClusterVersion() uint64 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.metaData.clusterTopology.Version
+}
+
+func (c *Cluster) GetClusterShardView() []*clusterpb.Shard {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.metaData.clusterTopology.ShardView
+}
+
+func (c *Cluster) UpdateClusterTopology(ctx context.Context, shardView []*clusterpb.Shard) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.metaData.clusterTopology.ShardView = shardView
+	return c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), c.metaData.clusterTopology)
 }
