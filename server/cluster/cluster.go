@@ -18,16 +18,16 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-type MetaData struct {
+type metaData struct {
 	cluster         *clusterpb.Cluster
 	clusterTopology *clusterpb.ClusterTopology
 }
 
-func (m MetaData) GetCluster() *clusterpb.Cluster {
+func (m metaData) GetCluster() *clusterpb.Cluster {
 	return m.cluster
 }
 
-func (m MetaData) GetClusterTopology() *clusterpb.ClusterTopology {
+func (m metaData) GetClusterTopology() *clusterpb.ClusterTopology {
 	return m.clusterTopology
 }
 
@@ -36,7 +36,7 @@ type Cluster struct {
 
 	// RWMutex is used to protect following fields.
 	lock         sync.RWMutex
-	metaData     *MetaData
+	metaData     *metaData
 	shardsCache  map[uint32]*Shard         // shard_id -> shard
 	schemasCache map[string]*Schema        // schema_name -> schema
 	nodesCache   map[string]*Node          // node_name -> node
@@ -66,7 +66,7 @@ func (c *Cluster) GetClusterID() uint32 {
 func NewCluster(meta *clusterpb.Cluster, storage storage.Storage, kv clientv3.KV, hbstream *schedule.HeartbeatStreams, rootPath string, idAllocatorStep uint) *Cluster {
 	cluster := &Cluster{
 		clusterID:     meta.GetId(),
-		metaData:      &MetaData{cluster: meta},
+		metaData:      &metaData{cluster: meta},
 		shardsCache:   make(map[uint32]*Shard),
 		schemasCache:  make(map[string]*Schema),
 		nodesCache:    make(map[string]*Node),
