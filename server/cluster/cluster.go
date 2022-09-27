@@ -49,14 +49,36 @@ type Cluster struct {
 	tableIDAlloc  id.Allocator
 }
 
-func (c *Cluster) GetNodesCache() map[string]*Node {
+func (c *Cluster) GetNodesSize() int {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return c.nodesCache
+	return len(c.nodesCache)
 }
 
-func (c *Cluster) GetStorage() storage.Storage {
-	return c.storage
+func (c *Cluster) GetClusterNodeCache() map[string]*Node {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	targetMap := make(map[string]*Node)
+	for key, value := range c.nodesCache {
+		targetMap[key] = value
+	}
+	return targetMap
+}
+
+func (c *Cluster) GetClusterShardView() ([]*clusterpb.Shard, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	shardView := c.metaData.clusterTopology.ShardView
+	targetArr := make([]*clusterpb.Shard, 0)
+	for _, shard := range shardView {
+		copyShard := &clusterpb.Shard{
+			Id:        shard.Id,
+			ShardRole: shard.ShardRole,
+			Node:      shard.Node,
+		}
+		targetArr = append(targetArr, copyShard)
+	}
+	return targetArr, nil
 }
 
 func (c *Cluster) GetClusterID() uint32 {
@@ -674,18 +696,12 @@ func (c *Cluster) GetClusterState() clusterpb.ClusterTopology_ClusterState {
 	return c.metaData.clusterTopology.State
 }
 
-func (c *Cluster) GetClusterShardView() []*clusterpb.Shard {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.metaData.clusterTopology.ShardView
-}
-
 func (c *Cluster) UpdateClusterTopology(ctx context.Context, state clusterpb.ClusterTopology_ClusterState, shardView []*clusterpb.Shard) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.metaData.clusterTopology.ShardView = shardView
 	c.metaData.clusterTopology.State = state
-	return c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), c.metaData.clusterTopology)
+	return c.storage.PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), c.metaData.clusterTopology)
 }
 
 type ShardWithLock struct {

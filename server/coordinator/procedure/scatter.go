@@ -52,7 +52,7 @@ var (
 				}
 			}
 
-			if !(int(c.GetClusterMinNodeCount()) <= len(c.GetNodesCache()) &&
+			if !(int(c.GetClusterMinNodeCount()) <= c.GetNodesSize() &&
 				c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
 				event.Cancel()
 			}
@@ -61,8 +61,9 @@ var (
 			minNodeCount := int(c.GetClusterMinNodeCount())
 			perNodeShardCount := shardTotal / minNodeCount
 			shards := make([]*clusterpb.Shard, 0, shardTotal)
-			nodeList := make([]*clusterpb.Node, 0, len(c.GetNodesCache()))
-			for _, v := range c.GetNodesCache() {
+			nodeList := make([]*clusterpb.Node, 0, c.GetNodesSize())
+			nodeCahce := c.GetClusterNodeCache()
+			for _, v := range nodeCahce {
 				nodeList = append(nodeList, v.GetMeta())
 			}
 
@@ -87,7 +88,7 @@ var (
 				event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
 			}
 
-			for nodeName, node := range c.GetNodesCache() {
+			for nodeName, node := range nodeCahce {
 				if err := handler.Dispatch(ctx, nodeName, &schedule.OpenEvent{ShardIDs: node.GetShardIDs()}); err != nil {
 					event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
 				}
