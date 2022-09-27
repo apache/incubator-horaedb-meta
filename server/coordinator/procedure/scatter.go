@@ -40,7 +40,7 @@ var (
 			nodeInfo := request.nodeInfo
 			ctx := request.cxt
 
-			if c.GetMetaData().GetClusterTopology().State == clusterpb.ClusterTopology_STABLE {
+			if c.GetClusterState() == clusterpb.ClusterTopology_STABLE {
 				shardIDs, err := c.GetShardIDs(nodeInfo.GetEndpoint())
 				if err != nil {
 					event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
@@ -52,13 +52,13 @@ var (
 				}
 			}
 
-			if !(int(c.GetMetaData().GetCluster().MinNodeCount) <= len(c.GetNodesCache()) &&
-				c.GetMetaData().GetClusterTopology().State == clusterpb.ClusterTopology_EMPTY) {
+			if !(int(c.GetClusterMinNodeCount()) <= len(c.GetNodesCache()) &&
+				c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
 				event.Cancel()
 			}
 
-			shardTotal := int(c.GetMetaData().GetCluster().ShardTotal)
-			minNodeCount := int(c.GetMetaData().GetCluster().MinNodeCount)
+			shardTotal := int(c.GetClusterShardTotal())
+			minNodeCount := int(c.GetClusterMinNodeCount())
 			perNodeShardCount := shardTotal / minNodeCount
 			shards := make([]*clusterpb.Shard, 0, shardTotal)
 			nodeList := make([]*clusterpb.Node, 0, len(c.GetNodesCache()))
@@ -79,9 +79,7 @@ var (
 				}
 			}
 
-			c.GetMetaData().GetClusterTopology().ShardView = shards
-			c.GetMetaData().GetClusterTopology().State = clusterpb.ClusterTopology_STABLE
-			if err := c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetMetaData().GetClusterTopology().Version, c.GetMetaData().GetClusterTopology()); err != nil {
+			if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
 				event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
 			}
 

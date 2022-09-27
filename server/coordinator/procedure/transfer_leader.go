@@ -133,7 +133,7 @@ var (
 				}
 			}
 
-			if err := c.UpdateClusterTopology(ctx, shardView); err != nil {
+			if err := c.UpdateClusterTopology(ctx, c.GetClusterState(), shardView); err != nil {
 				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
 			}
 
@@ -231,7 +231,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 
 func (p *TransferLeaderProcedure) Cancel(ctx context.Context) error {
 	p.state = StateCancelled
-	// TODO: Add
+	// TODO: Add rollback implementation
 	return nil
 }
 

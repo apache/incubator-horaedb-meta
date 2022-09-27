@@ -37,10 +37,10 @@ type Cluster struct {
 	// RWMutex is used to protect following fields.
 	lock         sync.RWMutex
 	metaData     *MetaData
-	shardsCache  map[uint32]*Shard  // shard_id -> shard
-	schemasCache map[string]*Schema // schema_name -> schema
-	nodesCache   map[string]*Node   // node_name -> node
-	shardLockMap map[uint32]*ShardWithLock
+	shardsCache  map[uint32]*Shard         // shard_id -> shard
+	schemasCache map[string]*Schema        // schema_name -> schema
+	nodesCache   map[string]*Node          // node_name -> node
+	shardLockMap map[uint32]*ShardWithLock // shard_id -> shardLock
 
 	storage       storage.Storage
 	kv            clientv3.KV
@@ -656,16 +656,35 @@ func (c *Cluster) GetClusterVersion() uint64 {
 	return c.metaData.clusterTopology.Version
 }
 
+func (c *Cluster) GetClusterMinNodeCount() uint32 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.metaData.cluster.MinNodeCount
+}
+
+func (c *Cluster) GetClusterShardTotal() uint32 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.metaData.cluster.ShardTotal
+}
+
+func (c *Cluster) GetClusterState() clusterpb.ClusterTopology_ClusterState {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.metaData.clusterTopology.State
+}
+
 func (c *Cluster) GetClusterShardView() []*clusterpb.Shard {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return c.metaData.clusterTopology.ShardView
 }
 
-func (c *Cluster) UpdateClusterTopology(ctx context.Context, shardView []*clusterpb.Shard) error {
+func (c *Cluster) UpdateClusterTopology(ctx context.Context, state clusterpb.ClusterTopology_ClusterState, shardView []*clusterpb.Shard) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.metaData.clusterTopology.ShardView = shardView
+	c.metaData.clusterTopology.State = state
 	return c.GetStorage().PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), c.metaData.clusterTopology)
 }
 
