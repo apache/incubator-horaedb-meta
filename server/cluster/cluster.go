@@ -35,6 +35,7 @@ type Cluster struct {
 	clusterID uint32
 
 	// RWMutex is used to protect following fields.
+	// TODO: Encapsulated maps as a specific struct
 	lock         sync.RWMutex
 	metaData     *metaData
 	shardsCache  map[uint32]*Shard         // shard_id -> shard
@@ -724,18 +725,16 @@ func (c *Cluster) LockShardByID(shardID uint32) bool {
 	return shardLock.lock.TryLock()
 }
 
-func (c *Cluster) LockShardByIDWithRetry(shardID uint32, maxRetrySize int, waitDuration time.Duration) bool {
-	lockResult := c.LockShardByID(shardID)
-	// if lock failed, wait 1 seconds and retry
-	if maxRetrySize == 0 {
+func (c *Cluster) LockShardByIDWithRetry(shardID uint32, maxRetry int, waitInterval time.Duration) bool {
+	if maxRetry == 0 {
 		return false
 	}
-	result := true
+	lockResult := c.LockShardByID(shardID)
 	if !lockResult {
-		time.Sleep(waitDuration)
-		result = c.LockShardByIDWithRetry(shardID, maxRetrySize-1, waitDuration)
+		time.Sleep(waitInterval)
+		return c.LockShardByIDWithRetry(shardID, maxRetry-1, waitInterval)
 	}
-	return result
+	return lockResult
 }
 
 func (c *Cluster) UnlockShardByID(shardID uint32) {

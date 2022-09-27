@@ -66,7 +66,7 @@ var (
 			oldLeaderNode := request.OldLeaderNode
 			oldLeaderShardID := request.OldLeaderShardID
 
-			if result, err := dispatch.SendCloseEvent([]uint32{oldLeaderShardID}, oldLeaderNode); err != nil || !result {
+			if err := dispatch.CloseEvent([]uint32{oldLeaderShardID}, oldLeaderNode); err != nil {
 				event.Cancel(errors.Wrap(err, EventTransferFollowerFailed))
 			}
 		},
@@ -77,7 +77,7 @@ var (
 			oldLeaderShardID := request.OldLeaderShardID
 
 			// Transfer failed, stop transfer and reset state
-			if result, err := disPatch.SendOpenEvent([]uint32{oldLeaderShardID}, oldLeaderNode); err != nil || !result {
+			if err := disPatch.OpenEvent([]uint32{oldLeaderShardID}, oldLeaderNode); err != nil {
 				event.Cancel(errors.Wrap(err, EventTransferFollowerFailed))
 			}
 		},
@@ -118,7 +118,7 @@ var (
 			newLeaderShardID := request.NewLeaderShardID
 
 			// Send event to CeresDB, waiting for response
-			if result, err := dispatch.SendOpenEvent([]uint32{newLeaderShardID}, newLeaderNode); err != nil || !result {
+			if err := dispatch.OpenEvent([]uint32{newLeaderShardID}, newLeaderNode); err != nil {
 				event.Cancel(errors.Wrap(err, EventTransferLeader))
 			}
 		},
@@ -129,7 +129,7 @@ var (
 			newLeaderShardID := request.NewLeaderShardID
 
 			// Transfer failed, stop transfer and reset state
-			if result, err := dispatch.SendCloseEvent([]uint32{newLeaderShardID}, newLeaderNode); err != nil || !result {
+			if err := dispatch.CloseEvent([]uint32{newLeaderShardID}, newLeaderNode); err != nil {
 				event.Cancel(errors.Wrap(err, EventTransferLeaderFailed))
 			}
 		},
@@ -173,15 +173,15 @@ type FollowerCallbackRequest struct {
 ```
 */
 func NewShardFSM(role clusterpb.ShardRole) *fsm.FSM {
-	if role == clusterpb.ShardRole_LEADER {
+	switch role {
+	case clusterpb.ShardRole_LEADER:
 		leaderShardFsm := fsm.NewFSM(
 			StateLeader,
 			leaderFsmEvent,
 			leaderFsmCallbacks,
 		)
 		return leaderShardFsm
-	}
-	if role == clusterpb.ShardRole_FOLLOWER {
+	case clusterpb.ShardRole_FOLLOWER:
 		followerShardFsm := fsm.NewFSM(
 			StateFollower,
 			followerFsmEvent,

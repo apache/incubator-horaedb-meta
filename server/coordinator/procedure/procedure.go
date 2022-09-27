@@ -16,10 +16,10 @@ const (
 	StateCancelled = "cancelled"
 )
 
-type Type uint
+type Typ uint
 
 const (
-	Create Type = iota
+	Create Typ = iota
 	Delete
 	TransferLeader
 	Migrate
@@ -33,8 +33,8 @@ type Procedure interface {
 	// ID of the procedure.
 	ID() uint64
 
-	// Type of the procedure.
-	Type() Type
+	// Typ of the procedure.
+	Typ() Typ
 
 	// Start the procedure.
 	Start(ctx context.Context) error
@@ -52,7 +52,7 @@ type Manager struct {
 	procedures []Procedure
 }
 
-func NewProcedure(operationType Type) *Procedure {
+func NewProcedure(operationType Typ) *Procedure {
 	switch operationType {
 	case Create:
 		return nil

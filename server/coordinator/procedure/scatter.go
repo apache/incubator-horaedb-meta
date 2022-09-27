@@ -138,7 +138,7 @@ func (p *ScatterProcedure) ID() uint64 {
 	return p.id
 }
 
-func (p *ScatterProcedure) Type() Type {
+func (p *ScatterProcedure) Typ() Typ {
 	return TransferLeader
 }
 

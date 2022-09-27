@@ -7,17 +7,14 @@ import (
 	"sort"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/pkg/log"
-	"go.uber.org/zap"
-
-	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
-
-	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/shard"
-
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/shard"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
@@ -122,7 +119,10 @@ var (
 			ctx := request.cxt
 
 			// Update cluster topology.
-			shardView := c.GetClusterShardView()
+			shardView, err := c.GetClusterShardView()
+			if err != nil {
+				event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start"))
+			}
 			for i := 0; i < len(shardView); i++ {
 				shardID := shardView[i].Id
 				if shardID == p.oldLeader.Id {
@@ -181,7 +181,7 @@ func (p *TransferLeaderProcedure) ID() uint64 {
 	return p.id
 }
 
-func (p *TransferLeaderProcedure) Type() Type {
+func (p *TransferLeaderProcedure) Typ() Typ {
 	return TransferLeader
 }
 
