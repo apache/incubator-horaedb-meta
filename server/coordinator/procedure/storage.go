@@ -20,5 +20,5 @@ type Meta struct {
 
 type Storage interface {
 	Write
-	Scan(ctx context.Context, batchSize uint, state State, meta []*Meta) error
+	Scan(ctx context.Context, batchSize uint, state State, typ Typ) ([]*Procedure, error)
 }
