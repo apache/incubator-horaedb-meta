@@ -35,21 +35,6 @@ func (open *OpenEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
 	}
 }
 
-type CloseEvent struct {
-	ShardIDs []uint32
-}
-
-func (open *CloseEvent) ToHeartbeatResp() *metaservicepb.NodeHeartbeatResponse {
-	return &metaservicepb.NodeHeartbeatResponse{
-		Timestamp: uint64(time.Now().UnixMilli()),
-		Cmd: &metaservicepb.NodeHeartbeatResponse_CloseCmd{
-			CloseCmd: &metaservicepb.CloseCmd{
-				ShardIds: open.ShardIDs,
-			},
-		},
-	}
-}
-
 type EventHandler struct {
 	hbstreams *HeartbeatStreams
 }
