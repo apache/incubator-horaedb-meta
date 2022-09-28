@@ -23,14 +23,6 @@ type metaData struct {
 	clusterTopology *clusterpb.ClusterTopology
 }
 
-func (m metaData) GetCluster() *clusterpb.Cluster {
-	return m.cluster
-}
-
-func (m metaData) GetClusterTopology() *clusterpb.ClusterTopology {
-	return m.clusterTopology
-}
-
 type Cluster struct {
 	clusterID uint32
 
@@ -41,7 +33,7 @@ type Cluster struct {
 	shardsCache  map[uint32]*Shard         // shard_id -> shard
 	schemasCache map[string]*Schema        // schema_name -> schema
 	nodesCache   map[string]*Node          // node_name -> node
-	shardLockMap map[uint32]*ShardWithLock // shard_id -> shardLock
+	shardLock    map[uint32]*ShardWithLock // shard_id -> shardLock
 
 	storage       storage.Storage
 	kv            clientv3.KV
@@ -701,9 +693,13 @@ func (c *Cluster) GetClusterState() clusterpb.ClusterTopology_ClusterState {
 func (c *Cluster) UpdateClusterTopology(ctx context.Context, state clusterpb.ClusterTopology_ClusterState, shardView []*clusterpb.Shard) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.metaData.clusterTopology.ShardView = shardView
-	c.metaData.clusterTopology.State = state
-	return c.storage.PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), c.metaData.clusterTopology)
+	clusterTopology, err := c.storage.GetClusterTopology(ctx, c.GetClusterID())
+	if err != nil {
+		return errors.WithMessage(err, "UpdateClusterTopology failed")
+	}
+	clusterTopology.ShardView = shardView
+	clusterTopology.State = state
+	return c.storage.PutClusterTopology(ctx, c.GetClusterID(), c.GetClusterVersion(), clusterTopology)
 }
 
 type ShardWithLock struct {
@@ -714,11 +710,11 @@ type ShardWithLock struct {
 func (c *Cluster) getShardLock(shardID uint32) *ShardWithLock {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	_, ok := c.shardLockMap[shardID]
+	_, ok := c.shardLock[shardID]
 	if !ok {
-		c.shardLockMap[shardID] = &ShardWithLock{shardID: shardID, lock: sync.Mutex{}}
+		c.shardLock[shardID] = &ShardWithLock{shardID: shardID, lock: sync.Mutex{}}
 	}
-	return c.shardLockMap[shardID]
+	return c.shardLock[shardID]
 }
 
 func (c *Cluster) LockShardByID(shardID uint32) bool {
@@ -739,10 +735,12 @@ func (c *Cluster) LockShardByIDWithRetry(shardID uint32, maxRetry int, waitInter
 }
 
 func (c *Cluster) UnlockShardByID(shardID uint32) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	shardLock := c.getShardLock(shardID)
 	if shardLock == nil {
 		return
 	}
 	shardLock.lock.Unlock()
-	delete(c.shardLockMap, shardID)
+	delete(c.shardLock, shardID)
 }
