@@ -57,18 +57,18 @@ var (
 )
 
 type LeaderCallbackRequest struct {
-	Ctx      context.Context
-	C        *cluster.Cluster
-	Dispatch dispatch.EventDispatch
+	Ctx            context.Context
+	C              *cluster.Cluster
+	ActionDispatch dispatch.ActionDispatch
 
 	OldLeaderNode    string
 	OldLeaderShardID uint32
 }
 
 type FollowerCallbackRequest struct {
-	Ctx      context.Context
-	C        *cluster.Cluster
-	Dispatch dispatch.EventDispatch
+	Ctx            context.Context
+	C              *cluster.Cluster
+	ActionDispatch dispatch.ActionDispatch
 
 	NewLeaderNode    string
 	NewLeaderShardID uint32
@@ -128,11 +128,12 @@ func transferFollowerCallback(event *fsm.Event) {
 	request := event.Args[0].(*LeaderCallbackRequest)
 	ctx := request.Ctx
 	c := request.C
-	dispatch := request.Dispatch
+	actionDispatch := request.ActionDispatch
 	oldLeaderNode := request.OldLeaderNode
 	oldLeaderShardID := request.OldLeaderShardID
 
-	if err := dispatch.CloseShards([]uint32{oldLeaderShardID}, oldLeaderNode); err != nil {
+	action := dispatch.CloseShardAction{ShardIDs: []uint32{oldLeaderShardID}}
+	if err := actionDispatch.CloseShards(ctx, oldLeaderNode, action); err != nil {
 		event.Cancel(errors.Wrap(err, EventPrepareTransferFollower))
 	}
 
@@ -145,12 +146,13 @@ func transferFollowerFailedCallback(event *fsm.Event) {
 	request := event.Args[0].(*LeaderCallbackRequest)
 	ctx := request.Ctx
 	c := request.C
-	disPatch := request.Dispatch
+	actionDispatch := request.ActionDispatch
 	oldLeaderNode := request.OldLeaderNode
 	oldLeaderShardID := request.OldLeaderShardID
 
 	// Transfer failed, stop transfer and reset state
-	if err := disPatch.OpenShards([]uint32{oldLeaderShardID}, oldLeaderNode); err != nil {
+	action := dispatch.OpenShardAction{ShardIDs: []uint32{oldLeaderShardID}}
+	if err := actionDispatch.OpenShards(ctx, oldLeaderNode, action); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferFollowerFailed))
 	}
 
@@ -174,13 +176,14 @@ func prepareTransferLeaderCallback(event *fsm.Event) {
 func transferLeaderCallback(event *fsm.Event) {
 	request := event.Args[0].(*FollowerCallbackRequest)
 	ctx := request.Ctx
-	dispatch := request.Dispatch
+	actionDispatch := request.ActionDispatch
 	c := request.C
 	newLeaderNode := request.NewLeaderNode
 	newLeaderShardID := request.NewLeaderShardID
 
 	// Send event to CeresDB, waiting for response
-	if err := dispatch.OpenShards([]uint32{newLeaderShardID}, newLeaderNode); err != nil {
+	action := dispatch.OpenShardAction{ShardIDs: []uint32{newLeaderShardID}}
+	if err := actionDispatch.OpenShards(ctx, newLeaderNode, action); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferLeader))
 	}
 
@@ -192,13 +195,14 @@ func transferLeaderCallback(event *fsm.Event) {
 func transferLeaderFailed(event *fsm.Event) {
 	request := event.Args[0].(*FollowerCallbackRequest)
 	ctx := request.Ctx
-	dispatch := request.Dispatch
+	actionDispatch := request.ActionDispatch
 	c := request.C
 	newLeaderNode := request.NewLeaderNode
 	newLeaderShardID := request.NewLeaderShardID
 
 	// Transfer failed, stop transfer and reset state
-	if err := dispatch.CloseShards([]uint32{newLeaderShardID}, newLeaderNode); err != nil {
+	action := dispatch.CloseShardAction{ShardIDs: []uint32{newLeaderShardID}}
+	if err := actionDispatch.CloseShards(ctx, newLeaderNode, action); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferLeaderFailed))
 	}
 

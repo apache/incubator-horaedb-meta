@@ -3,26 +3,26 @@
 package dispatch
 
 import (
-	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"context"
 )
 
-type EventDispatchImpl struct{}
+type ActionDispatchImpl struct{}
 
-func NewEventDispatchImpl() *EventDispatchImpl {
-	return &EventDispatchImpl{}
+func NewEventDispatchImpl() *ActionDispatchImpl {
+	return &ActionDispatchImpl{}
 }
 
-func (d *EventDispatchImpl) OpenShards(_ []uint32, _ string) error {
+func (d *ActionDispatchImpl) OpenShards(_ context.Context, _ string, _ OpenShardAction) error {
 	// TODO: impl later
 	return nil
 }
 
-func (d *EventDispatchImpl) CloseShards(_ []uint32, _ string) error {
+func (d *ActionDispatchImpl) CloseShards(_ context.Context, _ string, _ CloseShardAction) error {
 	// TODO: impl later
 	return nil
 }
 
-func (d *EventDispatchImpl) ChangeShardRole(_ uint32, _ clusterpb.ShardRole, _ string) error {
+func (d *ActionDispatchImpl) ChangeShardRole(_ context.Context, _ string, _ ChangeShardRoleAction) error {
 	// TODO: impl later
 	return nil
 }

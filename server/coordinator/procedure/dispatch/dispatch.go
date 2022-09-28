@@ -3,13 +3,28 @@
 package dispatch
 
 import (
+	"context"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 )
 
-type EventDispatch interface {
-	OpenShards(ShardIDs []uint32, targetNode string) error
+type ActionDispatch interface {
+	OpenShards(context context.Context, address string, action OpenShardAction) error
 
-	CloseShards(ShardIDs []uint32, targetNode string) error
+	CloseShards(context context.Context, address string, action CloseShardAction) error
 
-	ChangeShardRole(ShardID uint32, shardRole clusterpb.ShardRole, targetNode string) error
+	ChangeShardRole(context context.Context, address string, action ChangeShardRoleAction) error
+}
+
+type OpenShardAction struct {
+	ShardIDs []uint32
+}
+
+type CloseShardAction struct {
+	ShardIDs []uint32
+}
+
+type ChangeShardRoleAction struct {
+	ShardID uint32
+	Role    clusterpb.ShardRole
 }
