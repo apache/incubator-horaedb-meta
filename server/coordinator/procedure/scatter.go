@@ -30,76 +30,79 @@ var (
 		{Name: EventTransferLeaderSuccess, Src: []string{StateScatterWaiting}, Dst: StateScatterFinish},
 		{Name: EventScatterFailed, Src: []string{StateScatterBegin, StateScatterWaiting}, Dst: StateScatterFailed},
 	}
+	scatterPrepareCallback = func(event *fsm.Event) {
+		// FIXME: The following logic is used for static topology, which is a bit simple and violent.
+		// It needs to be modified when supporting dynamic topology.
+		request := event.Args[0].(*ScatterCallbackRequest)
+		c := request.cluster
+		handler := request.handler
+		nodeInfo := request.nodeInfo
+		ctx := request.cxt
+
+		if c.GetClusterState() == clusterpb.ClusterTopology_STABLE {
+			shardIDs, err := c.GetShardIDs(nodeInfo.GetEndpoint())
+			if err != nil {
+				event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
+			}
+			if len(nodeInfo.GetShardInfos()) == 0 {
+				if err := handler.Dispatch(ctx, nodeInfo.GetEndpoint(), &schedule.OpenEvent{ShardIDs: shardIDs}); err != nil {
+					event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
+				}
+			}
+		}
+
+		if !(int(c.GetClusterMinNodeCount()) <= c.GetNodesSize() &&
+			c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
+			event.Cancel()
+		}
+
+		shardTotal := int(c.GetClusterShardTotal())
+		minNodeCount := int(c.GetClusterMinNodeCount())
+		perNodeShardCount := shardTotal / minNodeCount
+		shards := make([]*clusterpb.Shard, 0, shardTotal)
+		nodeList := make([]*clusterpb.Node, 0, c.GetNodesSize())
+		nodeCache := c.GetClusterNodeCache()
+		for _, v := range nodeCache {
+			nodeList = append(nodeList, v.GetMeta())
+		}
+
+		for i := 0; i < minNodeCount; i++ {
+			for j := 0; j < perNodeShardCount; j++ {
+				if i*perNodeShardCount+j < shardTotal {
+					// TODO: consider nodesCache state
+					shards = append(shards, &clusterpb.Shard{
+						Id:        uint32(i*perNodeShardCount + j),
+						ShardRole: clusterpb.ShardRole_LEADER,
+						Node:      nodeList[i].GetName(),
+					})
+				}
+			}
+		}
+
+		if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
+			event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
+		}
+
+		if err := c.Load(ctx); err != nil {
+			event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
+		}
+
+		for nodeName, node := range nodeCache {
+			if err := handler.Dispatch(ctx, nodeName, &schedule.OpenEvent{ShardIDs: node.GetShardIDs()}); err != nil {
+				event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
+			}
+		}
+	}
+	scatterSuccessCallback = func(event *fsm.Event) {
+		// nolint
+	}
+	scatterFailedCallback = func(event *fsm.Event) {
+		// nolint
+	}
 	ScatterCallbacks = fsm.Callbacks{
-		EventScatterPrepare: func(event *fsm.Event) {
-			// FIXME: The following logic is used for static topology, which is a bit simple and violent.
-			// It needs to be modified when supporting dynamic topology.
-			request := event.Args[0].(*ScatterCallbackRequest)
-			c := request.c
-			handler := request.handler
-			nodeInfo := request.nodeInfo
-			ctx := request.cxt
-
-			if c.GetClusterState() == clusterpb.ClusterTopology_STABLE {
-				shardIDs, err := c.GetShardIDs(nodeInfo.GetEndpoint())
-				if err != nil {
-					event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
-				}
-				if len(nodeInfo.GetShardInfos()) == 0 {
-					if err := handler.Dispatch(ctx, nodeInfo.GetEndpoint(), &schedule.OpenEvent{ShardIDs: shardIDs}); err != nil {
-						event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
-					}
-				}
-			}
-
-			if !(int(c.GetClusterMinNodeCount()) <= c.GetNodesSize() &&
-				c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
-				event.Cancel()
-			}
-
-			shardTotal := int(c.GetClusterShardTotal())
-			minNodeCount := int(c.GetClusterMinNodeCount())
-			perNodeShardCount := shardTotal / minNodeCount
-			shards := make([]*clusterpb.Shard, 0, shardTotal)
-			nodeList := make([]*clusterpb.Node, 0, c.GetNodesSize())
-			nodeCahce := c.GetClusterNodeCache()
-			for _, v := range nodeCahce {
-				nodeList = append(nodeList, v.GetMeta())
-			}
-
-			for i := 0; i < minNodeCount; i++ {
-				for j := 0; j < perNodeShardCount; j++ {
-					if i*perNodeShardCount+j < shardTotal {
-						// TODO: consider nodesCache state
-						shards = append(shards, &clusterpb.Shard{
-							Id:        uint32(i*perNodeShardCount + j),
-							ShardRole: clusterpb.ShardRole_LEADER,
-							Node:      nodeList[i].GetName(),
-						})
-					}
-				}
-			}
-
-			if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
-				event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
-			}
-
-			if err := c.Load(ctx); err != nil {
-				event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
-			}
-
-			for nodeName, node := range nodeCahce {
-				if err := handler.Dispatch(ctx, nodeName, &schedule.OpenEvent{ShardIDs: node.GetShardIDs()}); err != nil {
-					event.Cancel(errors.WithMessage(err, "procedure scatterShard"))
-				}
-			}
-		},
-		EventScatterFailed: func(event *fsm.Event) {
-			// nolint
-		},
-		EventScatterSuccess: func(event *fsm.Event) {
-			// nolint
-		},
+		EventScatterPrepare: scatterPrepareCallback,
+		EventScatterFailed:  scatterFailedCallback,
+		EventScatterSuccess: scatterSuccessCallback,
 	}
 )
 
@@ -108,7 +111,7 @@ type ScatterProcedure struct {
 	state State
 
 	fsm      *fsm.FSM
-	c        *cluster.Cluster
+	cluster  *cluster.Cluster
 	nodeInfo *metaservicepb.NodeInfo
 	handler  *schedule.EventHandler
 }
@@ -120,16 +123,16 @@ func NewScatterProcedure(cluster *cluster.Cluster, nodeInfo *metaservicepb.NodeI
 		ScatterCallbacks,
 	)
 
-	// TODO: fix id alloc
+	// TODO: try to allocate the procedure id in a proper way.
 	id := uint64(1)
-	return &ScatterProcedure{fsm: ScatterOperationFsm, id: id, state: StateInit, c: cluster, nodeInfo: nodeInfo}
+	return &ScatterProcedure{fsm: ScatterOperationFsm, id: id, state: StateInit, cluster: cluster, nodeInfo: nodeInfo}
 }
 
 type ScatterCallbackRequest struct {
-	p       *ScatterProcedure
-	c       *cluster.Cluster
-	handler *schedule.EventHandler
-	cxt     context.Context
+	procedure *ScatterProcedure
+	cluster   *cluster.Cluster
+	handler   *schedule.EventHandler
+	cxt       context.Context
 
 	nodeInfo *metaservicepb.NodeInfo
 }
@@ -146,11 +149,11 @@ func (p *ScatterProcedure) Start(ctx context.Context) error {
 	p.state = StateRunning
 
 	request := ScatterCallbackRequest{
-		p:        p,
-		c:        p.c,
-		handler:  p.handler,
-		cxt:      ctx,
-		nodeInfo: p.nodeInfo,
+		procedure: p,
+		cluster:   p.cluster,
+		handler:   p.handler,
+		cxt:       ctx,
+		nodeInfo:  p.nodeInfo,
 	}
 	if err := p.fsm.Event(EventScatterPrepare); err != nil {
 		p.state = StateFailed

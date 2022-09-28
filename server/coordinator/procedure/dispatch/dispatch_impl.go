@@ -12,17 +12,17 @@ func NewEventDispatchImpl() *EventDispatchImpl {
 	return &EventDispatchImpl{}
 }
 
-func (d *EventDispatchImpl) OpenEvent(shardIDs []uint32, targetNode string) error {
+func (d *EventDispatchImpl) OpenShards(shardIDs []uint32, targetNode string) error {
 	// TODO: impl later
 	return nil
 }
 
-func (d *EventDispatchImpl) CloseEvent(shardIDs []uint32, targetNode string) error {
+func (d *EventDispatchImpl) CloseShards(shardIDs []uint32, targetNode string) error {
 	// TODO: impl later
 	return nil
 }
 
-func (d *EventDispatchImpl) ChangeRoleEvent(shardID uint32, shardRole clusterpb.ShardRole, targetNode string) error {
+func (d *EventDispatchImpl) ChangeShardRole(shardID uint32, shardRole clusterpb.ShardRole, targetNode string) error {
 	// TODO: impl later
 	return nil
 }

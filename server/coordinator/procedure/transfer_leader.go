@@ -42,8 +42,8 @@ var (
 	transferLeaderCallbacks = fsm.Callbacks{
 		EventTransferLeaderPrepare: func(event *fsm.Event) {
 			request := event.Args[0].(*TransferLeaderCallbackRequest)
-			p := request.p
-			c := request.c
+			p := request.procedure
+			c := request.cluster
 			dispatch := request.dispatch
 			ctx := request.cxt
 			leaderFsm := request.leaderFsm
@@ -82,8 +82,8 @@ var (
 		},
 		EventTransferLeaderFailed: func(event *fsm.Event) {
 			request := event.Args[0].(*TransferLeaderCallbackRequest)
-			p := request.p
-			c := request.c
+			p := request.procedure
+			c := request.cluster
 			dispatch := request.dispatch
 			ctx := request.cxt
 			leaderFsm := request.leaderFsm
@@ -114,8 +114,8 @@ var (
 		},
 		EventTransferLeaderSuccess: func(event *fsm.Event) {
 			request := event.Args[0].(*TransferLeaderCallbackRequest)
-			p := request.p
-			c := request.c
+			p := request.procedure
+			c := request.cluster
 			ctx := request.cxt
 
 			// Update cluster topology.
@@ -151,15 +151,15 @@ type TransferLeaderProcedure struct {
 	fsm       *fsm.FSM
 	oldLeader *clusterpb.Shard
 	newLeader *clusterpb.Shard
-	c         *cluster.Cluster
+	cluster   *cluster.Cluster
 }
 
 // TransferLeaderCallbackRequest is fsm callbacks request param.
 type TransferLeaderCallbackRequest struct {
-	p        *TransferLeaderProcedure
-	c        *cluster.Cluster
-	dispatch dispatch.EventDispatch
-	cxt      context.Context
+	procedure *TransferLeaderProcedure
+	cluster   *cluster.Cluster
+	dispatch  dispatch.EventDispatch
+	cxt       context.Context
 
 	leaderFsm   *fsm.FSM
 	followerFsm *fsm.FSM
@@ -172,9 +172,9 @@ func NewTransferLeaderProcedure(cluster *cluster.Cluster, oldLeader *clusterpb.S
 		transferLeaderCallbacks,
 	)
 
-	// TODO: fix id alloc
+	// TODO: try to allocate the procedure id in a proper way.
 	id := uint64(1)
-	return &TransferLeaderProcedure{fsm: transferLeaderOperationFsm, id: id, state: StateInit, oldLeader: oldLeader, newLeader: newLeader, c: cluster}
+	return &TransferLeaderProcedure{fsm: transferLeaderOperationFsm, id: id, state: StateInit, oldLeader: oldLeader, newLeader: newLeader, cluster: cluster}
 }
 
 func (p *TransferLeaderProcedure) ID() uint64 {
@@ -192,14 +192,14 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 	shardIDs := []uint32{p.newLeader.Id, p.oldLeader.Id}
 	sort.Slice(shardIDs, func(i, j int) bool { return shardIDs[i] < shardIDs[j] })
 	for _, id := range shardIDs {
-		lockResult := p.c.LockShardByIDWithRetry(id, MaxLockRetrySize, LockWaitDuration)
+		lockResult := p.cluster.LockShardByIDWithRetry(id, MaxLockRetrySize, LockWaitDuration)
 		if !lockResult {
 			return ErrLockShard.WithCausef("lock shard failed, ShardID=%d ,MaxLockRetrySize=%d, LockWaitDuration=%s", id, MaxLockRetrySize, LockWaitDuration)
 		}
 	}
 	transferLeaderRequest := &TransferLeaderCallbackRequest{
-		p:           p,
-		c:           p.c,
+		procedure:   p,
+		cluster:     p.cluster,
 		dispatch:    dispatch.NewEventDispatchImpl(),
 		cxt:         ctx,
 		leaderFsm:   shard.NewShardFSM(clusterpb.ShardRole_LEADER),
@@ -222,7 +222,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 	// Unlock shard in reverse order.
 	for i := len(shardIDs) - 1; i >= 0; i-- {
 		ID := shardIDs[i]
-		p.c.UnlockShardByID(ID)
+		p.cluster.UnlockShardByID(ID)
 	}
 
 	p.state = StateFinished

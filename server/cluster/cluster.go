@@ -59,27 +59,28 @@ func (c *Cluster) GetNodesSize() int {
 func (c *Cluster) GetClusterNodeCache() map[string]*Node {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	targetMap := make(map[string]*Node)
+	newNodes := make(map[string]*Node)
 	for key, value := range c.nodesCache {
-		targetMap[key] = value
+		newNodes[key] = value
 	}
-	return targetMap
+	return newNodes
 }
 
 func (c *Cluster) GetClusterShardView() ([]*clusterpb.Shard, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	shardView := c.metaData.clusterTopology.ShardView
-	targetArr := make([]*clusterpb.Shard, 0)
+	newShardView := make([]*clusterpb.Shard, 0)
+	// TODO: We need to use the general deep copy tool method to replace
 	for _, shard := range shardView {
 		copyShard := &clusterpb.Shard{
 			Id:        shard.Id,
 			ShardRole: shard.ShardRole,
 			Node:      shard.Node,
 		}
-		targetArr = append(targetArr, copyShard)
+		newShardView = append(newShardView, copyShard)
 	}
-	return targetArr, nil
+	return newShardView, nil
 }
 
 func (c *Cluster) GetClusterID() uint32 {
@@ -726,7 +727,7 @@ func (c *Cluster) LockShardByID(shardID uint32) bool {
 }
 
 func (c *Cluster) LockShardByIDWithRetry(shardID uint32, maxRetry int, waitInterval time.Duration) bool {
-	if maxRetry == 0 {
+	if maxRetry <= 0 {
 		return false
 	}
 	lockResult := c.LockShardByID(shardID)

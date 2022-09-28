@@ -7,9 +7,9 @@ import (
 )
 
 type EventDispatch interface {
-	OpenEvent(ShardIDs []uint32, targetNode string) error
+	OpenShards(ShardIDs []uint32, targetNode string) error
 
-	CloseEvent(ShardIDs []uint32, targetNode string) error
+	CloseShards(ShardIDs []uint32, targetNode string) error
 
-	ChangeRoleEvent(ShardID uint32, shardRole clusterpb.ShardRole, targetNode string) error
+	ChangeShardRole(ShardID uint32, shardRole clusterpb.ShardRole, targetNode string) error
 }
