@@ -735,12 +735,12 @@ func (c *Cluster) LockShardByIDWithRetry(shardID uint32, maxRetry int, waitInter
 }
 
 func (c *Cluster) UnlockShardByID(shardID uint32) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	shardLock := c.getShardLock(shardID)
 	if shardLock == nil {
 		return
 	}
 	shardLock.lock.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	delete(c.shardLock, shardID)
 }
