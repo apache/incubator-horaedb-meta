@@ -8,6 +8,7 @@ import (
 
 type Write interface {
 	CreateOrUpdate(ctx context.Context, meta *Meta) error
+	Delete(ctx context.Context, meta *Meta) error
 }
 
 // nolint

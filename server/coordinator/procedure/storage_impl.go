@@ -13,40 +13,60 @@ import (
 )
 
 const (
-	Version       = "v1"
-	PathProcedure = "procedure"
+	Version              = "v1"
+	PathProcedure        = "procedure"
+	PathHistoryProcedure = "historyProcedure"
 )
 
 type EtcdStorageImpl struct {
-	client *clientv3.Client
-
-	// opts Options
+	client    *clientv3.Client
 	clusterId uint32
-
-	rootPath string
+	rootPath  string
 }
 
-// example:
-// procedure 1: v1/procedure/{ClusterID}/{procedureID} -> {procedureType} + {procedureState} + {data}
+func NewEtcdStorageImpl(client *clientv3.Client, clusterId uint32, rootPath string) *EtcdStorageImpl {
+	return &EtcdStorageImpl{
+		client:    client,
+		clusterId: clusterId,
+		rootPath:  rootPath,
+	}
+}
 
+// CreateOrUpdate example:
+// procedure : /{rootPath}/v1/procedure/{clusterID}/{procedureID} -> {procedureType} + {procedureState} + {data}
 func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta *Meta) error {
-	keyPath := e.generateKeyPath(meta.ID)
-
 	str, err := encode(meta)
 	if err != nil {
 		return errors.WithMessage(err, "encode meta failed")
 	}
-	opPutProcedure := clientv3.OpPut(keyPath, str)
+	keyPath := e.generateKeyPath(meta.ID, false)
+	opPut := clientv3.OpPut(keyPath, str)
 
 	_, err = e.client.Txn(ctx).
-		Then(opPutProcedure).
+		Then(opPut).
 		Commit()
 
 	return err
 }
 
-func (e EtcdStorageImpl) Scan(ctx context.Context, batchSize uint, state State, typ Typ) ([]*Meta, error) {
+// Delete example:
+// historyProcedure : /{rootPath}/v1/historyProcedure/{clusterID}/{procedureID}
+func (e EtcdStorageImpl) Delete(ctx context.Context, meta *Meta) error {
+	str, err := encode(meta)
+	if err != nil {
+		return errors.WithMessage(err, "encode meta failed")
+	}
+	keyPath := e.generateKeyPath(meta.ID, false)
+	historyKeyPath := e.generateKeyPath(meta.ID, true)
+	opDelete := clientv3.OpDelete(keyPath)
+	opPut := clientv3.OpPut(historyKeyPath, str)
 
+	_, err = e.client.Txn(ctx).Then(opDelete).Then(opPut).Commit()
+
+	return err
+}
+
+func (e EtcdStorageImpl) Scan(ctx context.Context, batchSize uint, state State, typ Typ) ([]*Meta, error) {
 	metas := make([]*Meta, 0)
 	do := func(_ string, value []byte) error {
 		meta := &Meta{}
@@ -58,8 +78,8 @@ func (e EtcdStorageImpl) Scan(ctx context.Context, batchSize uint, state State, 
 		return nil
 	}
 
-	startKey := e.generateKeyPath(0)
-	endKey := e.generateKeyPath(math.MaxUint64)
+	startKey := e.generateKeyPath(0, false)
+	endKey := e.generateKeyPath(math.MaxUint64, false)
 
 	err := etcdutil.Scan(ctx, e.client, startKey, endKey, math.MaxInt, do)
 	if err != nil {
@@ -68,11 +88,14 @@ func (e EtcdStorageImpl) Scan(ctx context.Context, batchSize uint, state State, 
 	return metas, nil
 }
 
-/*
-*
- */
-func (e EtcdStorageImpl) generateKeyPath(procedureId uint64) string {
-	return path.Join(e.rootPath, Version, PathProcedure, fmtID(uint64(e.clusterId)), fmtID(procedureId))
+func (e EtcdStorageImpl) generateKeyPath(procedureId uint64, isHistory bool) string {
+	var pathPrefix string
+	if isHistory {
+		pathPrefix = PathHistoryProcedure
+	} else {
+		pathPrefix = PathProcedure
+	}
+	return path.Join(e.rootPath, Version, pathPrefix, fmtID(uint64(e.clusterId)), fmtID(procedureId))
 }
 
 func fmtID(id uint64) string {
