@@ -47,7 +47,7 @@ type TransferLeaderProcedure struct {
 }
 
 // CallbackRequest is fsm callbacks param
-type CallbackRequest struct {
+type TransferLeaderCallbackRequest struct {
 	cluster  *cluster.Cluster
 	cxt      context.Context
 	dispatch dispatch.ActionDispatch
@@ -79,7 +79,7 @@ func (p *TransferLeaderProcedure) Typ() Typ {
 func (p *TransferLeaderProcedure) Start(ctx context.Context, cluster *cluster.Cluster) error {
 	p.state = StateRunning
 
-	transferLeaderRequest := &CallbackRequest{
+	transferLeaderRequest := &TransferLeaderCallbackRequest{
 		cluster:   cluster,
 		cxt:       ctx,
 		newLeader: p.newLeader,
@@ -111,7 +111,7 @@ func (p *TransferLeaderProcedure) State() State {
 }
 
 func transferLeaderPrepareCallback(event *fsm.Event) {
-	request := event.Args[0].(*CallbackRequest)
+	request := event.Args[0].(*TransferLeaderCallbackRequest)
 	cxt := request.cxt
 	oldLeader := request.oldLeader
 	newLeader := request.newLeader
@@ -136,7 +136,7 @@ func transferLeaderFailedCallback(_ *fsm.Event) {
 }
 
 func transferLeaderSuccessCallback(event *fsm.Event) {
-	request := event.Args[0].(*CallbackRequest)
+	request := event.Args[0].(*TransferLeaderCallbackRequest)
 	cluster := request.cluster
 	ctx := request.cxt
 	oldLeader := request.oldLeader
