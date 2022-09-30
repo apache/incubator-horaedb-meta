@@ -4,10 +4,11 @@ package procedure
 
 import (
 	"context"
-	"github.com/CeresDB/ceresmeta/server/etcdutil"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/CeresDB/ceresmeta/server/etcdutil"
+	"github.com/stretchr/testify/require"
 )
 
 const (

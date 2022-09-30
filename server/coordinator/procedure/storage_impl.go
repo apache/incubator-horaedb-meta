@@ -22,14 +22,14 @@ const (
 
 type EtcdStorageImpl struct {
 	client    *clientv3.Client
-	clusterId uint32
+	clusterID uint32
 	rootPath  string
 }
 
-func NewEtcdStorageImpl(client *clientv3.Client, clusterId uint32, rootPath string) *EtcdStorageImpl {
+func NewEtcdStorageImpl(client *clientv3.Client, clusterID uint32, rootPath string) *EtcdStorageImpl {
 	return &EtcdStorageImpl{
 		client:    client,
-		clusterId: clusterId,
+		clusterID: clusterID,
 		rootPath:  rootPath,
 	}
 }
@@ -90,14 +90,14 @@ func (e EtcdStorageImpl) Scan(ctx context.Context, batchSize int) ([]*Meta, erro
 	return metas, nil
 }
 
-func (e EtcdStorageImpl) generateKeyPath(procedureId uint64, isHistory bool) string {
+func (e EtcdStorageImpl) generateKeyPath(procedureID uint64, isHistory bool) string {
 	var pathPrefix string
 	if isHistory {
 		pathPrefix = PathHistoryProcedure
 	} else {
 		pathPrefix = PathProcedure
 	}
-	return path.Join(e.rootPath, Version, pathPrefix, fmtID(uint64(e.clusterId)), fmtID(procedureId))
+	return path.Join(e.rootPath, Version, pathPrefix, fmtID(uint64(e.clusterID)), fmtID(procedureID))
 }
 
 func fmtID(id uint64) string {
@@ -105,11 +105,11 @@ func fmtID(id uint64) string {
 }
 
 func encode(meta *Meta) (string, error) {
-	if bytes, err := json.Marshal(meta); err != nil {
+	bytes, err := json.Marshal(meta)
+	if err != nil {
 		return "", err
-	} else {
-		return string(bytes), nil
 	}
+	return string(bytes), nil
 }
 
 func decode(m *Meta, meta string) error {
