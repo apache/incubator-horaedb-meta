@@ -61,12 +61,12 @@ func (e EtcdStorageImpl) Delete(ctx context.Context, meta *Meta) error {
 	opDelete := clientv3.OpDelete(keyPath)
 	opPut := clientv3.OpPut(historyKeyPath, str)
 
-	_, err = e.client.Txn(ctx).Then(opDelete).Then(opPut).Commit()
+	_, err = e.client.Txn(ctx).Then(opDelete, opPut).Commit()
 
 	return err
 }
 
-func (e EtcdStorageImpl) Scan(ctx context.Context, batchSize uint, state State, typ Typ) ([]*Meta, error) {
+func (e EtcdStorageImpl) Scan(ctx context.Context, batchSize int) ([]*Meta, error) {
 	metas := make([]*Meta, 0)
 	do := func(_ string, value []byte) error {
 		meta := &Meta{}
@@ -78,10 +78,10 @@ func (e EtcdStorageImpl) Scan(ctx context.Context, batchSize uint, state State, 
 		return nil
 	}
 
-	startKey := e.generateKeyPath(0, false)
+	startKey := e.generateKeyPath(uint64(0), false)
 	endKey := e.generateKeyPath(math.MaxUint64, false)
 
-	err := etcdutil.Scan(ctx, e.client, startKey, endKey, math.MaxInt, do)
+	err := etcdutil.Scan(ctx, e.client, startKey, endKey, batchSize, do)
 	if err != nil {
 		return nil, errors.WithMessage(err, "scan procedure failed")
 	}
