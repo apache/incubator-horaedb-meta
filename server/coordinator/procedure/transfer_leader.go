@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"context"
+	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -37,16 +38,18 @@ var (
 )
 
 type TransferLeaderProcedure struct {
+	lock     sync.RWMutex
 	fsm      *fsm.FSM
 	id       uint64
 	state    State
 	dispatch dispatch.ActionDispatch
+	cluster  *cluster.Cluster
 
 	oldLeader *clusterpb.Shard
 	newLeader *clusterpb.Shard
 }
 
-// CallbackRequest is fsm callbacks param
+// TransferLeaderCallbackRequest is fsm callbacks param
 type TransferLeaderCallbackRequest struct {
 	cluster  *cluster.Cluster
 	cxt      context.Context
@@ -56,7 +59,7 @@ type TransferLeaderCallbackRequest struct {
 	newLeader *clusterpb.Shard
 }
 
-func NewTransferLeaderProcedure(oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard) *TransferLeaderProcedure {
+func NewTransferLeaderProcedure(oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard) Procedure {
 	transferLeaderOperationFsm := fsm.NewFSM(
 		StateTransferLeaderBegin,
 		transferLeaderEvents,
@@ -76,11 +79,11 @@ func (p *TransferLeaderProcedure) Typ() Typ {
 	return TransferLeader
 }
 
-func (p *TransferLeaderProcedure) Start(ctx context.Context, cluster *cluster.Cluster) error {
-	p.state = StateRunning
+func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
+	p.UpdateStateWithLock(StateRunning)
 
 	transferLeaderRequest := &TransferLeaderCallbackRequest{
-		cluster:   cluster,
+		cluster:   p.cluster,
 		cxt:       ctx,
 		newLeader: p.newLeader,
 		oldLeader: p.oldLeader,
@@ -89,7 +92,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context, cluster *cluster.Cl
 
 	if err := p.fsm.Event(EventTransferLeaderPrepare, transferLeaderRequest); err != nil {
 		err := p.fsm.Event(EventTransferLeaderFailed, transferLeaderRequest)
-		p.state = StateFailed
+		p.UpdateStateWithLock(StateFailed)
 		return errors.WithMessage(err, "coordinator transferLeaderShard start")
 	}
 
@@ -97,16 +100,18 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context, cluster *cluster.Cl
 		return errors.WithMessage(err, "coordinator transferLeaderShard start")
 	}
 
-	p.state = StateFinished
+	p.UpdateStateWithLock(StateFinished)
 	return nil
 }
 
 func (p *TransferLeaderProcedure) Cancel(_ context.Context) error {
-	p.state = StateCancelled
+	p.UpdateStateWithLock(StateCancelled)
 	return nil
 }
 
 func (p *TransferLeaderProcedure) State() State {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 	return p.state
 }
 
@@ -160,4 +165,10 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 	if err := cluster.UpdateClusterTopology(ctx, cluster.GetClusterState(), shardView); err != nil {
 		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start success callback"))
 	}
+}
+
+func (p *TransferLeaderProcedure) UpdateStateWithLock(state State) {
+	p.lock.Lock()
+	p.state = state
+	p.lock.Unlock()
 }
