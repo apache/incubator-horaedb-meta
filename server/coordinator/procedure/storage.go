@@ -8,7 +8,6 @@ import (
 
 type Write interface {
 	CreateOrUpdate(ctx context.Context, meta *Meta) error
-	Delete(ctx context.Context, meta *Meta) error
 }
 
 // nolint
@@ -21,5 +20,5 @@ type Meta struct {
 
 type Storage interface {
 	Write
-	Scan(ctx context.Context, batchSize int) ([]*Meta, error)
+	ReadAll(ctx context.Context, batchSize int, metas *[]*Meta) error
 }
