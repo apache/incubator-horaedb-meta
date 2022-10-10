@@ -107,6 +107,7 @@ func fmtID(id uint64) string {
 	return fmt.Sprintf("%020d", id)
 }
 
+// TODO: Use proto.Marshal replace json.Marshal
 func encode(meta *Meta) (string, error) {
 	bytes, err := json.Marshal(meta)
 	if err != nil {
@@ -115,6 +116,7 @@ func encode(meta *Meta) (string, error) {
 	return string(bytes), nil
 }
 
+// TODO: Use proto.Unmarshal replace json.unmarshal
 func decode(m *Meta, meta string) error {
 	err := json.Unmarshal([]byte(meta), &m)
 	return err
