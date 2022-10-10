@@ -26,7 +26,7 @@ type EtcdStorageImpl struct {
 	rootPath  string
 }
 
-func NewEtcdStorageImpl(client *clientv3.Client, clusterID uint32, rootPath string) *EtcdStorageImpl {
+func NewEtcdStorageImpl(client *clientv3.Client, clusterID uint32, rootPath string) Storage {
 	return &EtcdStorageImpl{
 		client:    client,
 		clusterID: clusterID,
