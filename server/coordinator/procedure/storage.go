@@ -21,5 +21,5 @@ type Meta struct {
 type Storage interface {
 	Write
 	List(ctx context.Context, batchSize int) ([]*Meta, error)
-	MarkDeleted(ctx context.Context, meta *Meta) error
+	MarkDeleted(ctx context.Context, id uint64) error
 }
