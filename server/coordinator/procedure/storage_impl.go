@@ -59,7 +59,7 @@ func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta *Meta) error {
 }
 
 // Delete example:
-// historyProcedure : /{rootPath}/v1/historyProcedure/{clusterID}/{procedureID}
+// deletedProcedure : /{rootPath}/v1/historyProcedure/{clusterID}/{procedureID}
 func (e EtcdStorageImpl) deleteAndRecord(ctx context.Context, meta *Meta) error {
 	str, err := encode(meta)
 	if err != nil {
@@ -75,7 +75,7 @@ func (e EtcdStorageImpl) deleteAndRecord(ctx context.Context, meta *Meta) error 
 	return err
 }
 
-func (e EtcdStorageImpl) ReadAll(ctx context.Context, batchSize int, metas *[]*Meta) error {
+func (e EtcdStorageImpl) ReadAllNeedRetry(ctx context.Context, batchSize int, metas *[]*Meta) error {
 	do := func(_ string, value []byte) error {
 		meta := &Meta{}
 		if err := decode(meta, string(value)); err != nil {

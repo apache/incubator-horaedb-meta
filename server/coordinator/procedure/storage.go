@@ -20,5 +20,5 @@ type Meta struct {
 
 type Storage interface {
 	Write
-	ReadAll(ctx context.Context, batchSize int, metas *[]*Meta) error
+	ReadAllNeedRetry(ctx context.Context, batchSize int, metas *[]*Meta) error
 }
