@@ -18,13 +18,13 @@ const (
 	DefaultScanBatchSie = 100
 )
 
-func newTestStorage(t *testing.T) *EtcdStorageImpl {
+func newTestStorage(t *testing.T) Storage {
 	_, client, _ := etcdutil.PrepareEtcdServerAndClient(t)
 	storage := NewEtcdStorageImpl(client, uint32(TestClusterID), TestRootPath)
 	return storage
 }
 
-func testWrite(t *testing.T, storage *EtcdStorageImpl) {
+func testWrite(t *testing.T, storage Storage) {
 	re := require.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
@@ -55,7 +55,7 @@ func testWrite(t *testing.T, storage *EtcdStorageImpl) {
 	re.NoError(err)
 }
 
-func testScan(t *testing.T, storage *EtcdStorageImpl) {
+func testScan(t *testing.T, storage Storage) {
 	re := require.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
@@ -67,7 +67,7 @@ func testScan(t *testing.T, storage *EtcdStorageImpl) {
 	re.Equal("test update", string(metas[1].RawData))
 }
 
-func testDelete(t *testing.T, storage *EtcdStorageImpl) {
+func testDelete(t *testing.T, storage Storage) {
 	re := require.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
