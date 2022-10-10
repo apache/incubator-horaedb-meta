@@ -45,12 +45,12 @@ func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta *Meta) error {
 		return nil
 	}
 
-	str, err := encode(meta)
+	s, err := encode(meta)
 	if err != nil {
 		return errors.WithMessage(err, "encode meta failed")
 	}
-	keyPath := e.generateNormalKeyPath(meta.ID)
-	opPut := clientv3.OpPut(keyPath, str)
+	keyPath := e.generateKeyPath(meta.ID, false)
+	opPut := clientv3.OpPut(keyPath, s)
 
 	if _, err = e.client.Do(ctx, opPut); err != nil {
 		return errors.WithMessage(err, "etcd put data failed")
@@ -58,15 +58,15 @@ func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta *Meta) error {
 	return nil
 }
 
-// Delete example:
+// Do a soft deletion, and the deleted key's format is:
 // deletedProcedure : /{rootPath}/v1/historyProcedure/{clusterID}/{procedureID}
 func (e EtcdStorageImpl) deleteAndRecord(ctx context.Context, meta *Meta) error {
 	str, err := encode(meta)
 	if err != nil {
 		return errors.WithMessage(err, "encode meta failed")
 	}
-	keyPath := e.generateNormalKeyPath(meta.ID)
-	deletedKeyPath := e.generateDeletedKeyPath(meta.ID)
+	keyPath := e.generateKeyPath(meta.ID, false)
+	deletedKeyPath := e.generateKeyPath(meta.ID, true)
 	opDelete := clientv3.OpDelete(keyPath)
 	opPut := clientv3.OpPut(deletedKeyPath, str)
 
@@ -86,8 +86,8 @@ func (e EtcdStorageImpl) ReadAllNeedRetry(ctx context.Context, batchSize int, me
 		return nil
 	}
 
-	startKey := e.generateNormalKeyPath(uint64(0))
-	endKey := e.generateNormalKeyPath(math.MaxUint64)
+	startKey := e.generateKeyPath(uint64(0), false)
+	endKey := e.generateKeyPath(math.MaxUint64, false)
 
 	err := etcdutil.Scan(ctx, e.client, startKey, endKey, batchSize, do)
 	if err != nil {
@@ -96,12 +96,11 @@ func (e EtcdStorageImpl) ReadAllNeedRetry(ctx context.Context, batchSize int, me
 	return nil
 }
 
-func (e EtcdStorageImpl) generateNormalKeyPath(procedureID uint64) string {
+func (e EtcdStorageImpl) generateKeyPath(procedureID uint64, isDeleted bool) string {
+	if isDeleted {
+		return path.Join(e.rootPath, Version, PathDeletedProcedure, fmtID(uint64(e.clusterID)), fmtID(procedureID))
+	}
 	return path.Join(e.rootPath, Version, PathProcedure, fmtID(uint64(e.clusterID)), fmtID(procedureID))
-}
-
-func (e EtcdStorageImpl) generateDeletedKeyPath(procedureID uint64) string {
-	return path.Join(e.rootPath, Version, PathDeletedProcedure, fmtID(uint64(e.clusterID)), fmtID(procedureID))
 }
 
 func fmtID(id uint64) string {
