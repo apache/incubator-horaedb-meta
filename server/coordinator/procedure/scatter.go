@@ -179,7 +179,7 @@ func (p *ScatterProcedure) Start(ctx context.Context) error {
 	return nil
 }
 
-func (p *ScatterProcedure) Cancel(ctx context.Context) error {
+func (p *ScatterProcedure) Cancel(_ context.Context) error {
 	p.UpdateStateWithLock(StateCancelled)
 	return nil
 }
