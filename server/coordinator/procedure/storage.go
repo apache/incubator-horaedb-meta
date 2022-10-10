@@ -20,5 +20,6 @@ type Meta struct {
 
 type Storage interface {
 	Write
-	ReadAllNeedRetry(ctx context.Context, batchSize int, metas *[]*Meta) error
+	List(ctx context.Context, batchSize int) ([]*Meta, error)
+	MarkDeleted(ctx context.Context, meta *Meta) error
 }

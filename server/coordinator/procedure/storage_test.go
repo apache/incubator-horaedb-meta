@@ -60,8 +60,7 @@ func testScan(t *testing.T, storage *EtcdStorageImpl) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
-	metas := make([]*Meta, 0)
-	err := storage.ReadAllNeedRetry(ctx, DefaultScanBatchSie, &metas)
+	metas, err := storage.List(ctx, DefaultScanBatchSie)
 	re.NoError(err)
 	re.Equal(2, len(metas))
 	re.Equal("test", string(metas[0].RawData))
@@ -79,11 +78,10 @@ func testDelete(t *testing.T, storage *EtcdStorageImpl) {
 		State:   StateInit,
 		RawData: []byte("test"),
 	}
-	err := storage.deleteAndRecord(ctx, testMeta1)
+	err := storage.MarkDeleted(ctx, testMeta1.ID)
 	re.NoError(err)
 
-	metas := make([]*Meta, 0)
-	err = storage.ReadAllNeedRetry(ctx, DefaultScanBatchSie, &metas)
+	metas, err := storage.List(ctx, DefaultScanBatchSie)
 	re.NoError(err)
 	re.Equal(1, len(metas))
 }
