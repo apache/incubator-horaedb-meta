@@ -59,7 +59,7 @@ type TransferLeaderCallbackRequest struct {
 	newLeader *clusterpb.Shard
 }
 
-func NewTransferLeaderProcedure(oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard) Procedure {
+func NewTransferLeaderProcedure(dispatch dispatch.ActionDispatch, cluster *cluster.Cluster, oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard) Procedure {
 	transferLeaderOperationFsm := fsm.NewFSM(
 		StateTransferLeaderBegin,
 		transferLeaderEvents,
@@ -68,7 +68,7 @@ func NewTransferLeaderProcedure(oldLeader *clusterpb.Shard, newLeader *clusterpb
 	// alloc id
 	id := uint64(1)
 
-	return &TransferLeaderProcedure{fsm: transferLeaderOperationFsm, id: id, state: StateInit, oldLeader: oldLeader, newLeader: newLeader}
+	return &TransferLeaderProcedure{fsm: transferLeaderOperationFsm, dispatch: dispatch, cluster: cluster, id: id, state: StateInit, oldLeader: oldLeader, newLeader: newLeader}
 }
 
 func (p *TransferLeaderProcedure) ID() uint64 {
@@ -126,6 +126,7 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 	}
 	if err := request.dispatch.CloseShards(cxt, oldLeader.Node, closeShardAction); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback"))
+		return
 	}
 
 	openShardAction := dispatch.OpenShardAction{
@@ -133,6 +134,7 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 	}
 	if err := request.dispatch.OpenShards(cxt, newLeader.Node, openShardAction); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback"))
+		return
 	}
 }
 
@@ -151,19 +153,22 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 	shardView, err := cluster.GetClusterShardView()
 	if err != nil {
 		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure success callback"))
+		return
 	}
+	var oldLeaderIndex int
 	for i := 0; i < len(shardView); i++ {
 		shardID := shardView[i].Id
 		if shardID == oldLeader.Id {
-			shardView[i].ShardRole = clusterpb.ShardRole_FOLLOWER
-		}
-		if shardID == newLeader.Id {
-			shardView[i].ShardRole = clusterpb.ShardRole_LEADER
+			// shardView[i].ShardRole = clusterpb.ShardRole_FOLLOWER
+			oldLeaderIndex = i
 		}
 	}
+	shardView = append(shardView[:oldLeaderIndex], shardView[oldLeaderIndex+1:]...)
+	shardView = append(shardView, newLeader)
 
 	if err := cluster.UpdateClusterTopology(ctx, cluster.GetClusterState(), shardView); err != nil {
 		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start success callback"))
+		return
 	}
 }
 
