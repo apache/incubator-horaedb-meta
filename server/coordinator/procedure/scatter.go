@@ -32,13 +32,13 @@ var (
 		{Name: EventScatterFailed, Src: []string{StateScatterWaiting}, Dst: StateScatterFailed},
 	}
 	scatterCallbacks = fsm.Callbacks{
-		EventScatterPrepare: transferLeaderPrepareCallback,
-		EventScatterFailed:  transferLeaderFailedCallback,
-		EventScatterSuccess: transferLeaderSuccessCallback,
+		EventScatterPrepare: scatterPrepareCallback,
+		EventScatterFailed:  scatterFailedCallback,
+		EventScatterSuccess: scatterSuccessCallback,
 	}
 )
 
-func transferLeaderPrepareCallback(event *fsm.Event) {
+func scatterPrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
 	requestCluster := request.cluster
 	requestDispatch := request.dispatch
@@ -49,28 +49,31 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 		shardIDs, err := requestCluster.GetShardIDs(nodeInfo.GetEndpoint())
 		if err != nil {
 			event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
+			return
 		}
 		if len(nodeInfo.GetShardInfos()) == 0 {
 			if err := requestDispatch.OpenShards(ctx, nodeInfo.GetEndpoint(), dispatch.OpenShardAction{ShardIDs: shardIDs}); err != nil {
 				event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
+				return
 			}
 		}
 	}
 
-	noeCache := requestCluster.GetClusterNodeCache()
+	nodeCache := requestCluster.GetClusterNodeCache()
 	shardTotal := requestCluster.GetClusterShardTotal()
 	minNodeCount := requestCluster.GetClusterMinNodeCount()
 
-	if !(int(minNodeCount) <= len(noeCache) &&
+	if !(int(minNodeCount) <= len(nodeCache) &&
 		requestCluster.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
 		event.Cancel()
+		return
 	}
 
 	perNodeShardCount := shardTotal / minNodeCount
 
 	shards := make([]*clusterpb.Shard, 0, shardTotal)
-	nodeList := make([]*clusterpb.Node, 0, len(noeCache))
-	for _, v := range noeCache {
+	nodeList := make([]*clusterpb.Node, 0, len(nodeCache))
+	for _, v := range nodeCache {
 		nodeList = append(nodeList, v.GetMeta())
 	}
 
@@ -78,8 +81,8 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 		for j := uint32(0); j < perNodeShardCount; j++ {
 			shardID := i*perNodeShardCount + j
 			if shardID < shardTotal {
-				requestCluster.LockShardByID(shardID)
-				defer requestCluster.UnlockShardByID(shardID)
+				// requestCluster.LockShardByID(shardID)
+				// defer requestCluster.UnlockShardByID(shardID)
 				// TODO: consider nodesCache state
 				shards = append(shards, &clusterpb.Shard{
 					Id:        shardID,
@@ -90,28 +93,31 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 		}
 	}
 
-	for nodeName, node := range noeCache {
+	for nodeName, node := range nodeCache {
 		if err := requestDispatch.OpenShards(ctx, nodeName, dispatch.OpenShardAction{ShardIDs: node.GetShardIDs()}); err != nil {
 			event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
+			return
 		}
 	}
 
 	if err := requestCluster.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
+		return
 	}
 }
 
-func transferLeaderSuccessCallback(event *fsm.Event) {
+func scatterSuccessCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
 	requestCluster := request.cluster
 	ctx := request.cxt
 
 	if err := requestCluster.Load(ctx); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
+		return
 	}
 }
 
-func transferLeaderFailedCallback(_ *fsm.Event) {
+func scatterFailedCallback(_ *fsm.Event) {
 	// TODO: Use RollbackProcedure to rollback transfer failed
 }
 
