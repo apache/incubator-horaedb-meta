@@ -47,30 +47,3 @@ type Procedure interface {
 	// State of the procedure. Retrieve the state of this procedure.
 	State() State
 }
-
-// nolint
-type Manager struct {
-	storage    *Storage
-	procedures []Procedure
-}
-
-func NewProcedure(operationType Typ) *Procedure {
-	switch operationType {
-	case Create:
-		return nil
-	case Delete:
-		return nil
-	case TransferLeader:
-		return nil
-	case Migrate:
-		return nil
-	case Split:
-		return nil
-	case Merge:
-		return nil
-	case Scatter:
-		return nil
-	}
-
-	return nil
-}
