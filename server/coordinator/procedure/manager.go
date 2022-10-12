@@ -4,6 +4,8 @@ package procedure
 
 import (
 	"context"
+	"sync"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -12,80 +14,75 @@ import (
 )
 
 type Manager interface {
-	SubmitScatterTask(ctx context.Context, nodeInfo *metaservicepb.NodeInfo) error
-	SubmitTransferLeaderTask(ctx context.Context, oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard) error
-	SubmitMigrateTask(ctx context.Context, targetShard *clusterpb.Shard, targetNode *clusterpb.Node) error
-	SubmitSplitTask(ctx context.Context, targetShard *clusterpb.Shard) error
-	SubmitMergeTask(ctx context.Context, targetShards []*clusterpb.Shard) error
+	SubmitScatterTask(ctx context.Context, request *ScatterRequest) error
+	SubmitTransferLeaderTask(ctx context.Context, request *TransferLeaderRequest) error
+	SubmitMigrateTask(ctx context.Context, request *MigrateRequest) error
+	SubmitSplitTask(ctx context.Context, request *SplitRequest) error
+	SubmitMergeTask(ctx context.Context, request *MergeRequest) error
 
 	Cancel(ctx context.Context, procedureID uint64) error
+	ListRunningProcedure(ctx context.Context) ([]*RunningProcedureInfo, error)
+}
+
+type ScatterRequest struct {
+	nodeInfo *metaservicepb.NodeInfo
+}
+
+type TransferLeaderRequest struct {
+	oldLeader *clusterpb.Shard
+	newLeader *clusterpb.Shard
+}
+
+type MigrateRequest struct {
+	targetShard *clusterpb.Shard
+	targetNode  *clusterpb.Node
+}
+
+type SplitRequest struct {
+	targetShard *clusterpb.Shard
+}
+
+type MergeRequest struct {
+	targetShards []*clusterpb.Shard
 }
 
 type ManagerImpl struct {
-	storage    Storage
+	lock       sync.RWMutex
 	procedures []Procedure
-	cluster    *cluster.Cluster
-	dispatch   dispatch.ActionDispatch
+
+	storage  Storage
+	cluster  *cluster.Cluster
+	dispatch dispatch.ActionDispatch
 }
 
-func (m ManagerImpl) SubmitScatterTask(_ context.Context, _ *metaservicepb.NodeInfo) error {
+func (m *ManagerImpl) SubmitScatterTask(_ context.Context, _ *ScatterRequest) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (m ManagerImpl) SubmitTransferLeaderTask(_ context.Context, _ *clusterpb.Shard, _ *clusterpb.Shard) error {
+func (m *ManagerImpl) SubmitTransferLeaderTask(_ context.Context, _ *TransferLeaderRequest) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (m ManagerImpl) SubmitMigrateTask(_ context.Context, _ *clusterpb.Shard, _ *clusterpb.Node) error {
+func (m *ManagerImpl) SubmitMigrateTask(_ context.Context, _ *MigrateRequest) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (m ManagerImpl) SubmitSplitTask(_ context.Context, _ *clusterpb.Shard) error {
+func (m *ManagerImpl) SubmitSplitTask(_ context.Context, _ *SplitRequest) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (m ManagerImpl) SubmitMergeTask(_ context.Context, _ []*clusterpb.Shard) error {
+func (m *ManagerImpl) SubmitMergeTask(_ context.Context, _ *MergeRequest) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func NewManagerImpl(storage Storage, cluster *cluster.Cluster, actionDispatch dispatch.ActionDispatch) (Manager, error) {
-	return &ManagerImpl{
-		storage:  storage,
-		cluster:  cluster,
-		dispatch: actionDispatch,
-	}, nil
-}
-
-func (m ManagerImpl) RetryAll(ctx context.Context) error {
-	metas, err := m.storage.List(ctx, 100)
-	if err != nil {
-		return errors.WithMessage(err, "storage list meta failed")
-	}
-	for _, meta := range metas {
-		if !checkNeedRetry(meta) {
-			continue
-		}
-		p := load(meta)
-		err := m.Retry(ctx, p)
-		return errors.WithMessagef(err, "retry procedure failed, procedureID = %d", p.ID())
-	}
-	return nil
-}
-
-func (m ManagerImpl) Submit(ctx context.Context, procedure Procedure) error {
-	err := procedure.Start(ctx)
-	if err != nil {
-		return errors.WithMessage(err, "submit procedure failed")
-	}
-	return nil
-}
-
-func (m ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
+func (m *ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	for _, procedure := range m.procedures {
 		if procedure.ID() == procedureID {
 			err := procedure.Cancel(ctx)
@@ -95,7 +92,65 @@ func (m ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
 	return nil
 }
 
-func (m ManagerImpl) Retry(ctx context.Context, procedure Procedure) error {
+func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*RunningProcedureInfo, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	procedureInfos := make([]*RunningProcedureInfo, 0)
+	for _, procedure := range m.procedures {
+		procedureInfos = append(procedureInfos, &RunningProcedureInfo{
+			ID:    procedure.ID(),
+			Typ:   procedure.Typ(),
+			State: procedure.State(),
+		})
+	}
+	return procedureInfos, nil
+}
+
+type RunningProcedureInfo struct {
+	ID    uint64
+	Typ   Typ
+	State State
+}
+
+func NewManagerImpl(ctx context.Context, storage Storage, cluster *cluster.Cluster, actionDispatch dispatch.ActionDispatch) (Manager, error) {
+	manager := &ManagerImpl{
+		storage:  storage,
+		cluster:  cluster,
+		dispatch: actionDispatch,
+	}
+
+	err := manager.retryAll(ctx)
+	if err != nil {
+		return nil, errors.WithMessage(err, "retry all running procedure failed")
+	}
+	return manager, nil
+}
+
+func (m *ManagerImpl) retryAll(ctx context.Context) error {
+	metas, err := m.storage.List(ctx, 100)
+	if err != nil {
+		return errors.WithMessage(err, "storage list meta failed")
+	}
+	for _, meta := range metas {
+		if !checkNeedRetry(meta) {
+			continue
+		}
+		p := load(meta)
+		err := m.retry(ctx, p)
+		return errors.WithMessagef(err, "retry procedure failed, procedureID = %d", p.ID())
+	}
+	return nil
+}
+
+func (m *ManagerImpl) submit(ctx context.Context, procedure Procedure) error {
+	err := procedure.Start(ctx)
+	if err != nil {
+		return errors.WithMessage(err, "submit procedure failed")
+	}
+	return nil
+}
+
+func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
 	err := procedure.Start(ctx)
 	if err != nil {
 		return errors.WithMessagef(err, "start procedure failed, procedureID = %d", procedure.ID())
