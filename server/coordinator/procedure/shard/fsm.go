@@ -7,7 +7,7 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
-	"github.com/CeresDB/ceresmeta/server/coordinator/dispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
 )
@@ -59,7 +59,7 @@ var (
 type LeaderCallbackRequest struct {
 	Ctx           context.Context
 	Cluster       *cluster.Cluster
-	EventDispatch dispatch.EventDispatch
+	EventDispatch eventdispatch.Dispatch
 
 	Node    string
 	ShardID uint32
@@ -68,7 +68,7 @@ type LeaderCallbackRequest struct {
 type FollowerCallbackRequest struct {
 	Ctx           context.Context
 	Cluster       *cluster.Cluster
-	EventDispatch dispatch.EventDispatch
+	EventDispatch eventdispatch.Dispatch
 
 	Node    string
 	ShardID uint32
@@ -121,12 +121,12 @@ func transferFollowerCallback(event *fsm.Event) {
 	request := event.Args[0].(*LeaderCallbackRequest)
 	ctx := request.Ctx
 	c := request.Cluster
-	EventDispatch := request.EventDispatch
+	eventDispatch := request.EventDispatch
 	node := request.Node
 	shardID := request.ShardID
 
-	action := &dispatch.CloseShardRequest{ShardID: shardID}
-	if err := EventDispatch.CloseShard(ctx, node, action); err != nil {
+	req := &eventdispatch.CloseShardRequest{ShardID: shardID}
+	if err := eventDispatch.CloseShard(ctx, node, req); err != nil {
 		event.Cancel(errors.Wrap(err, EventPrepareTransferFollower))
 	}
 
@@ -139,13 +139,13 @@ func transferFollowerFailedCallback(event *fsm.Event) {
 	request := event.Args[0].(*LeaderCallbackRequest)
 	ctx := request.Ctx
 	c := request.Cluster
-	EventDispatch := request.EventDispatch
+	eventDispatch := request.EventDispatch
 	node := request.Node
 	shardID := request.ShardID
 
+	req := &eventdispatch.CloseShardRequest{ShardID: shardID}
 	// Transfer failed, stop transfer and reset state.
-	action := &dispatch.CloseShardRequest{ShardID: shardID}
-	if err := EventDispatch.CloseShard(ctx, node, action); err != nil {
+	if err := eventDispatch.CloseShard(ctx, node, req); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferFollowerFailed))
 	}
 
@@ -167,14 +167,14 @@ func transferLeaderCallback(event *fsm.Event) {
 	node := request.Node
 	shardID := request.ShardID
 
-	// Send event to CeresDB, waiting for response
+	// Send event to CeresDB, waiting for response.
 	// TODO: add shardInfo in FollowerCallbackRequest
-	action := &dispatch.OpenShardRequest{Shard: &cluster.ShardInfo{
+	req := &eventdispatch.OpenShardRequest{Shard: &cluster.ShardInfo{
 		ShardID:   shardID,
 		ShardRole: clusterpb.ShardRole_LEADER,
 		Version:   0,
 	}}
-	if err := EventDispatch.OpenShard(ctx, node, action); err != nil {
+	if err := EventDispatch.OpenShard(ctx, node, req); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferLeader))
 	}
 
@@ -186,14 +186,14 @@ func transferLeaderCallback(event *fsm.Event) {
 func transferLeaderFailed(event *fsm.Event) {
 	request := event.Args[0].(*FollowerCallbackRequest)
 	ctx := request.Ctx
-	EventDispatch := request.EventDispatch
+	eventDispatch := request.EventDispatch
 	c := request.Cluster
 	node := request.Node
 	shardID := request.ShardID
 
+	req := &eventdispatch.CloseShardRequest{ShardID: shardID}
 	// Transfer failed, stop transfer and reset state.
-	action := &dispatch.CloseShardRequest{ShardID: shardID}
-	if err := EventDispatch.CloseShard(ctx, node, action); err != nil {
+	if err := eventDispatch.CloseShard(ctx, node, req); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferLeaderFailed))
 	}
 

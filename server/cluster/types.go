@@ -45,7 +45,7 @@ type GetNodesResult struct {
 	NodeShards             []*NodeShard
 }
 
-func ConvertShardsInfo(shard *ShardInfo) *metaservicepb.ShardInfo {
+func ConvertShardsInfoToPB(shard *ShardInfo) *metaservicepb.ShardInfo {
 	return &metaservicepb.ShardInfo{
 		ShardId: shard.ShardID,
 		Role:    shard.ShardRole,
@@ -53,7 +53,7 @@ func ConvertShardsInfo(shard *ShardInfo) *metaservicepb.ShardInfo {
 	}
 }
 
-func ConvertTableInfo(table *TableInfo) *metaservicepb.TableInfo {
+func ConvertTableInfoToPB(table *TableInfo) *metaservicepb.TableInfo {
 	return &metaservicepb.TableInfo{
 		Id:         table.ID,
 		Name:       table.Name,

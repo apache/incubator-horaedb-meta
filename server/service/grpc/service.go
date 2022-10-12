@@ -116,7 +116,7 @@ func (s *Service) GetShardTables(ctx context.Context, req *metaservicepb.GetShar
 			})
 		}
 		tablesPb[shardID] = &metaservicepb.ShardTables{
-			ShardInfo: cluster.ConvertShardsInfo(shardTables.Shard),
+			ShardInfo: cluster.ConvertShardsInfoToPB(shardTables.Shard),
 			Tables:    tablesOfShardPb,
 		}
 	}
@@ -216,12 +216,8 @@ func convertGetNodesResult(nodesResult *cluster.GetNodesResult) *metaservicepb.G
 	nodeShards := make([]*metaservicepb.NodeShard, 0, len(nodesResult.NodeShards))
 	for _, nodeShard := range nodesResult.NodeShards {
 		nodeShards = append(nodeShards, &metaservicepb.NodeShard{
-			Endpoint: nodeShard.Endpoint,
-			ShardInfo: &metaservicepb.ShardInfo{
-				ShardId: nodeShard.ShardInfo.ShardID,
-				Role:    nodeShard.ShardInfo.ShardRole,
-				Version: nodeShard.ShardInfo.Version,
-			},
+			Endpoint:  nodeShard.Endpoint,
+			ShardInfo: cluster.ConvertShardsInfoToPB(nodeShard.ShardInfo),
 		})
 	}
 	return &metaservicepb.GetNodesResponse{

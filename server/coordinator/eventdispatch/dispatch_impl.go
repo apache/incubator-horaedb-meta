@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package dispatch
+package eventdispatch
 
 import (
 	"context"
@@ -13,32 +13,32 @@ import (
 	"google.golang.org/grpc"
 )
 
-type EventDispatchImpl struct {
+type DispatchImpl struct {
 	conns sync.Map
 }
 
-func NewEventDispatchImpl() *EventDispatchImpl {
-	return &EventDispatchImpl{}
+func NewDispatchImpl() *DispatchImpl {
+	return &DispatchImpl{}
 }
 
-func (e *EventDispatchImpl) OpenShard(ctx context.Context, addr string, request *OpenShardRequest) error {
+func (e *DispatchImpl) OpenShard(ctx context.Context, addr string, request *OpenShardRequest) error {
 	client, err := e.getMetaEventClient(ctx, addr)
 	if err != nil {
 		return err
 	}
 	resp, err := client.OpenShard(ctx, &metaeventpb.OpenShardRequest{
-		Shard: cluster.ConvertShardsInfo(request.Shard),
+		Shard: cluster.ConvertShardsInfoToPB(request.Shard),
 	})
 	if err != nil {
-		return errors.WithMessage(err, "open shards")
+		return errors.WithMessage(err, "open shard")
 	}
 	if resp.GetHeader().Code != 0 {
-		return errors.Errorf("failed to open shards, err:%s", resp.GetHeader().GetError())
+		return errors.Errorf("failed to open shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
 }
 
-func (e *EventDispatchImpl) CloseShard(ctx context.Context, addr string, request *CloseShardRequest) error {
+func (e *DispatchImpl) CloseShard(ctx context.Context, addr string, request *CloseShardRequest) error {
 	client, err := e.getMetaEventClient(ctx, addr)
 	if err != nil {
 		return err
@@ -47,20 +47,20 @@ func (e *EventDispatchImpl) CloseShard(ctx context.Context, addr string, request
 		ShardId: request.ShardID,
 	})
 	if err != nil {
-		return errors.WithMessage(err, "close shards")
+		return errors.WithMessage(err, "close shard")
 	}
 	if resp.GetHeader().Code != 0 {
-		return errors.Errorf("failed to close shards, err:%s", resp.GetHeader().GetError())
+		return errors.Errorf("failed to close shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
 }
 
-func (e *EventDispatchImpl) CreateTableOnShard(ctx context.Context, addr string, request *CreateTableOnShardRequest) error {
+func (e *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, request *CreateTableOnShardRequest) error {
 	client, err := e.getMetaEventClient(ctx, addr)
 	if err != nil {
 		return err
 	}
-	resp, err := client.CreateTableOnShard(ctx, convertCreateTableOnShardRequest(request))
+	resp, err := client.CreateTableOnShard(ctx, convertCreateTableOnShardRequestToPB(request))
 	if err != nil {
 		return errors.WithMessage(err, "create table on shard")
 	}
@@ -70,12 +70,12 @@ func (e *EventDispatchImpl) CreateTableOnShard(ctx context.Context, addr string,
 	return nil
 }
 
-func (e *EventDispatchImpl) DropTableOnShard(ctx context.Context, addr string, request *DropTableOnShardRequest) error {
+func (e *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, request *DropTableOnShardRequest) error {
 	client, err := e.getMetaEventClient(ctx, addr)
 	if err != nil {
 		return err
 	}
-	resp, err := client.DropTableOnShard(ctx, convertDropTableOnShardRequest(request))
+	resp, err := client.DropTableOnShard(ctx, convertDropTableOnShardRequestToPB(request))
 	if err != nil {
 		return errors.WithMessage(err, "drop table on shard")
 	}
@@ -85,20 +85,20 @@ func (e *EventDispatchImpl) DropTableOnShard(ctx context.Context, addr string, r
 	return nil
 }
 
-func (e *EventDispatchImpl) getGrpcClient(ctx context.Context, forwardedAddr string) (*grpc.ClientConn, error) {
-	client, ok := e.conns.Load(forwardedAddr)
+func (e *DispatchImpl) getGrpcClient(ctx context.Context, addr string) (*grpc.ClientConn, error) {
+	client, ok := e.conns.Load(addr)
 	if !ok {
-		cc, err := service.GetClientConn(ctx, forwardedAddr)
+		cc, err := service.GetClientConn(ctx, addr)
 		if err != nil {
 			return nil, err
 		}
 		client = cc
-		e.conns.Store(forwardedAddr, cc)
+		e.conns.Store(addr, cc)
 	}
 	return client.(*grpc.ClientConn), nil
 }
 
-func (e *EventDispatchImpl) getMetaEventClient(ctx context.Context, addr string) (metaeventpb.MetaEventServiceClient, error) {
+func (e *DispatchImpl) getMetaEventClient(ctx context.Context, addr string) (metaeventpb.MetaEventServiceClient, error) {
 	client, err := e.getGrpcClient(ctx, addr)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get meta event client, addr:%s", addr)
@@ -106,20 +106,20 @@ func (e *EventDispatchImpl) getMetaEventClient(ctx context.Context, addr string)
 	return metaeventpb.NewMetaEventServiceClient(client), nil
 }
 
-func convertCreateTableOnShardRequest(request *CreateTableOnShardRequest) *metaeventpb.CreateTableOnShardRequest {
+func convertCreateTableOnShardRequestToPB(request *CreateTableOnShardRequest) *metaeventpb.CreateTableOnShardRequest {
 	return &metaeventpb.CreateTableOnShardRequest{
 		UpdateShardInfo: nil,
-		TableInfo:       cluster.ConvertTableInfo(request.TableInfo),
+		TableInfo:       cluster.ConvertTableInfoToPB(request.TableInfo),
 		CreateSql:       request.CreateSQL,
 	}
 }
 
-func convertDropTableOnShardRequest(request *DropTableOnShardRequest) *metaeventpb.DropTableOnShardRequest {
+func convertDropTableOnShardRequestToPB(request *DropTableOnShardRequest) *metaeventpb.DropTableOnShardRequest {
 	return &metaeventpb.DropTableOnShardRequest{
 		UpdateShardInfo: &metaeventpb.UpdateShardInfo{
-			CurrShardInfo: cluster.ConvertShardsInfo(request.ShardInfo),
+			CurrShardInfo: cluster.ConvertShardsInfoToPB(request.ShardInfo),
 			PrevVersion:   request.PrevVersion,
 		},
-		TableInfo: cluster.ConvertTableInfo(request.TableInfo),
+		TableInfo: cluster.ConvertTableInfoToPB(request.TableInfo),
 	}
 }

@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package dispatch
+package eventdispatch
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster"
 )
 
-type EventDispatch interface {
+type Dispatch interface {
 	OpenShard(context context.Context, address string, request *OpenShardRequest) error
 	CloseShard(context context.Context, address string, request *CloseShardRequest) error
 	CreateTableOnShard(context context.Context, address string, request *CreateTableOnShardRequest) error
