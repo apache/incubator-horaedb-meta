@@ -4,7 +4,6 @@ package procedure
 
 import (
 	"context"
-
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -20,7 +19,6 @@ type Manager interface {
 	SubmitMergeTask(ctx context.Context, targetShards []*clusterpb.Shard) error
 
 	Cancel(ctx context.Context, procedureID uint64) error
-	RetryAll(ctx context.Context) error
 }
 
 type ManagerImpl struct {
