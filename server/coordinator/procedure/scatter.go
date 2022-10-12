@@ -81,8 +81,6 @@ func scatterPrepareCallback(event *fsm.Event) {
 		for j := uint32(0); j < perNodeShardCount; j++ {
 			shardID := i*perNodeShardCount + j
 			if shardID < shardTotal {
-				// requestCluster.LockShardByID(shardID)
-				// defer requestCluster.UnlockShardByID(shardID)
 				// TODO: consider nodesCache state
 				shards = append(shards, &clusterpb.Shard{
 					Id:        shardID,
