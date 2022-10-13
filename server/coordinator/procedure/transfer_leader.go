@@ -8,7 +8,7 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
-	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
 )
@@ -42,7 +42,7 @@ type TransferLeaderProcedure struct {
 	fsm      *fsm.FSM
 	id       uint64
 	state    State
-	dispatch dispatch.ActionDispatch
+	dispatch eventdispatch.Dispatch
 	cluster  *cluster.Cluster
 
 	oldLeader *clusterpb.Shard
@@ -53,13 +53,13 @@ type TransferLeaderProcedure struct {
 type TransferLeaderCallbackRequest struct {
 	cluster  *cluster.Cluster
 	cxt      context.Context
-	dispatch dispatch.ActionDispatch
+	dispatch eventdispatch.Dispatch
 
 	oldLeader *clusterpb.Shard
 	newLeader *clusterpb.Shard
 }
 
-func NewTransferLeaderProcedure(dispatch dispatch.ActionDispatch, cluster *cluster.Cluster, oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard, id uint64) Procedure {
+func NewTransferLeaderProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard, id uint64) Procedure {
 	transferLeaderOperationFsm := fsm.NewFSM(
 		StateTransferLeaderBegin,
 		transferLeaderEvents,
@@ -117,18 +117,18 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*TransferLeaderCallbackRequest)
 	cxt := request.cxt
 
-	closeShardAction := dispatch.CloseShardAction{
-		ShardIDs: []uint32{request.oldLeader.Id},
+	closeShardRequest := &eventdispatch.CloseShardRequest{
+		ShardID: request.oldLeader.Id,
 	}
-	if err := request.dispatch.CloseShards(cxt, request.oldLeader.Node, closeShardAction); err != nil {
+	if err := request.dispatch.CloseShard(cxt, request.oldLeader.Node, closeShardRequest); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback"))
 		return
 	}
 
-	openShardAction := dispatch.OpenShardAction{
-		ShardIDs: []uint32{request.newLeader.Id},
+	openShardRequest := &eventdispatch.OpenShardRequest{
+		Shard: &cluster.ShardInfo{ShardID: request.newLeader.Id, ShardRole: clusterpb.ShardRole_LEADER},
 	}
-	if err := request.dispatch.OpenShards(cxt, request.newLeader.Node, openShardAction); err != nil {
+	if err := request.dispatch.OpenShard(cxt, request.newLeader.Node, openShardRequest); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback"))
 		return
 	}

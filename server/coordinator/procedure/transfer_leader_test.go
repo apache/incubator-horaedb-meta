@@ -8,9 +8,8 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
-	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
-	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -30,7 +29,7 @@ const (
 func TestTransferLeader(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
-	dispatch := dispatch.NewEventDispatchImpl()
+	dispatch := eventdispatch.NewDispatchImpl()
 	cluster := newTestCluster(ctx, t)
 
 	// Initialize shard topology
@@ -87,7 +86,7 @@ func newTestEtcdStorage(t *testing.T) (storage.Storage, clientv3.KV, etcdutil.Cl
 func newTestCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 	re := require.New(t)
 	storage, kv, _ := newTestEtcdStorage(t)
-	manager, err := cluster.NewManagerImpl(storage, kv, schedule.NewHeartbeatStreams(ctx), testRootPath, defaultIDAllocatorStep)
+	manager, err := cluster.NewManagerImpl(storage, kv, testRootPath, defaultIDAllocatorStep)
 	re.NoError(err)
 
 	cluster, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
