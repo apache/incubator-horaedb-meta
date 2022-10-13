@@ -40,13 +40,13 @@ var (
 
 func scatterPrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
-	cluster := request.cluster
+	c := request.cluster
 	d := request.dispatch
 	ctx := request.ctx
 	nodeInfo := request.nodeInfo
 
-	if cluster.GetClusterState() == clusterpb.ClusterTopology_STABLE {
-		shardIDs, err := cluster.GetShardIDs(nodeInfo.GetEndpoint())
+	if c.GetClusterState() == clusterpb.ClusterTopology_STABLE {
+		shardIDs, err := c.GetShardIDs(nodeInfo.GetEndpoint())
 		if err != nil {
 			event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
 			return
@@ -59,13 +59,12 @@ func scatterPrepareCallback(event *fsm.Event) {
 		}
 	}
 
-	nodeCache := cluster.GetClusterNodeCache()
-	shardTotal := cluster.GetClusterShardTotal()
-	minNodeCount := cluster.GetClusterMinNodeCount()
+	nodeCache := c.GetClusterNodeCache()
+	shardTotal := c.GetClusterShardTotal()
+	minNodeCount := c.GetClusterMinNodeCount()
 
 	if !(int(minNodeCount) <= len(nodeCache) &&
-		cluster.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
-		event.Cancel()
+		c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
 		return
 	}
 
@@ -98,7 +97,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 		}
 	}
 
-	if err := cluster.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
+	if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
 		return
 	}
@@ -106,10 +105,10 @@ func scatterPrepareCallback(event *fsm.Event) {
 
 func scatterSuccessCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
-	requestCluster := request.cluster
+	c := request.cluster
 	ctx := request.ctx
 
-	if err := requestCluster.Load(ctx); err != nil {
+	if err := c.Load(ctx); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
 		return
 	}
