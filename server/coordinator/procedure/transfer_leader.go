@@ -155,7 +155,7 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure success callback"))
 		return
 	}
-	var oldLeaderIndex = -1
+	oldLeaderIndex := -1
 	for i := 0; i < len(shardView); i++ {
 		shardID := shardView[i].Id
 		if shardID == request.oldLeader.Id {
@@ -164,6 +164,7 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 	}
 	if oldLeaderIndex == -1 {
 		event.Cancel(errors.WithMessage(cluster.ErrShardNotFound, fmt.Sprintf("shard not found,shardID = %d", request.oldLeader.Id)))
+		return
 	}
 	shardView = append(shardView[:oldLeaderIndex], shardView[oldLeaderIndex+1:]...)
 	shardView = append(shardView, request.newLeader)
