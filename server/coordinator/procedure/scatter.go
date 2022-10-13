@@ -40,31 +40,31 @@ var (
 
 func scatterPrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
-	requestCluster := request.cluster
-	requestDispatch := request.dispatch
-	ctx := request.cxt
+	cluster := request.cluster
+	d := request.dispatch
+	ctx := request.ctx
 	nodeInfo := request.nodeInfo
 
-	if requestCluster.GetClusterState() == clusterpb.ClusterTopology_STABLE {
-		shardIDs, err := requestCluster.GetShardIDs(nodeInfo.GetEndpoint())
+	if cluster.GetClusterState() == clusterpb.ClusterTopology_STABLE {
+		shardIDs, err := cluster.GetShardIDs(nodeInfo.GetEndpoint())
 		if err != nil {
 			event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
 			return
 		}
 		if len(nodeInfo.GetShardInfos()) == 0 {
-			if err := requestDispatch.OpenShards(ctx, nodeInfo.GetEndpoint(), dispatch.OpenShardAction{ShardIDs: shardIDs}); err != nil {
+			if err := d.OpenShards(ctx, nodeInfo.GetEndpoint(), dispatch.OpenShardAction{ShardIDs: shardIDs}); err != nil {
 				event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
 				return
 			}
 		}
 	}
 
-	nodeCache := requestCluster.GetClusterNodeCache()
-	shardTotal := requestCluster.GetClusterShardTotal()
-	minNodeCount := requestCluster.GetClusterMinNodeCount()
+	nodeCache := cluster.GetClusterNodeCache()
+	shardTotal := cluster.GetClusterShardTotal()
+	minNodeCount := cluster.GetClusterMinNodeCount()
 
 	if !(int(minNodeCount) <= len(nodeCache) &&
-		requestCluster.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
+		cluster.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
 		event.Cancel()
 		return
 	}
@@ -92,13 +92,13 @@ func scatterPrepareCallback(event *fsm.Event) {
 	}
 
 	for nodeName, node := range nodeCache {
-		if err := requestDispatch.OpenShards(ctx, nodeName, dispatch.OpenShardAction{ShardIDs: node.GetShardIDs()}); err != nil {
+		if err := d.OpenShards(ctx, nodeName, dispatch.OpenShardAction{ShardIDs: node.GetShardIDs()}); err != nil {
 			event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
 			return
 		}
 	}
 
-	if err := requestCluster.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
+	if err := cluster.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
 		return
 	}
@@ -107,7 +107,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 func scatterSuccessCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
 	requestCluster := request.cluster
-	ctx := request.cxt
+	ctx := request.ctx
 
 	if err := requestCluster.Load(ctx); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
@@ -119,10 +119,10 @@ func scatterFailedCallback(_ *fsm.Event) {
 	// TODO: Use RollbackProcedure to rollback transfer failed
 }
 
-// ScatterCallbackRequest is fsm callbacks param
+// ScatterCallbackRequest is fsm callbacks param.
 type ScatterCallbackRequest struct {
 	cluster  *cluster.Cluster
-	cxt      context.Context
+	ctx      context.Context
 	dispatch dispatch.ActionDispatch
 
 	nodeInfo *metaservicepb.NodeInfo
@@ -164,7 +164,7 @@ func (p *ScatterProcedure) Start(ctx context.Context) error {
 
 	scatterCallbackRequest := &ScatterCallbackRequest{
 		cluster:  p.cluster,
-		cxt:      ctx,
+		ctx:      ctx,
 		dispatch: p.dispatch,
 		nodeInfo: p.nodeInfo,
 	}
