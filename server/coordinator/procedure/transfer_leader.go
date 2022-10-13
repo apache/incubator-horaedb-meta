@@ -14,26 +14,26 @@ import (
 )
 
 const (
-	EventTransferLeaderPrepare = "EventTransferLeaderPrepare"
-	EventTransferLeaderFailed  = "EventTransferLeaderFailed"
-	EventTransferLeaderSuccess = "EventTransferLeaderSuccess"
+	eventTransferLeaderPrepare = "EventTransferLeaderPrepare"
+	eventTransferLeaderFailed  = "EventTransferLeaderFailed"
+	eventTransferLeaderSuccess = "EventTransferLeaderSuccess"
 
-	StateTransferLeaderBegin   = "StateTransferLeaderBegin"
-	StateTransferLeaderWaiting = "StateTransferLeaderWaiting"
-	StateTransferLeaderFinish  = "StateTransferLeaderFinish"
-	StateTransferLeaderFailed  = "StateTransferLeaderFailed"
+	stateTransferLeaderBegin   = "StateTransferLeaderBegin"
+	stateTransferLeaderWaiting = "StateTransferLeaderWaiting"
+	stateTransferLeaderFinish  = "StateTransferLeaderFinish"
+	stateTransferLeaderFailed  = "StateTransferLeaderFailed"
 )
 
 var (
 	transferLeaderEvents = fsm.Events{
-		{Name: EventTransferLeaderPrepare, Src: []string{StateTransferLeaderBegin}, Dst: StateTransferLeaderWaiting},
-		{Name: EventTransferLeaderSuccess, Src: []string{StateTransferLeaderWaiting}, Dst: StateTransferLeaderFinish},
-		{Name: EventTransferLeaderFailed, Src: []string{StateTransferLeaderWaiting}, Dst: StateTransferLeaderFailed},
+		{Name: eventTransferLeaderPrepare, Src: []string{stateTransferLeaderBegin}, Dst: stateTransferLeaderWaiting},
+		{Name: eventTransferLeaderSuccess, Src: []string{stateTransferLeaderWaiting}, Dst: stateTransferLeaderFinish},
+		{Name: eventTransferLeaderFailed, Src: []string{stateTransferLeaderWaiting}, Dst: stateTransferLeaderFailed},
 	}
 	transferLeaderCallbacks = fsm.Callbacks{
-		EventTransferLeaderPrepare: transferLeaderPrepareCallback,
-		EventTransferLeaderFailed:  transferLeaderFailedCallback,
-		EventTransferLeaderSuccess: transferLeaderSuccessCallback,
+		eventTransferLeaderPrepare: transferLeaderPrepareCallback,
+		eventTransferLeaderFailed:  transferLeaderFailedCallback,
+		eventTransferLeaderSuccess: transferLeaderSuccessCallback,
 	}
 )
 
@@ -61,7 +61,7 @@ type TransferLeaderCallbackRequest struct {
 
 func NewTransferLeaderProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard, id uint64) Procedure {
 	transferLeaderOperationFsm := fsm.NewFSM(
-		StateTransferLeaderBegin,
+		stateTransferLeaderBegin,
 		transferLeaderEvents,
 		transferLeaderCallbacks,
 	)
@@ -88,13 +88,13 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 		dispatch:  p.dispatch,
 	}
 
-	if err := p.fsm.Event(EventTransferLeaderPrepare, transferLeaderRequest); err != nil {
-		err := p.fsm.Event(EventTransferLeaderFailed, transferLeaderRequest)
+	if err := p.fsm.Event(eventTransferLeaderPrepare, transferLeaderRequest); err != nil {
+		err := p.fsm.Event(eventTransferLeaderFailed, transferLeaderRequest)
 		p.UpdateStateWithLock(StateFailed)
 		return errors.WithMessage(err, "coordinator transferLeaderShard start")
 	}
 
-	if err := p.fsm.Event(EventTransferLeaderSuccess, transferLeaderRequest); err != nil {
+	if err := p.fsm.Event(eventTransferLeaderSuccess, transferLeaderRequest); err != nil {
 		return errors.WithMessage(err, "coordinator transferLeaderShard start")
 	}
 
