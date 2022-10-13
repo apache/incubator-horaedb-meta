@@ -20,15 +20,9 @@ type OrderedList struct {
 	sorted []uint64
 }
 
-func (l *OrderedList) IndexOfValue(v uint64) int {
-	for i, value := range l.sorted {
-		if value == v {
-			return i
-		}
-	}
-	return -1
-}
-
+// FindFirstHoleValueAndIndex Find the minimum hole value and its index.
+// If the list is empty, then return invalid value and 0 as index;
+// If no hole is found, then return the `last_value + 1` in the list and l.Len() as the index;
 func (l *OrderedList) FindFirstHoleValueAndIndex(min uint64) (uint64, int) {
 	if len(l.sorted) == 0 {
 		return min, 0
@@ -50,6 +44,7 @@ func (l *OrderedList) FindFirstHoleValueAndIndex(min uint64) (uint64, int) {
 	return s[len(s)-1] + 1, len(s)
 }
 
+// Insert the value at the idx whose correctness should be ensured by the caller.
 func (l *OrderedList) Insert(v uint64, i int) {
 	if len(l.sorted) == i {
 		l.sorted = append(l.sorted, v)
