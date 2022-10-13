@@ -4,6 +4,9 @@ package procedure
 
 import (
 	"context"
+	"fmt"
+	"github.com/CeresDB/ceresmeta/pkg/log"
+	"go.uber.org/zap"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
@@ -38,13 +41,14 @@ var (
 )
 
 type TransferLeaderProcedure struct {
-	lock     sync.RWMutex
-	fsm      *fsm.FSM
-	id       uint64
-	state    State
-	dispatch eventdispatch.Dispatch
-	cluster  *cluster.Cluster
+	// Protect the state.
+	lock  sync.RWMutex
+	state State
 
+	fsm       *fsm.FSM
+	id        uint64
+	dispatch  eventdispatch.Dispatch
+	cluster   *cluster.Cluster
 	oldLeader *clusterpb.Shard
 	newLeader *clusterpb.Shard
 }
@@ -52,7 +56,7 @@ type TransferLeaderProcedure struct {
 // TransferLeaderCallbackRequest is fsm callbacks param
 type TransferLeaderCallbackRequest struct {
 	cluster  *cluster.Cluster
-	cxt      context.Context
+	ctx      context.Context
 	dispatch eventdispatch.Dispatch
 
 	oldLeader *clusterpb.Shard
@@ -82,7 +86,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 
 	transferLeaderRequest := &TransferLeaderCallbackRequest{
 		cluster:   p.cluster,
-		cxt:       ctx,
+		ctx:       ctx,
 		newLeader: p.newLeader,
 		oldLeader: p.oldLeader,
 		dispatch:  p.dispatch,
@@ -115,21 +119,23 @@ func (p *TransferLeaderProcedure) State() State {
 
 func transferLeaderPrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*TransferLeaderCallbackRequest)
-	cxt := request.cxt
+	ctx := request.ctx
 
 	closeShardRequest := &eventdispatch.CloseShardRequest{
 		ShardID: request.oldLeader.Id,
 	}
-	if err := request.dispatch.CloseShard(cxt, request.oldLeader.Node, closeShardRequest); err != nil {
-		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback"))
+	if err := request.dispatch.CloseShard(ctx, request.oldLeader.Node, closeShardRequest); err != nil {
+		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback, close shard failed"))
+		log.Error("coordinator transferLeaderShard prepare callback, close shard failed", zap.Uint32("shardId", request.oldLeader.Id))
 		return
 	}
 
 	openShardRequest := &eventdispatch.OpenShardRequest{
 		Shard: &cluster.ShardInfo{ShardID: request.newLeader.Id, ShardRole: clusterpb.ShardRole_LEADER},
 	}
-	if err := request.dispatch.OpenShard(cxt, request.newLeader.Node, openShardRequest); err != nil {
-		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback"))
+	if err := request.dispatch.OpenShard(ctx, request.newLeader.Node, openShardRequest); err != nil {
+		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback, open shard failed"))
+		log.Error("coordinator transferLeaderShard prepare callback, open shard failed", zap.Uint32("shardId", request.newLeader.Id))
 		return
 	}
 }
@@ -141,7 +147,7 @@ func transferLeaderFailedCallback(_ *fsm.Event) {
 func transferLeaderSuccessCallback(event *fsm.Event) {
 	request := event.Args[0].(*TransferLeaderCallbackRequest)
 	c := request.cluster
-	ctx := request.cxt
+	ctx := request.ctx
 
 	// Update cluster topology
 	shardView, err := c.GetClusterShardView()
@@ -149,18 +155,22 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure success callback"))
 		return
 	}
-	var oldLeaderIndex int
+	var oldLeaderIndex = -1
 	for i := 0; i < len(shardView); i++ {
 		shardID := shardView[i].Id
 		if shardID == request.oldLeader.Id {
 			oldLeaderIndex = i
 		}
 	}
+	if oldLeaderIndex == -1 {
+		event.Cancel(errors.WithMessage(cluster.ErrShardNotFound, fmt.Sprintf("shard not found,shardID = %d", request.oldLeader.Id)))
+	}
 	shardView = append(shardView[:oldLeaderIndex], shardView[oldLeaderIndex+1:]...)
 	shardView = append(shardView, request.newLeader)
 
 	if err := c.UpdateClusterTopology(ctx, c.GetClusterState(), shardView); err != nil {
 		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start success callback"))
+		log.Error("coordinator transferLeaderShard prepare callback, update shard topology failed")
 		return
 	}
 }
