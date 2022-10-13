@@ -115,6 +115,7 @@ func TestAllocNodeShard(t *testing.T) {
 	}
 	// NodeCount = 2, shardTotal = 3
 	// Three shard distributed in node0,node0,node1
+	allocator = id.NewReusableAllocatorImpl(make([]uint64, 0), 0)
 	shardView, err = allocNodeShards(ctx, uint32(shardTotal), uint32(minNodeCount), nodeList, allocator)
 	re.NoError(err)
 	re.Equal(shardTotal, len(shardView))
