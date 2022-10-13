@@ -4,7 +4,6 @@ package procedure
 
 import (
 	"context"
-	"go.uber.org/zap"
 	"sync"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
