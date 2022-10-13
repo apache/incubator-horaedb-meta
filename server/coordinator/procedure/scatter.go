@@ -44,9 +44,7 @@ var (
 func scatterPrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
 	c := request.cluster
-	d := request.dispatch
 	ctx := request.ctx
-	allocator := request.allocator
 
 	for {
 		time.Sleep(DefaultTimeInterval)
@@ -70,14 +68,14 @@ func scatterPrepareCallback(event *fsm.Event) {
 		nodeList = append(nodeList, v.GetMeta())
 	}
 
-	shards, err := allocNodeShards(ctx, shardTotal, minNodeCount, nodeList, allocator)
+	shards, err := allocNodeShards(ctx, shardTotal, minNodeCount, nodeList, request.allocator)
 	if err != nil {
 		event.Cancel(errors.WithMessage(err, "alloc node shards failed"))
 		return
 	}
 
 	for nodeName, node := range nodeCache {
-		if err := d.OpenShards(ctx, nodeName, dispatch.OpenShardAction{ShardIDs: node.GetShardIDs()}); err != nil {
+		if err := request.dispatch.OpenShards(ctx, nodeName, dispatch.OpenShardAction{ShardIDs: node.GetShardIDs()}); err != nil {
 			event.Cancel(errors.WithMessage(err, "open shard failed"))
 			return
 		}
@@ -120,10 +118,8 @@ func allocNodeShards(cxt context.Context, shardTotal uint32, minNodeCount uint32
 
 func scatterSuccessCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
-	c := request.cluster
-	ctx := request.ctx
 
-	if err := c.Load(ctx); err != nil {
+	if err := request.cluster.Load(request.ctx); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
 		return
 	}
