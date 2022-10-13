@@ -1,3 +1,5 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package id
 
 import (
@@ -11,43 +13,79 @@ type ReusableAllocatorImpl struct {
 	lock sync.Mutex
 
 	minID    uint64
-	existIDs []uint64
+	existIDs *OrderedList
 }
 
-func NewReusableAllocatorImpl(existIDs []uint64, minID uint64) *ReusableAllocatorImpl {
-	return &ReusableAllocatorImpl{minID: minID, existIDs: existIDs}
+type OrderedList struct {
+	sortedArray []uint64
 }
 
-func (a *ReusableAllocatorImpl) Alloc(ctx context.Context) (uint64, error) {
+func (l *OrderedList) IndexOfValue(v uint64) int {
+	for i, value := range l.sortedArray {
+		if value == v {
+			return i
+		}
+	}
+	return -1
+}
+
+func (l *OrderedList) Insert(v uint64) {
+	l.sortedArray = append(l.sortedArray, v)
+	sort.Slice(l.sortedArray, func(i, j int) bool {
+		return l.sortedArray[i] < l.sortedArray[j]
+	})
+}
+
+func (l *OrderedList) Get(i int) uint64 {
+	return l.sortedArray[i]
+}
+
+func (l *OrderedList) Remove(v uint64) int {
+	removeIndex := -1
+	for i, value := range l.sortedArray {
+		if value == v {
+			removeIndex = i
+		}
+	}
+	l.sortedArray = append(l.sortedArray[:removeIndex], l.sortedArray[removeIndex+1:]...)
+	return removeIndex
+}
+
+func (l *OrderedList) Length() int {
+	return len(l.sortedArray)
+}
+
+func (l *OrderedList) Min() uint64 {
+	return l.sortedArray[0]
+}
+
+func NewReusableAllocatorImpl(existIDs []uint64, minID uint64) Allocator {
+	return &ReusableAllocatorImpl{minID: minID, existIDs: &OrderedList{sortedArray: existIDs}}
+}
+
+func (a *ReusableAllocatorImpl) Alloc(_ context.Context) (uint64, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	var next uint64
-	// sort existIDs, find minimum number bigger than minID
-	sort.Slice(a.existIDs, func(i, j int) bool {
-		return a.existIDs[i] < a.existIDs[j]
-	})
-	if a.existIDs[0] > a.minID {
+	// find minimum unused ID bigger than minID
+	if a.existIDs.Length() == 0 || a.existIDs.Min() > a.minID {
 		next = a.minID
-		a.existIDs = append(a.existIDs, next)
+		a.existIDs.Insert(next)
 		return next, nil
 	}
-	for i := 0; i < len(a.existIDs); i++ {
-		if i == len(a.existIDs)-1 || a.existIDs[i]+1 != a.existIDs[i+1] {
-			next = a.existIDs[i] + 1
+	for i := 0; i < a.existIDs.Length(); i++ {
+		if i == a.existIDs.Length()-1 || a.existIDs.Get(i)+1 != a.existIDs.Get(i+1) {
+			next = a.existIDs.Get(i) + 1
 			break
 		}
 	}
-	a.existIDs = append(a.existIDs, next)
+	a.existIDs.Insert(next)
 	return next, nil
 }
 
-func (a *ReusableAllocatorImpl) Collect(ctx context.Context, id uint64) error {
+func (a *ReusableAllocatorImpl) Collect(_ context.Context, id uint64) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	for i := 0; i < len(a.existIDs); i++ {
-		if a.existIDs[i] == id {
-			a.existIDs = append(a.existIDs[:i], a.existIDs[i+1:]...)
-		}
-	}
+	a.existIDs.Remove(id)
 	return nil
 }
