@@ -17,11 +17,11 @@ type ReusableAllocatorImpl struct {
 }
 
 type OrderedList struct {
-	sortedArray []uint64
+	sorted []uint64
 }
 
 func (l *OrderedList) IndexOfValue(v uint64) int {
-	for i, value := range l.sortedArray {
+	for i, value := range l.sorted {
 		if value == v {
 			return i
 		}
@@ -30,18 +30,18 @@ func (l *OrderedList) IndexOfValue(v uint64) int {
 }
 
 func (l *OrderedList) FindFirstHoleValueAndIndex(min uint64) (uint64, int) {
-	if len(l.sortedArray) == 0 {
+	if len(l.sorted) == 0 {
 		return min, 0
 	}
-	if len(l.sortedArray) == 1 {
-		return l.sortedArray[0] + 1, 1
+	if len(l.sorted) == 1 {
+		return l.sorted[0] + 1, 1
 	}
-	if l.sortedArray[0] > min {
+	if l.sorted[0] > min {
 		return min, 0
 	}
 
-	s := l.sortedArray
-	for i := 0; i < len(l.sortedArray)-1; i++ {
+	s := l.sorted
+	for i := 0; i < len(l.sorted)-1; i++ {
 		if s[i]+1 != s[i+1] {
 			return s[i] + 1, i + 1
 		}
@@ -51,42 +51,30 @@ func (l *OrderedList) FindFirstHoleValueAndIndex(min uint64) (uint64, int) {
 }
 
 func (l *OrderedList) Insert(v uint64, i int) {
-	if len(l.sortedArray) == i {
-		l.sortedArray = append(l.sortedArray, v)
+	if len(l.sorted) == i {
+		l.sorted = append(l.sorted, v)
 	} else {
-		l.sortedArray = append(l.sortedArray[:i+1], l.sortedArray[i:]...)
-		l.sortedArray[i] = v
+		l.sorted = append(l.sorted[:i+1], l.sorted[i:]...)
+		l.sorted[i] = v
 	}
-}
-
-func (l *OrderedList) Get(i int) uint64 {
-	return l.sortedArray[i]
 }
 
 func (l *OrderedList) Remove(v uint64) int {
 	removeIndex := -1
-	for i, value := range l.sortedArray {
+	for i, value := range l.sorted {
 		if value == v {
 			removeIndex = i
 		}
 	}
-	l.sortedArray = append(l.sortedArray[:removeIndex], l.sortedArray[removeIndex+1:]...)
+	l.sorted = append(l.sorted[:removeIndex], l.sorted[removeIndex+1:]...)
 	return removeIndex
-}
-
-func (l *OrderedList) Length() int {
-	return len(l.sortedArray)
-}
-
-func (l *OrderedList) Min() uint64 {
-	return l.sortedArray[0]
 }
 
 func NewReusableAllocatorImpl(existIDs []uint64, minID uint64) Allocator {
 	sort.Slice(existIDs, func(i, j int) bool {
 		return existIDs[i] < existIDs[j]
 	})
-	return &ReusableAllocatorImpl{minID: minID, existIDs: &OrderedList{sortedArray: existIDs}}
+	return &ReusableAllocatorImpl{minID: minID, existIDs: &OrderedList{sorted: existIDs}}
 }
 
 func (a *ReusableAllocatorImpl) Alloc(_ context.Context) (uint64, error) {
