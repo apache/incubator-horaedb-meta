@@ -6,12 +6,16 @@ import (
 	"context"
 	"sync"
 
+	"github.com/CeresDB/ceresmeta/pkg/coderr"
+
 	"github.com/CeresDB/ceresdbproto/pkg/metaeventpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/service"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
+
+var ErrDispatch = coderr.NewCodeError(coderr.Internal, "event dispatch failed")
 
 type DispatchImpl struct {
 	conns sync.Map
@@ -21,8 +25,8 @@ func NewDispatchImpl() *DispatchImpl {
 	return &DispatchImpl{}
 }
 
-func (e *DispatchImpl) OpenShard(ctx context.Context, addr string, request *OpenShardRequest) error {
-	client, err := e.getMetaEventClient(ctx, addr)
+func (d *DispatchImpl) OpenShard(ctx context.Context, addr string, request *OpenShardRequest) error {
+	client, err := d.getMetaEventClient(ctx, addr)
 	if err != nil {
 		return err
 	}
@@ -33,13 +37,13 @@ func (e *DispatchImpl) OpenShard(ctx context.Context, addr string, request *Open
 		return errors.WithMessage(err, "open shard")
 	}
 	if resp.GetHeader().Code != 0 {
-		return errors.Errorf("failed to open shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("open shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
 }
 
-func (e *DispatchImpl) CloseShard(ctx context.Context, addr string, request *CloseShardRequest) error {
-	client, err := e.getMetaEventClient(ctx, addr)
+func (d *DispatchImpl) CloseShard(ctx context.Context, addr string, request *CloseShardRequest) error {
+	client, err := d.getMetaEventClient(ctx, addr)
 	if err != nil {
 		return err
 	}
@@ -50,13 +54,13 @@ func (e *DispatchImpl) CloseShard(ctx context.Context, addr string, request *Clo
 		return errors.WithMessage(err, "close shard")
 	}
 	if resp.GetHeader().Code != 0 {
-		return errors.Errorf("failed to close shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("close shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
 }
 
-func (e *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, request *CreateTableOnShardRequest) error {
-	client, err := e.getMetaEventClient(ctx, addr)
+func (d *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, request *CreateTableOnShardRequest) error {
+	client, err := d.getMetaEventClient(ctx, addr)
 	if err != nil {
 		return err
 	}
@@ -65,13 +69,13 @@ func (e *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, requ
 		return errors.WithMessage(err, "create table on shard")
 	}
 	if resp.GetHeader().Code != 0 {
-		return errors.Errorf("failed to create table on shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("create table on shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
 }
 
-func (e *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, request *DropTableOnShardRequest) error {
-	client, err := e.getMetaEventClient(ctx, addr)
+func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, request *DropTableOnShardRequest) error {
+	client, err := d.getMetaEventClient(ctx, addr)
 	if err != nil {
 		return err
 	}
@@ -80,26 +84,26 @@ func (e *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, reques
 		return errors.WithMessage(err, "drop table on shard")
 	}
 	if resp.GetHeader().Code != 0 {
-		return errors.Errorf("failed to drop table on shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("drop table on shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
 }
 
-func (e *DispatchImpl) getGrpcClient(ctx context.Context, addr string) (*grpc.ClientConn, error) {
-	client, ok := e.conns.Load(addr)
+func (d *DispatchImpl) getGrpcClient(ctx context.Context, addr string) (*grpc.ClientConn, error) {
+	client, ok := d.conns.Load(addr)
 	if !ok {
 		cc, err := service.GetClientConn(ctx, addr)
 		if err != nil {
 			return nil, err
 		}
 		client = cc
-		e.conns.Store(addr, cc)
+		d.conns.Store(addr, cc)
 	}
 	return client.(*grpc.ClientConn), nil
 }
 
-func (e *DispatchImpl) getMetaEventClient(ctx context.Context, addr string) (metaeventpb.MetaEventServiceClient, error) {
-	client, err := e.getGrpcClient(ctx, addr)
+func (d *DispatchImpl) getMetaEventClient(ctx context.Context, addr string) (metaeventpb.MetaEventServiceClient, error) {
+	client, err := d.getGrpcClient(ctx, addr)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get meta event client, addr:%s", addr)
 	}

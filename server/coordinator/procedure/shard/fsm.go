@@ -121,12 +121,12 @@ func transferFollowerCallback(event *fsm.Event) {
 	request := event.Args[0].(*LeaderCallbackRequest)
 	ctx := request.Ctx
 	c := request.Cluster
-	eventDispatch := request.EventDispatch
+	d := request.EventDispatch
 	node := request.Node
 	shardID := request.ShardID
 
 	req := &eventdispatch.CloseShardRequest{ShardID: shardID}
-	if err := eventDispatch.CloseShard(ctx, node, req); err != nil {
+	if err := d.CloseShard(ctx, node, req); err != nil {
 		event.Cancel(errors.Wrap(err, EventPrepareTransferFollower))
 	}
 
@@ -139,13 +139,13 @@ func transferFollowerFailedCallback(event *fsm.Event) {
 	request := event.Args[0].(*LeaderCallbackRequest)
 	ctx := request.Ctx
 	c := request.Cluster
-	eventDispatch := request.EventDispatch
+	d := request.EventDispatch
 	node := request.Node
 	shardID := request.ShardID
 
 	req := &eventdispatch.CloseShardRequest{ShardID: shardID}
 	// Transfer failed, stop transfer and reset state.
-	if err := eventDispatch.CloseShard(ctx, node, req); err != nil {
+	if err := d.CloseShard(ctx, node, req); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferFollowerFailed))
 	}
 
@@ -162,7 +162,7 @@ func prepareTransferLeaderCallback(_ *fsm.Event) {
 func transferLeaderCallback(event *fsm.Event) {
 	request := event.Args[0].(*FollowerCallbackRequest)
 	ctx := request.Ctx
-	EventDispatch := request.EventDispatch
+	d := request.EventDispatch
 	c := request.Cluster
 	node := request.Node
 	shardID := request.ShardID
@@ -174,7 +174,7 @@ func transferLeaderCallback(event *fsm.Event) {
 		ShardRole: clusterpb.ShardRole_LEADER,
 		Version:   0,
 	}}
-	if err := EventDispatch.OpenShard(ctx, node, req); err != nil {
+	if err := d.OpenShard(ctx, node, req); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferLeader))
 	}
 
@@ -186,14 +186,14 @@ func transferLeaderCallback(event *fsm.Event) {
 func transferLeaderFailed(event *fsm.Event) {
 	request := event.Args[0].(*FollowerCallbackRequest)
 	ctx := request.Ctx
-	eventDispatch := request.EventDispatch
+	d := request.EventDispatch
 	c := request.Cluster
 	node := request.Node
 	shardID := request.ShardID
 
 	req := &eventdispatch.CloseShardRequest{ShardID: shardID}
 	// Transfer failed, stop transfer and reset state.
-	if err := eventDispatch.CloseShard(ctx, node, req); err != nil {
+	if err := d.CloseShard(ctx, node, req); err != nil {
 		event.Cancel(errors.Wrap(err, EventTransferLeaderFailed))
 	}
 
