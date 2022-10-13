@@ -21,7 +21,7 @@ type OrderedList struct {
 }
 
 // FindMinHoleValueAndIndex Find the minimum hole value and its index.
-// If the list is empty, then return invalid value and 0 as index;
+// If the list is empty, then return min value and 0 as index;
 // If no hole is found, then return the `last_value + 1` in the list and l.Len() as the index;
 func (l *OrderedList) FindMinHoleValueAndIndex(min uint64) (uint64, int) {
 	if len(l.sorted) == 0 {
