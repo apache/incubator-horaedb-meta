@@ -13,6 +13,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
+	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/schedule"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,8 @@ func TestScatter(t *testing.T) {
 		ShardInfos: nil,
 	}
 
-	p := NewScatterProcedure(dispatch, cluster, 1)
+	allocator := id.NewReusableAllocatorImpl(make([]uint64, 0), 0)
+	p := NewScatterProcedure(dispatch, cluster, 1, allocator)
 	go func() {
 		err := p.Start(ctx)
 		re.NoError(err)
@@ -82,6 +84,8 @@ func TestScatter(t *testing.T) {
 
 func TestAllocNodeShard(t *testing.T) {
 	re := require.New(t)
+	ctx := context.Background()
+
 	minNodeCount := 4
 	shardTotal := 2
 	nodeList := make([]*clusterpb.Node, 0)
@@ -91,9 +95,11 @@ func TestAllocNodeShard(t *testing.T) {
 		}
 		nodeList = append(nodeList, nodeInfo)
 	}
+	allocator := id.NewReusableAllocatorImpl(make([]uint64, 0), 0)
 	// NodeCount = 4, shardTotal = 2
 	// Two shard distributed in node0,node1
-	shardView := allocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList)
+	shardView, err := allocNodeShards(ctx, uint32(shardTotal), uint32(minNodeCount), nodeList, allocator)
+	re.NoError(err)
 	re.Equal(shardTotal, len(shardView))
 	re.Equal("node0", shardView[0].Node)
 	re.Equal("node1", shardView[1].Node)
@@ -109,7 +115,8 @@ func TestAllocNodeShard(t *testing.T) {
 	}
 	// NodeCount = 2, shardTotal = 3
 	// Three shard distributed in node0,node0,node1
-	shardView = allocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList)
+	shardView, err = allocNodeShards(ctx, uint32(shardTotal), uint32(minNodeCount), nodeList, allocator)
+	re.NoError(err)
 	re.Equal(shardTotal, len(shardView))
 	re.Equal("node0", shardView[0].Node)
 	re.Equal("node0", shardView[1].Node)
