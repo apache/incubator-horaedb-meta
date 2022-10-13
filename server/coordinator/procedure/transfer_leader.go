@@ -5,15 +5,15 @@ package procedure
 import (
 	"context"
 	"fmt"
-	"github.com/CeresDB/ceresmeta/pkg/log"
-	"go.uber.org/zap"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
