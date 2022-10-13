@@ -4,7 +4,7 @@ package procedure
 
 import (
 	"context"
-	"fmt"
+	"go.uber.org/zap"
 	"sync"
 	"time"
 
@@ -98,7 +98,7 @@ func waitForNodesReady(c *cluster.Cluster) {
 		currNodeNum := uint32(c.GetNodesSize())
 		expectNodeNum := c.GetClusterMinNodeCount()
 		if currNodeNum < expectNodeNum {
-			log.Warn(fmt.Sprintf("wait for cluster node register, current node num:%d, expect at least:%d", currNodeNum, expectNodeNum))
+			log.Warn("wait for cluster node register", zap.Uint32("currNodeNum", currNodeNum), zap.Uint32("expectNodeNum", expectNodeNum))
 			continue
 		}
 		break
