@@ -9,7 +9,7 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
-	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
@@ -75,9 +75,18 @@ func scatterPrepareCallback(event *fsm.Event) {
 	}
 
 	for nodeName, node := range nodeCache {
-		if err := request.dispatch.OpenShards(ctx, nodeName, dispatch.OpenShardAction{ShardIDs: node.GetShardIDs()}); err != nil {
-			event.Cancel(errors.WithMessage(err, "open shard failed"))
-			return
+		for _, shardID := range node.GetShardIDs() {
+			openShardRequest := &eventdispatch.OpenShardRequest{
+				Shard: &cluster.ShardInfo{
+					ShardID:   shardID,
+					ShardRole: clusterpb.ShardRole_LEADER,
+				},
+			}
+
+			if err := request.dispatch.OpenShard(ctx, nodeName, openShardRequest); err != nil {
+				event.Cancel(errors.WithMessage(err, "open shard failed"))
+				return
+			}
 		}
 	}
 
@@ -133,11 +142,11 @@ func scatterFailedCallback(_ *fsm.Event) {
 type ScatterCallbackRequest struct {
 	cluster   *cluster.Cluster
 	ctx       context.Context
-	dispatch  dispatch.ActionDispatch
+	dispatch  eventdispatch.Dispatch
 	allocator id.Allocator
 }
 
-func NewScatterProcedure(dispatch dispatch.ActionDispatch, cluster *cluster.Cluster, id uint64, shardIDAllocator id.Allocator) *ScatterProcedure {
+func NewScatterProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, shardIDAllocator id.Allocator) *ScatterProcedure {
 	scatterProcedureFsm := fsm.NewFSM(
 		StateScatterBegin,
 		scatterEvents,
@@ -151,7 +160,7 @@ type ScatterProcedure struct {
 	id       uint64
 	state    State
 	fsm      *fsm.FSM
-	dispatch dispatch.ActionDispatch
+	dispatch eventdispatch.Dispatch
 
 	cluster   *cluster.Cluster
 	allocator id.Allocator
