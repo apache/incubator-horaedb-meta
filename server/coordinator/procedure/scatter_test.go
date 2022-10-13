@@ -60,7 +60,7 @@ func TestScatter(t *testing.T) {
 	}
 	err = cluster.RegisterNode(ctx, nodeInfo2)
 	re.NoError(err)
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 5)
 	re.Equal(clusterpb.ClusterTopology_STABLE, cluster.GetClusterState())
 	shardViews, err := cluster.GetClusterShardView()
 	re.NoError(err)

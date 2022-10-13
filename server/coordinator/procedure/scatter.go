@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -16,28 +17,28 @@ import (
 )
 
 const (
-	EventScatterPrepare = "EventScatterPrepare"
-	EventScatterFailed  = "EventScatterFailed"
-	EventScatterSuccess = "EventScatterSuccess"
+	eventScatterPrepare = "EventScatterPrepare"
+	eventScatterFailed  = "EventScatterFailed"
+	eventScatterSuccess = "EventScatterSuccess"
 
-	StateScatterBegin   = "StateScatterBegin"
-	StateScatterWaiting = "StateScatterWaiting"
-	StateScatterFinish  = "StateScatterFinish"
-	StateScatterFailed  = "StateScatterFailed"
+	stateScatterBegin   = "StateScatterBegin"
+	stateScatterWaiting = "StateScatterWaiting"
+	stateScatterFinish  = "StateScatterFinish"
+	stateScatterFailed  = "StateScatterFailed"
 
-	DefaultTimeInterval = time.Second * 1
+	defaultTimeInterval = time.Second * 3
 )
 
 var (
 	scatterEvents = fsm.Events{
-		{Name: EventScatterPrepare, Src: []string{StateScatterBegin}, Dst: StateScatterWaiting},
-		{Name: EventScatterSuccess, Src: []string{StateScatterWaiting}, Dst: StateScatterFinish},
-		{Name: EventScatterFailed, Src: []string{StateScatterWaiting}, Dst: StateScatterFailed},
+		{Name: eventScatterPrepare, Src: []string{stateScatterBegin}, Dst: stateScatterWaiting},
+		{Name: eventScatterSuccess, Src: []string{stateScatterWaiting}, Dst: stateScatterFinish},
+		{Name: eventScatterFailed, Src: []string{stateScatterWaiting}, Dst: stateScatterFailed},
 	}
 	scatterCallbacks = fsm.Callbacks{
-		EventScatterPrepare: scatterPrepareCallback,
-		EventScatterFailed:  scatterFailedCallback,
-		EventScatterSuccess: scatterSuccessCallback,
+		eventScatterPrepare: scatterPrepareCallback,
+		eventScatterFailed:  scatterFailedCallback,
+		eventScatterSuccess: scatterSuccessCallback,
 	}
 )
 
@@ -47,8 +48,9 @@ func scatterPrepareCallback(event *fsm.Event) {
 	ctx := request.ctx
 
 	for {
-		time.Sleep(DefaultTimeInterval)
+		time.Sleep(defaultTimeInterval)
 		if uint32(c.GetNodesSize()) < c.GetClusterMinNodeCount() {
+			log.Warn("wait for cluster node register")
 			continue
 		}
 		break
@@ -146,9 +148,9 @@ type ScatterCallbackRequest struct {
 	allocator id.Allocator
 }
 
-func NewScatterProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, shardIDAllocator id.Allocator) *ScatterProcedure {
+func NewScatterProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, shardIDAllocator id.Allocator) Procedure {
 	scatterProcedureFsm := fsm.NewFSM(
-		StateScatterBegin,
+		stateScatterBegin,
 		scatterEvents,
 		scatterCallbacks,
 	)
@@ -184,13 +186,13 @@ func (p *ScatterProcedure) Start(ctx context.Context) error {
 		allocator: p.allocator,
 	}
 
-	if err := p.fsm.Event(EventScatterPrepare, scatterCallbackRequest); err != nil {
-		err := p.fsm.Event(EventScatterFailed, scatterCallbackRequest)
+	if err := p.fsm.Event(eventScatterPrepare, scatterCallbackRequest); err != nil {
+		err := p.fsm.Event(eventScatterFailed, scatterCallbackRequest)
 		p.UpdateStateWithLock(StateFailed)
 		return errors.WithMessage(err, "coordinator transferLeaderShard start")
 	}
 
-	if err := p.fsm.Event(EventScatterSuccess, scatterCallbackRequest); err != nil {
+	if err := p.fsm.Event(eventScatterSuccess, scatterCallbackRequest); err != nil {
 		return errors.WithMessage(err, "coordinator transferLeaderShard start")
 	}
 
