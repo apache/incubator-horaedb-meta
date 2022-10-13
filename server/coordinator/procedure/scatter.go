@@ -5,9 +5,9 @@ package procedure
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
-	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dispatch"
 	"github.com/looplab/fsm"
@@ -23,6 +23,8 @@ const (
 	StateScatterWaiting = "StateScatterWaiting"
 	StateScatterFinish  = "StateScatterFinish"
 	StateScatterFailed  = "StateScatterFailed"
+
+	DefaultTimeInterval = time.Second * 1
 )
 
 var (
@@ -43,28 +45,21 @@ func scatterPrepareCallback(event *fsm.Event) {
 	c := request.cluster
 	d := request.dispatch
 	ctx := request.ctx
-	nodeInfo := request.nodeInfo
 
-	if c.GetClusterState() == clusterpb.ClusterTopology_STABLE {
-		shardIDs, err := c.GetShardIDs(nodeInfo.GetEndpoint())
-		if err != nil {
-			event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
-			return
+	for {
+		time.Sleep(DefaultTimeInterval)
+		if uint32(c.GetNodesSize()) < c.GetClusterMinNodeCount() {
+			continue
 		}
-		if len(nodeInfo.GetShardInfos()) == 0 {
-			if err := d.OpenShards(ctx, nodeInfo.GetEndpoint(), dispatch.OpenShardAction{ShardIDs: shardIDs}); err != nil {
-				event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
-				return
-			}
-		}
+		break
 	}
 
 	nodeCache := c.GetClusterNodeCache()
 	shardTotal := c.GetClusterShardTotal()
 	minNodeCount := c.GetClusterMinNodeCount()
 
-	if !(int(minNodeCount) <= len(nodeCache) &&
-		c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
+	if !(c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
+		event.Cancel(errors.WithMessage(cluster.ErrClusterStateInvalid, "cluster topology state is not empty"))
 		return
 	}
 
@@ -93,7 +88,7 @@ func allocNodeShards(shardTotal uint32, minNodeCount uint32, nodeList []*cluster
 
 	perNodeShardCount := shardTotal / minNodeCount
 	if shardTotal%minNodeCount != 0 {
-		perNodeShardCount += 1
+		perNodeShardCount++
 	}
 
 	for i := uint32(0); i < minNodeCount; i++ {
@@ -133,20 +128,17 @@ type ScatterCallbackRequest struct {
 	cluster  *cluster.Cluster
 	ctx      context.Context
 	dispatch dispatch.ActionDispatch
-
-	nodeInfo *metaservicepb.NodeInfo
 }
 
-func NewScatterProcedure(dispatch dispatch.ActionDispatch, cluster *cluster.Cluster, nodeInfo *metaservicepb.NodeInfo) *ScatterProcedure {
+func NewScatterProcedure(dispatch dispatch.ActionDispatch, cluster *cluster.Cluster, id uint64) *ScatterProcedure {
 	scatterProcedureFsm := fsm.NewFSM(
 		StateScatterBegin,
 		scatterEvents,
 		scatterCallbacks,
 	)
 	// TODO: Alloc ID by ID Allocator
-	id := uint64(1)
 
-	return &ScatterProcedure{id: id, state: StateInit, fsm: scatterProcedureFsm, dispatch: dispatch, cluster: cluster, nodeInfo: nodeInfo}
+	return &ScatterProcedure{id: id, state: StateInit, fsm: scatterProcedureFsm, dispatch: dispatch, cluster: cluster}
 }
 
 type ScatterProcedure struct {
@@ -156,8 +148,7 @@ type ScatterProcedure struct {
 	fsm      *fsm.FSM
 	dispatch dispatch.ActionDispatch
 
-	cluster  *cluster.Cluster
-	nodeInfo *metaservicepb.NodeInfo
+	cluster *cluster.Cluster
 }
 
 func (p *ScatterProcedure) ID() uint64 {
@@ -175,7 +166,6 @@ func (p *ScatterProcedure) Start(ctx context.Context) error {
 		cluster:  p.cluster,
 		ctx:      ctx,
 		dispatch: p.dispatch,
-		nodeInfo: p.nodeInfo,
 	}
 
 	if err := p.fsm.Event(EventScatterPrepare, scatterCallbackRequest); err != nil {

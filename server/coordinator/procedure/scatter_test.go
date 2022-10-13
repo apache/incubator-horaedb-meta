@@ -4,7 +4,9 @@ package procedure
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
@@ -39,11 +41,14 @@ func TestScatter(t *testing.T) {
 		ShardInfos: nil,
 	}
 
+	p := NewScatterProcedure(dispatch, cluster, 1)
+	go func() {
+		err := p.Start(ctx)
+		re.NoError(err)
+	}()
+
 	// Cluster is empty, it should be return and do nothing
 	err := cluster.RegisterNode(ctx, nodeInfo1)
-	re.NoError(err)
-	p := NewScatterProcedure(dispatch, cluster, nodeInfo1)
-	err = p.Start(ctx)
 	re.NoError(err)
 	re.Equal(clusterpb.ClusterTopology_EMPTY, cluster.GetClusterState())
 
@@ -54,9 +59,7 @@ func TestScatter(t *testing.T) {
 	}
 	err = cluster.RegisterNode(ctx, nodeInfo2)
 	re.NoError(err)
-	p = NewScatterProcedure(dispatch, cluster, nodeInfo2)
-	err = p.Start(ctx)
-	re.NoError(err)
+	time.Sleep(time.Second * 3)
 	re.Equal(clusterpb.ClusterTopology_STABLE, cluster.GetClusterState())
 	shardViews, err := cluster.GetClusterShardView()
 	re.NoError(err)
@@ -78,7 +81,39 @@ func TestScatter(t *testing.T) {
 }
 
 func TestAllocNodeShard(t *testing.T) {
+	re := require.New(t)
+	minNodeCount := 4
+	shardTotal := 2
+	nodeList := make([]*clusterpb.Node, 0)
+	for i := 0; i < minNodeCount; i++ {
+		nodeInfo := &clusterpb.Node{
+			Name: fmt.Sprintf("node%d", i),
+		}
+		nodeList = append(nodeList, nodeInfo)
+	}
+	// NodeCount = 4, shardTotal = 2
+	// Two shard distributed in node0,node1
+	shardView := allocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList)
+	re.Equal(shardTotal, len(shardView))
+	re.Equal("node0", shardView[0].Node)
+	re.Equal("node1", shardView[1].Node)
 
+	minNodeCount = 2
+	shardTotal = 3
+	nodeList = make([]*clusterpb.Node, 0)
+	for i := 0; i < minNodeCount; i++ {
+		nodeInfo := &clusterpb.Node{
+			Name: fmt.Sprintf("node%d", i),
+		}
+		nodeList = append(nodeList, nodeInfo)
+	}
+	// NodeCount = 2, shardTotal = 3
+	// Three shard distributed in node0,node0,node1
+	shardView = allocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList)
+	re.Equal(shardTotal, len(shardView))
+	re.Equal("node0", shardView[0].Node)
+	re.Equal("node0", shardView[1].Node)
+	re.Equal("node1", shardView[2].Node)
 }
 
 func newTestEtcdStorage(t *testing.T) (storage.Storage, clientv3.KV, etcdutil.CloseFn) {
