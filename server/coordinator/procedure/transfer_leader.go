@@ -59,14 +59,12 @@ type TransferLeaderCallbackRequest struct {
 	newLeader *clusterpb.Shard
 }
 
-func NewTransferLeaderProcedure(dispatch dispatch.ActionDispatch, cluster *cluster.Cluster, oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard) Procedure {
+func NewTransferLeaderProcedure(dispatch dispatch.ActionDispatch, cluster *cluster.Cluster, oldLeader *clusterpb.Shard, newLeader *clusterpb.Shard, id uint64) Procedure {
 	transferLeaderOperationFsm := fsm.NewFSM(
 		StateTransferLeaderBegin,
 		transferLeaderEvents,
 		transferLeaderCallbacks,
 	)
-	// alloc id
-	id := uint64(1)
 
 	return &TransferLeaderProcedure{fsm: transferLeaderOperationFsm, dispatch: dispatch, cluster: cluster, id: id, state: StateInit, oldLeader: oldLeader, newLeader: newLeader}
 }
@@ -118,21 +116,19 @@ func (p *TransferLeaderProcedure) State() State {
 func transferLeaderPrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*TransferLeaderCallbackRequest)
 	cxt := request.cxt
-	oldLeader := request.oldLeader
-	newLeader := request.newLeader
 
 	closeShardAction := dispatch.CloseShardAction{
-		ShardIDs: []uint32{oldLeader.Id},
+		ShardIDs: []uint32{request.oldLeader.Id},
 	}
-	if err := request.dispatch.CloseShards(cxt, oldLeader.Node, closeShardAction); err != nil {
+	if err := request.dispatch.CloseShards(cxt, request.oldLeader.Node, closeShardAction); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback"))
 		return
 	}
 
 	openShardAction := dispatch.OpenShardAction{
-		ShardIDs: []uint32{newLeader.Id},
+		ShardIDs: []uint32{request.newLeader.Id},
 	}
-	if err := request.dispatch.OpenShards(cxt, newLeader.Node, openShardAction); err != nil {
+	if err := request.dispatch.OpenShards(cxt, request.newLeader.Node, openShardAction); err != nil {
 		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback"))
 		return
 	}
@@ -144,13 +140,11 @@ func transferLeaderFailedCallback(_ *fsm.Event) {
 
 func transferLeaderSuccessCallback(event *fsm.Event) {
 	request := event.Args[0].(*TransferLeaderCallbackRequest)
-	cluster := request.cluster
+	c := request.cluster
 	ctx := request.cxt
-	oldLeader := request.oldLeader
-	newLeader := request.newLeader
 
 	// Update cluster topology
-	shardView, err := cluster.GetClusterShardView()
+	shardView, err := c.GetClusterShardView()
 	if err != nil {
 		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure success callback"))
 		return
@@ -158,15 +152,14 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 	var oldLeaderIndex int
 	for i := 0; i < len(shardView); i++ {
 		shardID := shardView[i].Id
-		if shardID == oldLeader.Id {
-			// shardView[i].ShardRole = clusterpb.ShardRole_FOLLOWER
+		if shardID == request.oldLeader.Id {
 			oldLeaderIndex = i
 		}
 	}
 	shardView = append(shardView[:oldLeaderIndex], shardView[oldLeaderIndex+1:]...)
-	shardView = append(shardView, newLeader)
+	shardView = append(shardView, request.newLeader)
 
-	if err := cluster.UpdateClusterTopology(ctx, cluster.GetClusterState(), shardView); err != nil {
+	if err := c.UpdateClusterTopology(ctx, c.GetClusterState(), shardView); err != nil {
 		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start success callback"))
 		return
 	}

@@ -61,7 +61,7 @@ func TestTransferLeader(t *testing.T) {
 		Node:      nodeName1,
 		Id:        2,
 	}
-	procedure := NewTransferLeaderProcedure(dispatch, cluster, oldLeader, newLeader)
+	procedure := NewTransferLeaderProcedure(dispatch, cluster, oldLeader, newLeader, uint64(1))
 	err = procedure.Start(ctx)
 	re.NoError(err)
 	shardViews, err := cluster.GetClusterShardView()
