@@ -68,12 +68,32 @@ func scatterPrepareCallback(event *fsm.Event) {
 		return
 	}
 
-	perNodeShardCount := shardTotal / minNodeCount
-
-	shards := make([]*clusterpb.Shard, 0, shardTotal)
 	nodeList := make([]*clusterpb.Node, 0, len(nodeCache))
 	for _, v := range nodeCache {
 		nodeList = append(nodeList, v.GetMeta())
+	}
+
+	shards := allocNodeShards(shardTotal, minNodeCount, nodeList)
+
+	for nodeName, node := range nodeCache {
+		if err := d.OpenShards(ctx, nodeName, dispatch.OpenShardAction{ShardIDs: node.GetShardIDs()}); err != nil {
+			event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
+			return
+		}
+	}
+
+	if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
+		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
+		return
+	}
+}
+
+func allocNodeShards(shardTotal uint32, minNodeCount uint32, nodeList []*clusterpb.Node) []*clusterpb.Shard {
+	shards := make([]*clusterpb.Shard, 0, shardTotal)
+
+	perNodeShardCount := shardTotal / minNodeCount
+	if shardTotal%minNodeCount != 0 {
+		perNodeShardCount += 1
 	}
 
 	for i := uint32(0); i < minNodeCount; i++ {
@@ -90,17 +110,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 		}
 	}
 
-	for nodeName, node := range nodeCache {
-		if err := d.OpenShards(ctx, nodeName, dispatch.OpenShardAction{ShardIDs: node.GetShardIDs()}); err != nil {
-			event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
-			return
-		}
-	}
-
-	if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
-		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
-		return
-	}
+	return shards
 }
 
 func scatterSuccessCallback(event *fsm.Event) {

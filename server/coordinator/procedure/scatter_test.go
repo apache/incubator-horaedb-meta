@@ -47,7 +47,7 @@ func TestScatter(t *testing.T) {
 	re.NoError(err)
 	re.Equal(clusterpb.ClusterTopology_EMPTY, cluster.GetClusterState())
 
-	// Register two node, defaultNodeCount is satisfy, Initialize shard topology
+	// Register two node, defaultNodeCount is satisfied, Initialize shard topology
 	nodeInfo2 := &metaservicepb.NodeInfo{
 		Endpoint:   nodeName1,
 		ShardInfos: nil,
@@ -75,6 +75,10 @@ func TestScatter(t *testing.T) {
 	re.Equal(len(shardNodeMapping), defaultNodeCount)
 	re.Equal(len(shardNodeMapping[nodeName0]), defaultShardTotal/defaultNodeCount)
 	re.Equal(len(shardNodeMapping[nodeName1]), defaultShardTotal/defaultNodeCount)
+}
+
+func TestAllocNodeShard(t *testing.T) {
+
 }
 
 func newTestEtcdStorage(t *testing.T) (storage.Storage, clientv3.KV, etcdutil.CloseFn) {
