@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ const (
 	stateScatterFinish  = "StateScatterFinish"
 	stateScatterFailed  = "StateScatterFailed"
 
-	defaultTimeInterval = time.Second * 3
+	defaultCheckNodeNumTimeInterval = time.Second * 3
 )
 
 var (
@@ -47,14 +48,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 	c := request.cluster
 	ctx := request.ctx
 
-	for {
-		time.Sleep(defaultTimeInterval)
-		if uint32(c.GetNodesSize()) < c.GetClusterMinNodeCount() {
-			log.Warn("wait for cluster node register")
-			continue
-		}
-		break
-	}
+	waitForNodesReady(c)
 
 	nodeCache := c.GetClusterNodeCache()
 	shardTotal := c.GetClusterShardTotal()
@@ -95,6 +89,19 @@ func scatterPrepareCallback(event *fsm.Event) {
 	if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
 		event.Cancel(errors.WithMessage(err, "update cluster topology failed"))
 		return
+	}
+}
+
+func waitForNodesReady(c *cluster.Cluster) {
+	for {
+		time.Sleep(defaultCheckNodeNumTimeInterval)
+		currNodeNum := uint32(c.GetNodesSize())
+		expectNodeNum := c.GetClusterMinNodeCount()
+		if currNodeNum < expectNodeNum {
+			log.Warn(fmt.Sprintf("wait for cluster node register, current node num:%d, expect at least:%d", currNodeNum, expectNodeNum))
+			continue
+		}
+		break
 	}
 }
 
