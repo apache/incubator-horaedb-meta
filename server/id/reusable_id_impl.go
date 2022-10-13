@@ -20,18 +20,18 @@ type OrderedList struct {
 	sorted []uint64
 }
 
-// FindFirstHoleValueAndIndex Find the minimum hole value and its index.
+// FindMinHoleValueAndIndex Find the minimum hole value and its index.
 // If the list is empty, then return invalid value and 0 as index;
 // If no hole is found, then return the `last_value + 1` in the list and l.Len() as the index;
-func (l *OrderedList) FindFirstHoleValueAndIndex(min uint64) (uint64, int) {
+func (l *OrderedList) FindMinHoleValueAndIndex(min uint64) (uint64, int) {
 	if len(l.sorted) == 0 {
+		return min, 0
+	}
+	if l.sorted[0] > min {
 		return min, 0
 	}
 	if len(l.sorted) == 1 {
 		return l.sorted[0] + 1, 1
-	}
-	if l.sorted[0] > min {
-		return min, 0
 	}
 
 	s := l.sorted
@@ -76,7 +76,7 @@ func (a *ReusableAllocatorImpl) Alloc(_ context.Context) (uint64, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	// Find minimum unused ID bigger than minID
-	v, i := a.existIDs.FindFirstHoleValueAndIndex(a.minID)
+	v, i := a.existIDs.FindMinHoleValueAndIndex(a.minID)
 	a.existIDs.Insert(v, i)
 	return v, nil
 }
