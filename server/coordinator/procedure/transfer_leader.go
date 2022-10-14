@@ -81,7 +81,7 @@ func (p *TransferLeaderProcedure) Typ() Typ {
 }
 
 func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
-	p.UpdateStateWithLock(StateRunning)
+	p.updateStateWithLock(StateRunning)
 
 	transferLeaderRequest := &TransferLeaderCallbackRequest{
 		cluster:   p.cluster,
@@ -93,7 +93,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 
 	if err := p.fsm.Event(eventTransferLeaderPrepare, transferLeaderRequest); err != nil {
 		err := p.fsm.Event(eventTransferLeaderFailed, transferLeaderRequest)
-		p.UpdateStateWithLock(StateFailed)
+		p.updateStateWithLock(StateFailed)
 		return errors.WithMessage(err, "coordinator transferLeaderShard start")
 	}
 
@@ -101,12 +101,12 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 		return errors.WithMessage(err, "coordinator transferLeaderShard start")
 	}
 
-	p.UpdateStateWithLock(StateFinished)
+	p.updateStateWithLock(StateFinished)
 	return nil
 }
 
 func (p *TransferLeaderProcedure) Cancel(_ context.Context) error {
-	p.UpdateStateWithLock(StateCancelled)
+	p.updateStateWithLock(StateCancelled)
 	return nil
 }
 
@@ -124,7 +124,7 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 		ShardID: request.oldLeader.Id,
 	}
 	if err := request.dispatch.CloseShard(ctx, request.oldLeader.Node, closeShardRequest); err != nil {
-		CancelEventWithLog(event, err, LogLevelError, "close shard failed", zap.Uint32("shardId", request.oldLeader.Id))
+		cancelEventWithLog(event, err, "close shard failed", zap.Uint32("shardId", request.oldLeader.Id))
 		return
 	}
 
@@ -132,7 +132,7 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 		Shard: &cluster.ShardInfo{ShardID: request.newLeader.Id, ShardRole: clusterpb.ShardRole_LEADER},
 	}
 	if err := request.dispatch.OpenShard(ctx, request.newLeader.Node, openShardRequest); err != nil {
-		CancelEventWithLog(event, err, LogLevelError, "open shard failed", zap.Uint32("shardId", request.newLeader.Id))
+		cancelEventWithLog(event, err, "open shard failed", zap.Uint32("shardId", request.newLeader.Id))
 		return
 	}
 }
@@ -149,7 +149,7 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 	// Update cluster topology
 	shardView, err := c.GetClusterShardView()
 	if err != nil {
-		CancelEventWithLog(event, err, LogLevelError, "get cluster shard view failed")
+		cancelEventWithLog(event, err, "get cluster shard view failed")
 		return
 	}
 	oldLeaderIndex := -1
@@ -167,12 +167,12 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 	shardView = append(shardView, request.newLeader)
 
 	if err := c.UpdateClusterTopology(ctx, c.GetClusterState(), shardView); err != nil {
-		CancelEventWithLog(event, err, LogLevelError, "update shard topology failed")
+		cancelEventWithLog(event, err, "update shard topology failed")
 		return
 	}
 }
 
-func (p *TransferLeaderProcedure) UpdateStateWithLock(state State) {
+func (p *TransferLeaderProcedure) updateStateWithLock(state State) {
 	p.lock.Lock()
 	p.state = state
 	p.lock.Unlock()
