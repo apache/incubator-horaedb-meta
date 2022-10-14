@@ -55,7 +55,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 	minNodeCount := c.GetClusterMinNodeCount()
 
 	if !(c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
-		event.Cancel(errors.WithMessage(cluster.ErrClusterStateInvalid, "cluster topology state is not empty"))
+		CancelEventWithLog(event, cluster.ErrClusterStateInvalid, LogLevelError, "cluster topology state is not empty")
 		return
 	}
 
@@ -66,7 +66,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 
 	shards, err := allocNodeShards(ctx, shardTotal, minNodeCount, nodeList, request.allocator)
 	if err != nil {
-		event.Cancel(errors.WithMessage(err, "alloc node shards failed"))
+		CancelEventWithLog(event, err, LogLevelError, "alloc node shards failed")
 		return
 	}
 
@@ -80,14 +80,14 @@ func scatterPrepareCallback(event *fsm.Event) {
 			}
 
 			if err := request.dispatch.OpenShard(ctx, nodeName, openShardRequest); err != nil {
-				event.Cancel(errors.WithMessage(err, "open shard failed"))
+				CancelEventWithLog(event, err, LogLevelError, "open shard failed")
 				return
 			}
 		}
 	}
 
 	if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
-		event.Cancel(errors.WithMessage(err, "update cluster topology failed"))
+		CancelEventWithLog(event, err, LogLevelError, "update cluster topology failed")
 		return
 	}
 }
@@ -138,7 +138,7 @@ func scatterSuccessCallback(event *fsm.Event) {
 	request := event.Args[0].(*ScatterCallbackRequest)
 
 	if err := request.cluster.Load(request.ctx); err != nil {
-		event.Cancel(errors.WithMessage(err, "coordinator scatterShard"))
+		CancelEventWithLog(event, err, LogLevelError, "cluster load data failed")
 		return
 	}
 }

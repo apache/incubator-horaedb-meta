@@ -3,6 +3,7 @@ package procedure
 import (
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/looplab/fsm"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -16,7 +17,7 @@ const (
 
 func CancelEventWithLog(event *fsm.Event, err error, level LogLevel, msg string, fields ...zap.Field) {
 	logByLevel(level, msg, fields...)
-	event.Cancel(err)
+	event.Cancel(errors.WithMessage(err, msg))
 }
 
 func logByLevel(level LogLevel, msg string, fields ...zap.Field) {
