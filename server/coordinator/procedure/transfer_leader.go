@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
-	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/looplab/fsm"
@@ -125,8 +124,7 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 		ShardID: request.oldLeader.Id,
 	}
 	if err := request.dispatch.CloseShard(ctx, request.oldLeader.Node, closeShardRequest); err != nil {
-		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback, close shard failed"))
-		log.Error("coordinator transferLeaderShard prepare callback, close shard failed", zap.Uint32("shardId", request.oldLeader.Id))
+		CancelEventWithLog(event, err, LogLevelError, "close shard failed", zap.Uint32("shardId", request.oldLeader.Id))
 		return
 	}
 
@@ -134,8 +132,7 @@ func transferLeaderPrepareCallback(event *fsm.Event) {
 		Shard: &cluster.ShardInfo{ShardID: request.newLeader.Id, ShardRole: clusterpb.ShardRole_LEADER},
 	}
 	if err := request.dispatch.OpenShard(ctx, request.newLeader.Node, openShardRequest); err != nil {
-		event.Cancel(errors.WithMessage(err, "coordinator transferLeaderShard prepare callback, open shard failed"))
-		log.Error("coordinator transferLeaderShard prepare callback, open shard failed", zap.Uint32("shardId", request.newLeader.Id))
+		CancelEventWithLog(event, err, LogLevelError, "open shard failed", zap.Uint32("shardId", request.newLeader.Id))
 		return
 	}
 }
@@ -152,7 +149,7 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 	// Update cluster topology
 	shardView, err := c.GetClusterShardView()
 	if err != nil {
-		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure success callback"))
+		CancelEventWithLog(event, err, LogLevelError, "get cluster shard view failed")
 		return
 	}
 	oldLeaderIndex := -1
@@ -170,8 +167,7 @@ func transferLeaderSuccessCallback(event *fsm.Event) {
 	shardView = append(shardView, request.newLeader)
 
 	if err := c.UpdateClusterTopology(ctx, c.GetClusterState(), shardView); err != nil {
-		event.Cancel(errors.WithMessage(err, "TransferLeaderProcedure start success callback"))
-		log.Error("coordinator transferLeaderShard prepare callback, update shard topology failed")
+		CancelEventWithLog(event, err, LogLevelError, "update shard topology failed")
 		return
 	}
 }
