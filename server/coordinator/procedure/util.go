@@ -1,3 +1,5 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package procedure
 
 import (
@@ -24,12 +26,9 @@ func logByLevel(level LogLevel, msg string, fields ...zap.Field) {
 	switch level {
 	case LogLevelInfo:
 		log.Info(msg, fields...)
-		break
 	case LogLevelWarn:
 		log.Warn(msg, fields...)
-		break
 	case LogLevelError:
 		log.Error(msg, fields...)
-		break
 	}
 }

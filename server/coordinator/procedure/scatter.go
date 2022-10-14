@@ -70,19 +70,17 @@ func scatterPrepareCallback(event *fsm.Event) {
 		return
 	}
 
-	for nodeName, node := range nodeCache {
-		for _, shardID := range node.GetShardIDs() {
-			openShardRequest := &eventdispatch.OpenShardRequest{
-				Shard: &cluster.ShardInfo{
-					ShardID:   shardID,
-					ShardRole: clusterpb.ShardRole_LEADER,
-				},
-			}
+	for _, shard := range shards {
+		openShardRequest := &eventdispatch.OpenShardRequest{
+			Shard: &cluster.ShardInfo{
+				ShardID:   shard.GetId(),
+				ShardRole: clusterpb.ShardRole_LEADER,
+			},
+		}
 
-			if err := request.dispatch.OpenShard(ctx, nodeName, openShardRequest); err != nil {
-				CancelEventWithLog(event, err, LogLevelError, "open shard failed")
-				return
-			}
+		if err := request.dispatch.OpenShard(ctx, shard.Node, openShardRequest); err != nil {
+			CancelEventWithLog(event, err, LogLevelError, "open shard failed")
+			return
 		}
 	}
 
