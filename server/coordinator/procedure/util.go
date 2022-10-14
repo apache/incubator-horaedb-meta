@@ -10,6 +10,7 @@ import (
 )
 
 func cancelEventWithLog(event *fsm.Event, err error, msg string, fields ...zap.Field) {
+	fields = append(fields, zap.Error(err))
 	log.Error(msg, fields...)
 	event.Cancel(errors.WithMessage(err, msg))
 }

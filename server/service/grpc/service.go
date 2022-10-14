@@ -128,7 +128,7 @@ func (s *Service) GetShardTables(ctx context.Context, req *metaservicepb.GetShar
 }
 
 // CreateTable implements gRPC CeresmetaServer.
-func (s *Service) CreateTable(_ context.Context, _ *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
+func (s *Service) CreateTable(_ context.Context, _ *metaservicepb.CreateTableRequest) (*metaservicepb.CreateTableResponse, error) {
 	// TODO: impl later
 	return nil, nil
 }
