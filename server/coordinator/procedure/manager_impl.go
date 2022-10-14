@@ -8,7 +8,9 @@ import (
 
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
+	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/pkg/errors"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type ManagerImpl struct {
@@ -18,11 +20,19 @@ type ManagerImpl struct {
 	storage  Storage
 	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
+
+	procedureChan        chan<- Procedure
+	procedureIDAllocator id.Allocator
+	shardIDAllocator     id.Allocator
 }
 
-func (m *ManagerImpl) SubmitScatterTask(_ context.Context, _ *ScatterRequest) error {
-	// TODO implement me
-	panic("implement me")
+func (m *ManagerImpl) SubmitScatterTask(cxt context.Context, _ *ScatterRequest) error {
+	procedureID, err := m.procedureIDAllocator.Alloc(cxt)
+	if err != nil {
+		return errors.WithMessage(err, "alloc procedure id failed")
+	}
+	procedure := NewScatterProcedure(m.dispatch, m.cluster, procedureID, m.shardIDAllocator)
+	return m.submit(cxt, procedure)
 }
 
 func (m *ManagerImpl) SubmitTransferLeaderTask(_ context.Context, _ *TransferLeaderRequest) error {
@@ -77,18 +87,35 @@ type RunningProcedureInfo struct {
 	State State
 }
 
-func NewManagerImpl(ctx context.Context, storage Storage, cluster *cluster.Cluster, actionDispatch eventdispatch.Dispatch) (Manager, error) {
+func NewManagerImpl(ctx context.Context, cluster *cluster.Cluster, client *clientv3.Client, rootPath string) (Manager, error) {
 	manager := &ManagerImpl{
-		storage:  storage,
-		cluster:  cluster,
-		dispatch: actionDispatch,
+		storage:              NewEtcdStorageImpl(client, cluster.GetClusterID(), rootPath),
+		cluster:              cluster,
+		dispatch:             eventdispatch.NewDispatchImpl(),
+		shardIDAllocator:     id.NewReusableAllocatorImpl(make([]uint64, 0), 0),
+		procedureIDAllocator: id.NewAllocatorImpl(client, "procedure", 5),
 	}
 
-	err := manager.retryAll(ctx)
+	err := manager.Init(ctx)
 	if err != nil {
-		return nil, errors.WithMessage(err, "retry all running procedure failed")
+		return nil, errors.WithMessage(err, "init manager failed")
 	}
+
 	return manager, nil
+}
+
+func (m *ManagerImpl) Init(ctx context.Context) error {
+	procedureChan := make(chan Procedure, 10)
+	m.procedureChan = procedureChan
+	go startProcedureWorker(ctx, procedureChan, make(chan error, 10))
+	if err := m.SubmitScatterTask(ctx, &ScatterRequest{}); err != nil {
+		return errors.WithMessage(err, "submit scatter task failed")
+	}
+	err := m.retryAll(ctx)
+	if err != nil {
+		return errors.WithMessage(err, "retry all running procedure failed")
+	}
+	return nil
 }
 
 func (m *ManagerImpl) retryAll(ctx context.Context) error {
@@ -107,12 +134,15 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 	return nil
 }
 
-// nolint
-func (m *ManagerImpl) submit(ctx context.Context, procedure Procedure) error {
-	err := procedure.Start(ctx)
-	if err != nil {
-		return errors.WithMessage(err, "submit procedure failed")
+func startProcedureWorker(ctx context.Context, procedures <-chan Procedure, results chan<- error) {
+	for procedure := range procedures {
+		err := procedure.Start(ctx)
+		results <- err
 	}
+}
+
+func (m *ManagerImpl) submit(_ context.Context, procedure Procedure) error {
+	m.procedureChan <- procedure
 	return nil
 }
 

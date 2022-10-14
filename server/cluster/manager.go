@@ -83,10 +83,10 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	_, ok := m.clusters[clusterName]
+	cluster, ok := m.clusters[clusterName]
 	if ok {
-		log.Error("cluster already exists", zap.String("clusterName", clusterName))
-		return nil, ErrClusterAlreadyExists
+		log.Info("cluster already exists", zap.String("clusterName", clusterName))
+		return cluster, nil
 	}
 
 	clusterID, err := m.allocClusterID(ctx)
@@ -108,7 +108,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusters:%v", clusterPb)
 	}
 
-	cluster := NewCluster(clusterPb, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
+	cluster = NewCluster(clusterPb, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
 
 	if err = cluster.init(ctx); err != nil {
 		log.Error("fail to init cluster", zap.Error(err))
