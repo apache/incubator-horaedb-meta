@@ -8,13 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/server/cluster"
+
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/stretchr/testify/require"
 )
 
-func TestScatter(t *testing.T) {
+func NewClusterAndRegisterNode(t *testing.T) *cluster.Cluster {
 	re := require.New(t)
 	ctx := context.Background()
 	dispatch := MockDispatch{}
@@ -44,7 +46,11 @@ func TestScatter(t *testing.T) {
 	}
 	err = cluster.RegisterNode(ctx, nodeInfo2)
 	re.NoError(err)
-	time.Sleep(time.Second * 5)
+	return cluster
+}
+
+func scatterWithCluster(t *testing.T, cluster *cluster.Cluster) {
+	re := require.New(t)
 	re.Equal(clusterpb.ClusterTopology_STABLE, cluster.GetClusterState())
 	shardViews, err := cluster.GetClusterShardView()
 	re.NoError(err)
@@ -63,6 +69,12 @@ func TestScatter(t *testing.T) {
 	re.Equal(len(shardNodeMapping), defaultNodeCount)
 	re.Equal(len(shardNodeMapping[nodeName0]), defaultShardTotal/defaultNodeCount)
 	re.Equal(len(shardNodeMapping[nodeName1]), defaultShardTotal/defaultNodeCount)
+}
+
+func TestScatter(t *testing.T) {
+	cluster := NewClusterAndRegisterNode(t)
+	time.Sleep(time.Second * 5)
+	scatterWithCluster(t, cluster)
 }
 
 func TestAllocNodeShard(t *testing.T) {

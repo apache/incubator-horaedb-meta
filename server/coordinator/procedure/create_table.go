@@ -39,9 +39,12 @@ var (
 
 func createTablePrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*CreateTableCallbackRequest)
-	table, err := request.cluster.GetOrCreateTable(request.ctx, request.nodeName, request.schemaName, request.tableName)
+	table, exists, err := request.cluster.GetOrCreateTable(request.ctx, request.nodeName, request.schemaName, request.tableName)
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster get or create table")
+		return
+	}
+	if exists {
 		return
 	}
 	err = request.dispatch.CreateTableOnShard(request.ctx, request.nodeName, &eventdispatch.CreateTableOnShardRequest{
@@ -121,13 +124,16 @@ func (p *CreateTableProcedure) Start(ctx context.Context) error {
 	}
 
 	if err := p.fsm.Event(eventCreateTablePrepare, createTableCallbackRequest); err != nil {
-		err := p.fsm.Event(eventCreateTableFailed, createTableCallbackRequest)
+		err1 := p.fsm.Event(eventCreateTableFailed, createTableCallbackRequest)
 		p.updateStateWithLock(StateFailed)
-		return errors.WithMessage(err, "coordinator transferLeaderShard start")
+		if err1 != nil {
+			err = errors.WithMessagef(err, "createTable procedure start, fail to send eventCreateTableFailed err:%v", err1)
+		}
+		return errors.WithMessage(err, "createTable procedure start")
 	}
 
 	if err := p.fsm.Event(eventCreateTableSuccess, createTableCallbackRequest); err != nil {
-		return errors.WithMessage(err, "coordinator transferLeaderShard start")
+		return errors.WithMessage(err, "createTable procedure start")
 	}
 
 	p.updateStateWithLock(StateFinished)
