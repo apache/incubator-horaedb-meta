@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewClusterAndRegisterNode(t *testing.T) *cluster.Cluster {
+func newClusterAndRegisterNode(t *testing.T) *cluster.Cluster {
 	re := require.New(t)
 	ctx := context.Background()
 	dispatch := MockDispatch{}
@@ -71,7 +71,7 @@ func checkScatterWithCluster(t *testing.T, cluster *cluster.Cluster) {
 }
 
 func TestScatter(t *testing.T) {
-	cluster := NewClusterAndRegisterNode(t)
+	cluster := newClusterAndRegisterNode(t)
 	time.Sleep(time.Second * 5)
 	checkScatterWithCluster(t, cluster)
 }

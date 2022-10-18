@@ -171,7 +171,7 @@ func testRegisterNode(ctx context.Context, re *require.Assertions, manager Manag
 func testAllocSchemaID(ctx context.Context, re *require.Assertions, manager Manager,
 	cluster, schema string, schemaID uint32,
 ) {
-	id, err := manager.AllocSchemaID(ctx, cluster, schema)
+	id, _, err := manager.AllocSchemaID(ctx, cluster, schema)
 	re.NoError(err)
 	re.Equal(schemaID, id)
 }
