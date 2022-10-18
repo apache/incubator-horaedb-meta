@@ -47,7 +47,20 @@ func createTablePrepareCallback(event *fsm.Event) {
 	if exists {
 		return
 	}
-	err = request.dispatch.CreateTableOnShard(request.ctx, request.nodeName, &eventdispatch.CreateTableOnShardRequest{
+
+	shard, err := request.cluster.GetShardByID(table.GetShardID())
+	if err != nil {
+		cancelEventWithLog(event, err, "cluster get shard by id")
+		return
+	}
+	// TODO: consider followers
+	leader := shard.GetLeader()
+	if leader == nil {
+		cancelEventWithLog(event, ErrShardLeaderNotFound, "shard can't find leader")
+		return
+	}
+
+	err = request.dispatch.CreateTableOnShard(request.ctx, leader.Node, &eventdispatch.CreateTableOnShardRequest{
 		TableInfo: &cluster.TableInfo{
 			ID:         table.GetID(),
 			Name:       table.GetName(),
@@ -87,19 +100,18 @@ func NewCreateTableProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.C
 		createTableEvents,
 		createTableCallbacks,
 	)
-	return &CreateTableProcedure{id: id, state: StateInit, fsm: createTableProcedureFsm, dispatch: dispatch, cluster: cluster, req: req}
+	return &CreateTableProcedure{id: id, fsm: createTableProcedureFsm, cluster: cluster, dispatch: dispatch, req: req, state: StateInit}
 }
 
 type CreateTableProcedure struct {
-	lock     sync.RWMutex
 	id       uint64
-	state    State
 	fsm      *fsm.FSM
+	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
+	req      *metaservicepb.CreateTableRequest
 
-	cluster *cluster.Cluster
-
-	req *metaservicepb.CreateTableRequest
+	lock  sync.RWMutex
+	state State
 }
 
 func (p *CreateTableProcedure) ID() uint64 {

@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/server/cluster"
-
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
+	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +48,7 @@ func NewClusterAndRegisterNode(t *testing.T) *cluster.Cluster {
 	return cluster
 }
 
-func scatterWithCluster(t *testing.T, cluster *cluster.Cluster) {
+func checkScatterWithCluster(t *testing.T, cluster *cluster.Cluster) {
 	re := require.New(t)
 	re.Equal(clusterpb.ClusterTopology_STABLE, cluster.GetClusterState())
 	shardViews, err := cluster.GetClusterShardView()
@@ -74,7 +73,7 @@ func scatterWithCluster(t *testing.T, cluster *cluster.Cluster) {
 func TestScatter(t *testing.T) {
 	cluster := NewClusterAndRegisterNode(t)
 	time.Sleep(time.Second * 5)
-	scatterWithCluster(t, cluster)
+	checkScatterWithCluster(t, cluster)
 }
 
 func TestAllocNodeShard(t *testing.T) {

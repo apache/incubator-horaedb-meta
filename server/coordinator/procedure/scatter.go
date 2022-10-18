@@ -159,18 +159,18 @@ func NewScatterProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Clust
 		scatterEvents,
 		scatterCallbacks,
 	)
-	return &ScatterProcedure{id: id, state: StateInit, fsm: scatterProcedureFsm, dispatch: dispatch, cluster: cluster, allocator: shardIDAllocator}
+	return &ScatterProcedure{id: id, fsm: scatterProcedureFsm, cluster: cluster, dispatch: dispatch, allocator: shardIDAllocator, state: StateInit}
 }
 
 type ScatterProcedure struct {
-	lock     sync.RWMutex
-	id       uint64
-	state    State
-	fsm      *fsm.FSM
-	dispatch eventdispatch.Dispatch
-
+	id        uint64
+	fsm       *fsm.FSM
 	cluster   *cluster.Cluster
+	dispatch  eventdispatch.Dispatch
 	allocator id.Allocator
+
+	lock  sync.RWMutex
+	state State
 }
 
 func (p *ScatterProcedure) ID() uint64 {

@@ -40,16 +40,16 @@ var (
 )
 
 type TransferLeaderProcedure struct {
-	// Protect the state.
-	lock  sync.RWMutex
-	state State
-
-	fsm       *fsm.FSM
 	id        uint64
+	fsm       *fsm.FSM
 	dispatch  eventdispatch.Dispatch
 	cluster   *cluster.Cluster
 	oldLeader *clusterpb.Shard
 	newLeader *clusterpb.Shard
+
+	// Protect the state.
+	lock  sync.RWMutex
+	state State
 }
 
 // TransferLeaderCallbackRequest is fsm callbacks param
@@ -69,7 +69,7 @@ func NewTransferLeaderProcedure(dispatch eventdispatch.Dispatch, cluster *cluste
 		transferLeaderCallbacks,
 	)
 
-	return &TransferLeaderProcedure{fsm: transferLeaderOperationFsm, dispatch: dispatch, cluster: cluster, id: id, state: StateInit, oldLeader: oldLeader, newLeader: newLeader}
+	return &TransferLeaderProcedure{id: id, fsm: transferLeaderOperationFsm, dispatch: dispatch, cluster: cluster, oldLeader: oldLeader, newLeader: newLeader, state: StateInit}
 }
 
 func (p *TransferLeaderProcedure) ID() uint64 {

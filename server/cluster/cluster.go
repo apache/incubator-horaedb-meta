@@ -532,6 +532,17 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	return nil, false, nil
 }
 
+func (c *Cluster) GetShardByID(id uint32) (*Shard, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	shard, ok := c.shardsCache[id]
+	if !ok {
+		return nil, ErrNodeNotFound.WithCausef("cluster GetShardByID, shardID:%s", id)
+	}
+	return shard, nil
+}
+
 func (c *Cluster) GetShardIDs(nodeName string) ([]uint32, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

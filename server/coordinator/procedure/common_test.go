@@ -65,11 +65,13 @@ func newTestCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 	return cluster
 }
 
+// Prepare a test cluster which has scattered shards and created test schema.
+// Notice: sleep(5s) will be called in this function.
 func prepare(t *testing.T) *cluster.Cluster {
 	re := require.New(t)
 	cluster := NewClusterAndRegisterNode(t)
+	// Wait for the cluster to be ready.
 	time.Sleep(time.Second * 5)
-	scatterWithCluster(t, cluster)
 	_, err := cluster.GetOrCreateSchema(context.Background(), testSchemaName)
 	re.NoError(err)
 	return cluster
