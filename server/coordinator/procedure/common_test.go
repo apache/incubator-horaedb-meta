@@ -60,7 +60,7 @@ func newTestCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 	manager, err := cluster.NewManagerImpl(storage, kv, testRootPath, defaultIDAllocatorStep)
 	re.NoError(err)
 
-	cluster, err := manager.GetOrCreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
+	cluster, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
 	re.NoError(err)
 	return cluster
 }

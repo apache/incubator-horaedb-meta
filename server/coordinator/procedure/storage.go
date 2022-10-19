@@ -18,6 +18,7 @@ type Meta struct {
 	RawData []byte
 }
 
+// TODO: move needRetry to scheduler.go
 func (m *Meta) needRetry() bool {
 	if m.State == StateCancelled || m.State == StateFinished {
 		return false

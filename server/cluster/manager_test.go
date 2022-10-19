@@ -154,7 +154,7 @@ func testCluster(ctx context.Context, re *require.Assertions, manager Manager, c
 }
 
 func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
-	_, err := manager.GetOrCreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
+	_, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
 	re.NoError(err)
 }
 

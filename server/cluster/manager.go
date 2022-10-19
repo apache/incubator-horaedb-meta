@@ -29,7 +29,8 @@ type Manager interface {
 	// Stop must be called before manager is dropped.
 	Stop(ctx context.Context) error
 
-	GetOrCreateCluster(ctx context.Context, clusterName string, nodeCount, replicationFactor, shardTotal uint32) (*Cluster, error)
+	CreateCluster(ctx context.Context, clusterName string, nodeCount, replicationFactor, shardTotal uint32) (*Cluster, error)
+	GetCluster(ctx context.Context, clusterName string) (*Cluster, error)
 	// AllocSchemaID means get or create schema.
 	// The second output parameter bool: Returns true if the table was newly created.
 	AllocSchemaID(ctx context.Context, clusterName, schemaName string) (uint32, bool, error)
@@ -73,7 +74,7 @@ func NewManagerImpl(storage storage.Storage, kv clientv3.KV, rootPath string, id
 	return manager, nil
 }
 
-func (m *managerImpl) GetOrCreateCluster(ctx context.Context, clusterName string, initialNodeCount,
+func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, initialNodeCount,
 	replicationFactor, shardTotal uint32,
 ) (*Cluster, error) {
 	if initialNodeCount < 1 {
@@ -87,7 +88,7 @@ func (m *managerImpl) GetOrCreateCluster(ctx context.Context, clusterName string
 	cluster, ok := m.clusters[clusterName]
 	if ok {
 		log.Info("cluster already exists", zap.String("clusterName", clusterName))
-		return cluster, nil
+		return cluster, ErrClusterAlreadyExists
 	}
 
 	clusterID, err := m.allocClusterID(ctx)
@@ -124,6 +125,16 @@ func (m *managerImpl) GetOrCreateCluster(ctx context.Context, clusterName string
 	m.clusters[clusterName] = cluster
 
 	return cluster, nil
+}
+
+func (m *managerImpl) GetCluster(_ context.Context, clusterName string) (*Cluster, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	cluster, exist := m.clusters[clusterName]
+	if exist {
+		return cluster, nil
+	}
+	return nil, ErrClusterNotFound
 }
 
 func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName string) (uint32, bool, error) {

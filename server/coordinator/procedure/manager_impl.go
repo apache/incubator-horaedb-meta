@@ -47,6 +47,9 @@ func (m *ManagerImpl) Stop(_ context.Context) error {
 }
 
 func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) (<-chan error, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.procedures = append(m.procedures, procedure)
 	m.procedureQueue <- procedure
 	resultChannel := <-m.resultChannelQueue
 	return resultChannel, nil
