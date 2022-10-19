@@ -4,6 +4,8 @@ package procedure
 
 import (
 	"context"
+	"github.com/CeresDB/ceresmeta/pkg/log"
+	"go.uber.org/zap"
 	"sync"
 
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -41,7 +43,17 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 	return nil
 }
 
-func (m *ManagerImpl) Stop(_ context.Context) error {
+func (m *ManagerImpl) Stop(cxt context.Context) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	for _, procedure := range m.procedures {
+		if procedure.State() == StateRunning {
+			err := procedure.Cancel(cxt)
+			log.Error("cancel procedure failed", zap.Error(err), zap.Uint64("procedureID", procedure.ID()))
+			// TODO: consider whether a single procedure cancel failed should return directly
+			return err
+		}
+	}
 	return nil
 }
 
@@ -60,7 +72,7 @@ func (m *ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
 	for _, procedure := range m.procedures {
 		if procedure.ID() == procedureID {
 			err := procedure.Cancel(ctx)
-			return errors.WithMessagef(err, "cancel procedure failed, procedureID = %d", procedureID)
+			return errors.WithMessagef(err, "cancel procedure failed, procedureID:%d", procedureID)
 		}
 	}
 	return nil
@@ -102,7 +114,7 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 		}
 		p := load(meta)
 		err := m.retry(ctx, p)
-		return errors.WithMessagef(err, "retry procedure failed, procedureID：%d", p.ID())
+		return errors.WithMessagef(err, "retry procedure failed, procedureID:%d", p.ID())
 	}
 	return nil
 }
