@@ -8,51 +8,48 @@ import (
 
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
-	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
+const (
+	QueueSize         = 10
+	MetaListBatchSize = 100
+)
+
 type ManagerImpl struct {
+	// RWMutex is used to protect following fields.
 	lock       sync.RWMutex
 	procedures []Procedure
 
 	storage  Storage
-	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
 
-	procedureChan        chan<- Procedure
-	procedureIDAllocator id.Allocator
-	shardIDAllocator     id.Allocator
+	procedureQueue     chan<- Procedure
+	resultChannelQueue <-chan <-chan error
 }
 
-func (m *ManagerImpl) SubmitScatterTask(cxt context.Context, _ *ScatterRequest) error {
-	procedureID, err := m.procedureIDAllocator.Alloc(cxt)
+func (m *ManagerImpl) Start(ctx context.Context) error {
+	procedureQueue := make(chan Procedure, QueueSize)
+	m.procedureQueue = procedureQueue
+	resultQueue := make(chan chan error, QueueSize)
+	go startProcedureWorker(ctx, procedureQueue, resultQueue)
+	err := m.retryAll(ctx)
 	if err != nil {
-		return errors.WithMessage(err, "alloc procedure id failed")
+		return errors.WithMessage(err, "retry all running procedure failed")
 	}
-	procedure := NewScatterProcedure(m.dispatch, m.cluster, procedureID, m.shardIDAllocator)
-	return m.submit(cxt, procedure)
+	return nil
 }
 
-func (m *ManagerImpl) SubmitTransferLeaderTask(_ context.Context, _ *TransferLeaderRequest) error {
+func (m *ManagerImpl) Stop(_ context.Context) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (m *ManagerImpl) SubmitMigrateTask(_ context.Context, _ *MigrateRequest) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (m *ManagerImpl) SubmitSplitTask(_ context.Context, _ *SplitRequest) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (m *ManagerImpl) SubmitMergeTask(_ context.Context, _ *MergeRequest) error {
-	// TODO implement me
-	panic("implement me")
+func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) (<-chan error, error) {
+	m.procedureQueue <- procedure
+	resultChannel := <-m.resultChannelQueue
+	return resultChannel, nil
 }
 
 func (m *ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
@@ -72,6 +69,9 @@ func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*RunningProcedu
 	defer m.lock.RUnlock()
 	procedureInfos := make([]*RunningProcedureInfo, 0)
 	for _, procedure := range m.procedures {
+		if procedure.State() != StateRunning {
+			continue
+		}
 		procedureInfos = append(procedureInfos, &RunningProcedureInfo{
 			ID:    procedure.ID(),
 			Typ:   procedure.Typ(),
@@ -87,82 +87,56 @@ type RunningProcedureInfo struct {
 	State State
 }
 
-func NewManagerImpl(ctx context.Context, cluster *cluster.Cluster, client *clientv3.Client, rootPath string) (Manager, error) {
+func NewManagerImpl(_ context.Context, cluster *cluster.Cluster, client *clientv3.Client, rootPath string) (Manager, error) {
 	manager := &ManagerImpl{
-		storage:              NewEtcdStorageImpl(client, cluster.GetClusterID(), rootPath),
-		cluster:              cluster,
-		dispatch:             eventdispatch.NewDispatchImpl(),
-		shardIDAllocator:     id.NewReusableAllocatorImpl(make([]uint64, 0), 0),
-		procedureIDAllocator: id.NewAllocatorImpl(client, "procedure", 5),
+		storage:  NewEtcdStorageImpl(client, cluster.GetClusterID(), rootPath),
+		dispatch: eventdispatch.NewDispatchImpl(),
 	}
-
-	err := manager.Init(ctx)
-	if err != nil {
-		return nil, errors.WithMessage(err, "init manager failed")
-	}
-
 	return manager, nil
 }
 
-func (m *ManagerImpl) Init(ctx context.Context) error {
-	procedureChan := make(chan Procedure, 10)
-	m.procedureChan = procedureChan
-	go startProcedureWorker(ctx, procedureChan, make(chan error, 10))
-	if err := m.SubmitScatterTask(ctx, &ScatterRequest{}); err != nil {
-		return errors.WithMessage(err, "submit scatter task failed")
-	}
-	err := m.retryAll(ctx)
-	if err != nil {
-		return errors.WithMessage(err, "retry all running procedure failed")
-	}
-	return nil
-}
-
 func (m *ManagerImpl) retryAll(ctx context.Context) error {
-	metas, err := m.storage.List(ctx, 100)
+	metas, err := m.storage.List(ctx, MetaListBatchSize)
 	if err != nil {
 		return errors.WithMessage(err, "storage list meta failed")
 	}
 	for _, meta := range metas {
-		if !checkNeedRetry(meta) {
+		if !meta.needRetry() {
 			continue
 		}
 		p := load(meta)
 		err := m.retry(ctx, p)
-		return errors.WithMessagef(err, "retry procedure failed, procedureID = %d", p.ID())
+		return errors.WithMessagef(err, "retry procedure failed, procedureID：%d", p.ID())
 	}
 	return nil
 }
 
-func startProcedureWorker(ctx context.Context, procedures <-chan Procedure, results chan<- error) {
+func startProcedureWorker(ctx context.Context, procedures <-chan Procedure, results chan chan error) {
 	for procedure := range procedures {
 		err := procedure.Start(ctx)
-		results <- err
+		resultChannel := make(chan error, 1)
+		resultChannel <- err
+		results <- resultChannel
 	}
-}
-
-func (m *ManagerImpl) submit(_ context.Context, procedure Procedure) error {
-	m.procedureChan <- procedure
-	return nil
 }
 
 func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
 	err := procedure.Start(ctx)
 	if err != nil {
-		return errors.WithMessagef(err, "start procedure failed, procedureID = %d", procedure.ID())
+		return errors.WithMessagef(err, "start procedure failed, procedureID:%d", procedure.ID())
 	}
 	return nil
 }
 
-// load meta and restore procedure
+// Load meta and restore procedure
 func load(meta *Meta) Procedure {
 	typ := meta.Typ
 	rawData := meta.RawData
-	procedure := RestoreProcedure(typ, rawData)
+	procedure := restoreProcedure(typ, rawData)
 	return procedure
 }
 
-func RestoreProcedure(operationType Typ, _ []byte) Procedure {
+func restoreProcedure(operationType Typ, _ []byte) Procedure {
 	switch operationType {
 	case Create:
 		return nil
@@ -180,12 +154,4 @@ func RestoreProcedure(operationType Typ, _ []byte) Procedure {
 		return nil
 	}
 	return nil
-}
-
-func checkNeedRetry(meta *Meta) bool {
-	state := meta.State
-	if state == StateCancelled || state == StateFinished {
-		return false
-	}
-	return true
 }

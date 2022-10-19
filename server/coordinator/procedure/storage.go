@@ -18,6 +18,13 @@ type Meta struct {
 	RawData []byte
 }
 
+func (m *Meta) needRetry() bool {
+	if m.State == StateCancelled || m.State == StateFinished {
+		return false
+	}
+	return true
+}
+
 type Storage interface {
 	Write
 	List(ctx context.Context, batchSize int) ([]*Meta, error)

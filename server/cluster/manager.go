@@ -29,13 +29,14 @@ type Manager interface {
 	// Stop must be called before manager is dropped.
 	Stop(ctx context.Context) error
 
-	CreateCluster(ctx context.Context, clusterName string, nodeCount, replicationFactor, shardTotal uint32) (*Cluster, error)
+	GetOrCreateCluster(ctx context.Context, clusterName string, nodeCount, replicationFactor, shardTotal uint32) (*Cluster, error)
 	// AllocSchemaID means get or create schema.
 	// The second output parameter bool: Returns true if the table was newly created.
 	AllocSchemaID(ctx context.Context, clusterName, schemaName string) (uint32, bool, error)
 	// AllocTableID means get or create table.
 	// The second output parameter bool: Returns true if the table was newly created.
 	AllocTableID(ctx context.Context, clusterName, schemaName, tableName, nodeName string) (*Table, bool, error)
+	AllocShardID(ctx context.Context, clusterName string) (uint32, error)
 	GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error)
 	DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error
 	RegisterNode(ctx context.Context, clusterName string, nodeInfo *metaservicepb.NodeInfo) error
@@ -72,7 +73,7 @@ func NewManagerImpl(storage storage.Storage, kv clientv3.KV, rootPath string, id
 	return manager, nil
 }
 
-func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, initialNodeCount,
+func (m *managerImpl) GetOrCreateCluster(ctx context.Context, clusterName string, initialNodeCount,
 	replicationFactor, shardTotal uint32,
 ) (*Cluster, error) {
 	if initialNodeCount < 1 {
@@ -156,6 +157,22 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
 	return table, exists, nil
+}
+
+func (m *managerImpl) AllocShardID(ctx context.Context, clusterName string) (uint32, error) {
+	cluster, err := m.getCluster(clusterName)
+	if err != nil {
+		log.Error("cluster not found", zap.Error(err))
+		return 0, errors.WithMessage(err, "cluster manager AllocShardID")
+	}
+
+	shardID, err := cluster.allocShardID(ctx)
+	if err != nil {
+		log.Error("fail to alloc shard ID", zap.Error(err))
+		return 0, errors.WithMessagef(err, "cluster manager AllocShardID, "+
+			"clusterName:%s", clusterName)
+	}
+	return shardID, nil
 }
 
 func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error) {

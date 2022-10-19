@@ -198,7 +198,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) {
 
 	// Create default cluster by the leader.
 	if leaderResp.IsLocal {
-		cluster, err := srv.clusterManager.CreateCluster(ctx, srv.cfg.DefaultClusterName, uint32(srv.cfg.DefaultClusterNodeCount), uint32(srv.cfg.DefaultClusterReplicationFactor), uint32(srv.cfg.DefaultClusterShardTotal))
+		cluster, err := srv.clusterManager.GetOrCreateCluster(ctx, srv.cfg.DefaultClusterName, uint32(srv.cfg.DefaultClusterNodeCount), uint32(srv.cfg.DefaultClusterReplicationFactor), uint32(srv.cfg.DefaultClusterShardTotal))
 		if err != nil {
 			log.Warn("create default cluster failed", zap.Error(err))
 		} else {
