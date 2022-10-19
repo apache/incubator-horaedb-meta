@@ -14,5 +14,5 @@ type Manager interface {
 
 	Submit(ctx context.Context, procedure Procedure) (<-chan error, error)
 	Cancel(ctx context.Context, procedureID uint64) error
-	ListRunningProcedure(ctx context.Context) ([]*RunningProcedureInfo, error)
+	ListRunningProcedure(ctx context.Context) ([]*Info, error)
 }

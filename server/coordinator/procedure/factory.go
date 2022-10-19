@@ -14,9 +14,9 @@ import (
 )
 
 type Factory struct {
-	procedureIDAllocator id.Allocator
-	dispatch             eventdispatch.Dispatch
-	cluster              *cluster.Cluster
+	IDAllocator id.Allocator
+	dispatch    eventdispatch.Dispatch
+	cluster     *cluster.Cluster
 }
 
 type ScatterRequest struct {
@@ -29,22 +29,6 @@ type TransferLeaderRequest struct {
 	NewLeader *clusterpb.Shard
 }
 
-// nolint
-type MigrateRequest struct {
-	TargetShard *clusterpb.Shard
-	TargetNode  *clusterpb.Node
-}
-
-// nolint
-type SplitRequest struct {
-	TargetShard *clusterpb.Shard
-}
-
-// nolint
-type MergeRequest struct {
-	TargetShards []*clusterpb.Shard
-}
-
 type CreateTableRequest struct {
 	SchemaName string
 	NodeName   string
@@ -52,49 +36,42 @@ type CreateTableRequest struct {
 }
 
 // nolint
-func newFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, cluster *cluster.Cluster) *Factory {
+func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, cluster *cluster.Cluster) *Factory {
 	return &Factory{
-		procedureIDAllocator: allocator,
-		dispatch:             dispatch,
-		cluster:              cluster,
+		IDAllocator: allocator,
+		dispatch:    dispatch,
+		cluster:     cluster,
 	}
 }
 
 func (f *Factory) CreateScatterProcedure(cxt context.Context, request *ScatterRequest) (Procedure, error) {
-	procedureID, err := f.allocProcedureID(cxt)
+	id, err := f.allocProcedureID(cxt)
 	if err != nil {
-		return nil, errors.WithMessage(err, "alloc procedure id failed")
+		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
-	procedure := NewScatterProcedure(f.dispatch, f.cluster, procedureID, request.ShardIDs)
+	procedure := NewScatterProcedure(f.dispatch, f.cluster, id, request.ShardIDs)
 	return procedure, nil
 }
 
-func (f *Factory) CreateTransferLeaderProcedure(_ context.Context, _ *TransferLeaderRequest) (Procedure, error) {
-	return nil, nil
-}
-
-func (f *Factory) CreateMigrateProcedure(_ context.Context, _ *MigrateRequest) (Procedure, error) {
-	return nil, nil
-}
-
-func (f *Factory) CreateSplitProcedure(_ context.Context, _ *SplitRequest) (Procedure, error) {
-	return nil, nil
-}
-
-func (f *Factory) CreateMergeProcedure(_ context.Context, _ *MergeRequest) (Procedure, error) {
-	return nil, nil
+func (f *Factory) CreateTransferLeaderProcedure(cxt context.Context, request *TransferLeaderRequest) (Procedure, error) {
+	id, err := f.allocProcedureID(cxt)
+	if err != nil {
+		return nil, errors.WithMessage(err, "alloc procedure id")
+	}
+	procedure := NewTransferLeaderProcedure(f.dispatch, f.cluster, request.OldLeader, request.NewLeader, id)
+	return procedure, nil
 }
 
 func (f *Factory) CreateCreateTableProcedure(cxt context.Context, request *CreateTableRequest) (Procedure, error) {
-	procedureID, err := f.allocProcedureID(cxt)
+	id, err := f.allocProcedureID(cxt)
 	if err != nil {
-		return nil, errors.WithMessage(err, "alloc procedure id failed")
+		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
-	procedure := NewCreateTableProcedure(f.dispatch, f.cluster, procedureID,
+	procedure := NewCreateTableProcedure(f.dispatch, f.cluster, id,
 		&metaservicepb.CreateTableRequest{SchemaName: request.SchemaName, Name: request.NodeName, CreateSql: request.CreateSQL})
 	return procedure, nil
 }
 
 func (f *Factory) allocProcedureID(ctx context.Context) (uint64, error) {
-	return f.procedureIDAllocator.Alloc(ctx)
+	return f.IDAllocator.Alloc(ctx)
 }

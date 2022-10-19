@@ -47,3 +47,10 @@ type Procedure interface {
 	// State of the procedure. Retrieve the state of this procedure.
 	State() State
 }
+
+// Info is used to provide immutable description procedure information
+type Info struct {
+	ID    uint64
+	Typ   Typ
+	State State
+}

@@ -42,8 +42,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 }
 
 func (m *ManagerImpl) Stop(_ context.Context) error {
-	// TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) (<-chan error, error) {
@@ -67,15 +66,15 @@ func (m *ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
 	return nil
 }
 
-func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*RunningProcedureInfo, error) {
+func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
-	procedureInfos := make([]*RunningProcedureInfo, 0)
+	procedureInfos := make([]*Info, 0)
 	for _, procedure := range m.procedures {
 		if procedure.State() != StateRunning {
 			continue
 		}
-		procedureInfos = append(procedureInfos, &RunningProcedureInfo{
+		procedureInfos = append(procedureInfos, &Info{
 			ID:    procedure.ID(),
 			Typ:   procedure.Typ(),
 			State: procedure.State(),
@@ -84,13 +83,7 @@ func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*RunningProcedu
 	return procedureInfos, nil
 }
 
-type RunningProcedureInfo struct {
-	ID    uint64
-	Typ   Typ
-	State State
-}
-
-func NewManagerImpl(_ context.Context, cluster *cluster.Cluster, client *clientv3.Client, rootPath string) (Manager, error) {
+func NewManagerImpl(cluster *cluster.Cluster, client *clientv3.Client, rootPath string) (Manager, error) {
 	manager := &ManagerImpl{
 		storage:  NewEtcdStorageImpl(client, cluster.GetClusterID(), rootPath),
 		dispatch: eventdispatch.NewDispatchImpl(),
