@@ -131,6 +131,18 @@ func (m *ManagerImpl) startProcedureWorker(ctx context.Context, procedures <-cha
 		err := procedure.Start(ctx)
 		m.resultChannels[procedure.ID()] <- err
 		delete(m.resultChannels, procedure.ID())
+
+		m.lock.Lock()
+		index := -1
+		for i, p := range m.procedures {
+			if p.ID() == procedure.ID() {
+				index = i
+			}
+		}
+		if index != -1 {
+			m.procedures = append(m.procedures[:index], m.procedures[index+1:]...)
+		}
+		m.lock.Unlock()
 	}
 }
 
