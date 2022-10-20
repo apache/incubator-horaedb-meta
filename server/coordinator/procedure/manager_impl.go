@@ -73,6 +73,7 @@ func (m *ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
 	defer m.lock.RUnlock()
 	for _, procedure := range m.procedures {
 		if procedure.ID() == procedureID {
+			m.removeProcedure(procedure)
 			err := procedure.Cancel(ctx)
 			if err != nil {
 				return errors.WithMessagef(err, "cancel procedure failed, procedureID:%d", procedureID)
@@ -117,7 +118,7 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 		if !meta.needRetry() {
 			continue
 		}
-		p := load(meta)
+		p := restoreProcedure(meta)
 		err := m.retry(ctx, p)
 		return errors.WithMessagef(err, "retry procedure failed, procedureID:%d", p.ID())
 	}
@@ -131,18 +132,23 @@ func (m *ManagerImpl) startProcedureWorker(ctx context.Context, procedures <-cha
 			log.Error("procedure start failed", zap.Error(err))
 		}
 
-		m.lock.Lock()
-		index := -1
-		for i, p := range m.procedures {
-			if p.ID() == procedure.ID() {
-				index = i
-			}
-		}
-		if index != -1 {
-			m.procedures = append(m.procedures[:index], m.procedures[index+1:]...)
-		}
-		m.lock.Unlock()
+		m.removeProcedure(procedure)
 	}
+}
+
+func (m *ManagerImpl) removeProcedure(procedure Procedure) {
+	m.lock.Lock()
+	index := -1
+	for i, p := range m.procedures {
+		if p.ID() == procedure.ID() {
+			index = i
+			break
+		}
+	}
+	if index != -1 {
+		m.procedures = append(m.procedures[:index], m.procedures[index+1:]...)
+	}
+	m.lock.Unlock()
 }
 
 func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
@@ -154,15 +160,8 @@ func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
 }
 
 // Load meta and restore procedure.
-func load(meta *Meta) Procedure {
-	typ := meta.Typ
-	rawData := meta.RawData
-	procedure := restoreProcedure(typ, rawData)
-	return procedure
-}
-
-func restoreProcedure(operationType Typ, _ []byte) Procedure {
-	switch operationType {
+func restoreProcedure(meta *Meta) Procedure {
+	switch meta.Typ {
 	case Create:
 		return nil
 	case Delete:
