@@ -24,8 +24,11 @@ type CloseShardRequest struct {
 }
 
 type CreateTableOnShardRequest struct {
-	TableInfo *cluster.TableInfo
-	CreateSQL string
+	TableInfo        *cluster.TableInfo
+	EncodedSchema    []byte
+	Engine           string
+	CreateIfNotExist bool
+	Options          map[string]string
 }
 
 type DropTableOnShardRequest struct {

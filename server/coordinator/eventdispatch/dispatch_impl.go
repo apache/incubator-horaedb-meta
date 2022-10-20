@@ -112,9 +112,12 @@ func (d *DispatchImpl) getMetaEventClient(ctx context.Context, addr string) (met
 
 func convertCreateTableOnShardRequestToPB(request *CreateTableOnShardRequest) *metaeventpb.CreateTableOnShardRequest {
 	return &metaeventpb.CreateTableOnShardRequest{
-		UpdateShardInfo: nil,
-		TableInfo:       cluster.ConvertTableInfoToPB(request.TableInfo),
-		CreateSql:       request.CreateSQL,
+		UpdateShardInfo:  nil,
+		TableInfo:        cluster.ConvertTableInfoToPB(request.TableInfo),
+		EncodedSchema:    request.EncodedSchema,
+		Engine:           request.Engine,
+		CreateIfNotExist: request.CreateIfNotExist,
+		Options:          request.Options,
 	}
 }
 

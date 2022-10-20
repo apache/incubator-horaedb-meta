@@ -43,16 +43,16 @@ var (
 
 func dropTablePrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*DropTableCallbackRequest)
-	table, exists, err := request.cluster.GetTable(request.ctx, request.schemaName, request.tableName)
+	table, exists, err := request.cluster.GetTable(request.ctx, request.req.GetSchemaName(), request.req.GetName())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster get table")
 		return
 	}
 	if !exists {
-		log.Warn("drop non-existing table", zap.String("schema", request.schemaName), zap.String("table", request.tableName), zap.Uint64("tableID", request.tableID))
+		log.Warn("drop non-existing table", zap.String("schema", request.req.GetSchemaName()), zap.String("table", request.req.GetName()))
 		return
 	}
-	err = request.cluster.DropTable(request.ctx, request.schemaName, request.tableName, request.tableID)
+	err = request.cluster.DropTable(request.ctx, request.req.GetSchemaName(), request.req.GetName(), table.GetID())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster drop table")
 		return
@@ -97,9 +97,7 @@ type DropTableCallbackRequest struct {
 	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
 
-	schemaName string
-	tableName  string
-	tableID    uint64
+	req *metaservicepb.DropTableRequest
 }
 
 func NewDropTableProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, req *metaservicepb.DropTableRequest) Procedure {
@@ -134,12 +132,10 @@ func (p *DropTableProcedure) Start(ctx context.Context) error {
 	p.updateStateWithLock(StateRunning)
 
 	dropTableCallbackRequest := &DropTableCallbackRequest{
-		cluster:    p.cluster,
-		ctx:        ctx,
-		dispatch:   p.dispatch,
-		schemaName: p.req.GetSchemaName(),
-		tableName:  p.req.GetName(),
-		tableID:    p.req.GetId(),
+		cluster:  p.cluster,
+		ctx:      ctx,
+		dispatch: p.dispatch,
+		req:      p.req,
 	}
 
 	if err := p.fsm.Event(eventDropTablePrepare, dropTableCallbackRequest); err != nil {

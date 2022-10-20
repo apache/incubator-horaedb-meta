@@ -41,13 +41,13 @@ var (
 
 func createTablePrepareCallback(event *fsm.Event) {
 	request := event.Args[0].(*CreateTableCallbackRequest)
-	table, exists, err := request.cluster.GetOrCreateTable(request.ctx, request.nodeName, request.schemaName, request.tableName)
+	table, exists, err := request.cluster.GetOrCreateTable(request.ctx, request.req.GetHeader().GetNode(), request.req.GetSchemaName(), request.req.GetName())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster get or create table")
 		return
 	}
 	if exists {
-		log.Warn("create an existing table", zap.String("schema", request.schemaName), zap.String("table", request.tableName))
+		log.Warn("create an existing table", zap.String("schema", request.req.GetSchemaName()), zap.String("table", request.req.GetName()))
 		return
 	}
 
@@ -70,7 +70,10 @@ func createTablePrepareCallback(event *fsm.Event) {
 			SchemaID:   table.GetSchemaID(),
 			SchemaName: table.GetSchemaName(),
 		},
-		CreateSQL: request.createSQL,
+		EncodedSchema:    request.req.EncodedSchema,
+		Engine:           request.req.Engine,
+		CreateIfNotExist: request.req.CreateIfNotExist,
+		Options:          request.req.Options,
 	})
 	if err != nil {
 		cancelEventWithLog(event, err, "dispatch create table on shard")
@@ -100,10 +103,7 @@ type CreateTableCallbackRequest struct {
 	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
 
-	schemaName string
-	tableName  string
-	nodeName   string
-	createSQL  string
+	req *metaservicepb.CreateTableRequest
 
 	// TODO: correct callback input params
 	onSuccess func() error
@@ -145,13 +145,9 @@ func (p *CreateTableProcedure) Start(ctx context.Context) error {
 	p.updateStateWithLock(StateRunning)
 
 	createTableCallbackRequest := &CreateTableCallbackRequest{
-		cluster:    p.cluster,
-		ctx:        ctx,
-		dispatch:   p.dispatch,
-		tableName:  p.req.GetName(),
-		schemaName: p.req.GetSchemaName(),
-		nodeName:   p.req.GetHeader().GetNode(),
-		createSQL:  p.req.GetCreateSql(),
+		cluster:  p.cluster,
+		ctx:      ctx,
+		dispatch: p.dispatch,
 	}
 
 	if err := p.fsm.Event(eventCreateTablePrepare, createTableCallbackRequest); err != nil {
