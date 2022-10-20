@@ -65,6 +65,7 @@ func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.procedures = append(m.procedures, procedure)
+	m.procedureQueue <- procedure
 	return nil
 }
 
