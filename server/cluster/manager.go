@@ -86,7 +86,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 
 	_, ok := m.clusters[clusterName]
 	if ok {
-		log.Info("cluster already exists", zap.String("clusterName", clusterName))
+		log.Error("cluster already exists", zap.String("clusterName", clusterName))
 		return nil, ErrClusterAlreadyExists
 	}
 
