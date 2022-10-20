@@ -50,7 +50,7 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 		if procedure.State() == StateRunning {
 			err := procedure.Cancel(ctx)
 			log.Error("cancel procedure failed", zap.Error(err), zap.Uint64("procedureID", procedure.ID()))
-			// TODO: consider whether a single procedure cancel failed should return directly
+			// TODO: consider whether a single procedure cancel failed should return directly.
 			return err
 		}
 	}
@@ -136,7 +136,7 @@ func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
 	return nil
 }
 
-// Load meta and restore procedure
+// Load meta and restore procedure.
 func load(meta *Meta) Procedure {
 	typ := meta.Typ
 	rawData := meta.RawData

@@ -48,7 +48,7 @@ type Procedure interface {
 	State() State
 }
 
-// Info is used to provide immutable description procedure information
+// Info is used to provide immutable description procedure information.
 type Info struct {
 	ID    uint64
 	Typ   Typ
