@@ -6,6 +6,10 @@ import (
 	"context"
 	"sync"
 
+	"go.uber.org/zap"
+
+	"github.com/CeresDB/ceresmeta/pkg/log"
+
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
@@ -45,6 +49,7 @@ func dropTablePrepareCallback(event *fsm.Event) {
 		return
 	}
 	if !exists {
+		log.Warn("drop non-existing table", zap.String("schema", request.schemaName), zap.String("table", request.tableName), zap.Uint64("tableID", request.tableID))
 		return
 	}
 	err = request.cluster.DropTable(request.ctx, request.schemaName, request.tableName, request.tableID)
