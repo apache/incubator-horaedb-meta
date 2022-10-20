@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
-	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -23,6 +22,7 @@ type ManagerImpl struct {
 	// This lock is used to protect the field `procedures`.
 	lock       sync.RWMutex
 	procedures []Procedure
+	running    bool
 
 	storage  Storage
 	dispatch eventdispatch.Dispatch
@@ -32,6 +32,12 @@ type ManagerImpl struct {
 }
 
 func (m *ManagerImpl) Start(ctx context.Context) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if m.running {
+		log.Warn("cluster manager has already been started")
+		return nil
+	}
 	m.procedureQueue = make(chan Procedure, queueSize)
 	m.resultChannelMap = make(map[uint64]chan error, 0)
 	go m.startProcedureWorker(ctx, m.procedureQueue)
@@ -96,9 +102,9 @@ func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
 	return procedureInfos, nil
 }
 
-func NewManagerImpl(cluster *cluster.Cluster, client *clientv3.Client, rootPath string) (Manager, error) {
+func NewManagerImpl(client *clientv3.Client, rootPath string) (Manager, error) {
 	manager := &ManagerImpl{
-		storage:  NewEtcdStorageImpl(client, cluster.GetClusterID(), rootPath),
+		storage:  NewEtcdStorageImpl(client, rootPath),
 		dispatch: eventdispatch.NewDispatchImpl(),
 	}
 	return manager, nil

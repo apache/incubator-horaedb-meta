@@ -16,31 +16,32 @@ import (
 type Factory struct {
 	idAllocator id.Allocator
 	dispatch    eventdispatch.Dispatch
-	cluster     *cluster.Cluster
 }
 
 type ScatterRequest struct {
+	Cluster  *cluster.Cluster
 	ShardIDs []uint32
 }
 
 // nolint
 type TransferLeaderRequest struct {
-	OldLeader *clusterpb.Shard
-	NewLeader *clusterpb.Shard
+	Cluster   *cluster.Cluster
+	OldLeader clusterpb.Shard
+	NewLeader clusterpb.Shard
 }
 
 type CreateTableRequest struct {
+	Cluster    *cluster.Cluster
 	SchemaName string
 	NodeName   string
 	CreateSQL  string
 }
 
 // nolint
-func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, cluster *cluster.Cluster) *Factory {
+func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch) *Factory {
 	return &Factory{
 		idAllocator: allocator,
 		dispatch:    dispatch,
-		cluster:     cluster,
 	}
 }
 
@@ -49,7 +50,7 @@ func (f *Factory) CreateScatterProcedure(ctx context.Context, request *ScatterRe
 	if err != nil {
 		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
-	procedure := NewScatterProcedure(f.dispatch, f.cluster, id, request.ShardIDs)
+	procedure := NewScatterProcedure(f.dispatch, request.Cluster, id, request.ShardIDs)
 	return procedure, nil
 }
 
@@ -58,7 +59,7 @@ func (f *Factory) CreateTransferLeaderProcedure(ctx context.Context, request *Tr
 	if err != nil {
 		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
-	procedure := NewTransferLeaderProcedure(f.dispatch, f.cluster, request.OldLeader, request.NewLeader, id)
+	procedure := NewTransferLeaderProcedure(f.dispatch, request.Cluster, &request.OldLeader, &request.NewLeader, id)
 	return procedure, nil
 }
 
@@ -67,7 +68,7 @@ func (f *Factory) CreateCreateTableProcedure(ctx context.Context, request *Creat
 	if err != nil {
 		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
-	procedure := NewCreateTableProcedure(f.dispatch, f.cluster, id,
+	procedure := NewCreateTableProcedure(f.dispatch, request.Cluster, id,
 		&metaservicepb.CreateTableRequest{SchemaName: request.SchemaName, Name: request.NodeName, CreateSql: request.CreateSQL})
 	return procedure, nil
 }
