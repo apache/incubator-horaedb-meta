@@ -15,12 +15,12 @@ import (
 )
 
 const (
-	QueueSize         = 10
-	MetaListBatchSize = 100
+	queueSize         = 10
+	metaListBatchSize = 100
 )
 
 type ManagerImpl struct {
-	// RWMutex is used to protect following fields.
+	// This lock is used to protect the field `procedures`.
 	lock       sync.RWMutex
 	procedures []Procedure
 
@@ -32,9 +32,9 @@ type ManagerImpl struct {
 }
 
 func (m *ManagerImpl) Start(ctx context.Context) error {
-	procedureQueue := make(chan Procedure, QueueSize)
+	procedureQueue := make(chan Procedure, queueSize)
 	m.procedureQueue = procedureQueue
-	resultQueue := make(chan chan error, QueueSize)
+	resultQueue := make(chan chan error, queueSize)
 	go startProcedureWorker(ctx, procedureQueue, resultQueue)
 	err := m.retryAll(ctx)
 	if err != nil {
@@ -43,12 +43,12 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 	return nil
 }
 
-func (m *ManagerImpl) Stop(cxt context.Context) error {
+func (m *ManagerImpl) Stop(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	for _, procedure := range m.procedures {
 		if procedure.State() == StateRunning {
-			err := procedure.Cancel(cxt)
+			err := procedure.Cancel(ctx)
 			log.Error("cancel procedure failed", zap.Error(err), zap.Uint64("procedureID", procedure.ID()))
 			// TODO: consider whether a single procedure cancel failed should return directly
 			return err
@@ -83,14 +83,13 @@ func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
 	defer m.lock.RUnlock()
 	procedureInfos := make([]*Info, 0)
 	for _, procedure := range m.procedures {
-		if procedure.State() != StateRunning {
-			continue
+		if procedure.State() == StateRunning {
+			procedureInfos = append(procedureInfos, &Info{
+				ID:    procedure.ID(),
+				Typ:   procedure.Typ(),
+				State: procedure.State(),
+			})
 		}
-		procedureInfos = append(procedureInfos, &Info{
-			ID:    procedure.ID(),
-			Typ:   procedure.Typ(),
-			State: procedure.State(),
-		})
 	}
 	return procedureInfos, nil
 }
@@ -104,7 +103,7 @@ func NewManagerImpl(cluster *cluster.Cluster, client *clientv3.Client, rootPath 
 }
 
 func (m *ManagerImpl) retryAll(ctx context.Context) error {
-	metas, err := m.storage.List(ctx, MetaListBatchSize)
+	metas, err := m.storage.List(ctx, metaListBatchSize)
 	if err != nil {
 		return errors.WithMessage(err, "storage list meta failed")
 	}
@@ -120,11 +119,15 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 }
 
 func startProcedureWorker(ctx context.Context, procedures <-chan Procedure, results chan chan error) {
-	for procedure := range procedures {
-		err := procedure.Start(ctx)
-		resultChannel := make(chan error, 1)
-		resultChannel <- err
-		results <- resultChannel
+	for {
+		select {
+		case procedure := <-procedures:
+			err := procedure.Start(ctx)
+			resultChannel := make(chan error, 1)
+			resultChannel <- err
+			results <- resultChannel
+		}
+
 	}
 }
 

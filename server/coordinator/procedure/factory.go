@@ -14,7 +14,7 @@ import (
 )
 
 type Factory struct {
-	IDAllocator id.Allocator
+	idAllocator id.Allocator
 	dispatch    eventdispatch.Dispatch
 	cluster     *cluster.Cluster
 }
@@ -38,14 +38,14 @@ type CreateTableRequest struct {
 // nolint
 func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, cluster *cluster.Cluster) *Factory {
 	return &Factory{
-		IDAllocator: allocator,
+		idAllocator: allocator,
 		dispatch:    dispatch,
 		cluster:     cluster,
 	}
 }
 
-func (f *Factory) CreateScatterProcedure(cxt context.Context, request *ScatterRequest) (Procedure, error) {
-	id, err := f.allocProcedureID(cxt)
+func (f *Factory) CreateScatterProcedure(ctx context.Context, request *ScatterRequest) (Procedure, error) {
+	id, err := f.allocProcedureID(ctx)
 	if err != nil {
 		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
@@ -53,8 +53,8 @@ func (f *Factory) CreateScatterProcedure(cxt context.Context, request *ScatterRe
 	return procedure, nil
 }
 
-func (f *Factory) CreateTransferLeaderProcedure(cxt context.Context, request *TransferLeaderRequest) (Procedure, error) {
-	id, err := f.allocProcedureID(cxt)
+func (f *Factory) CreateTransferLeaderProcedure(ctx context.Context, request *TransferLeaderRequest) (Procedure, error) {
+	id, err := f.allocProcedureID(ctx)
 	if err != nil {
 		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
@@ -62,8 +62,8 @@ func (f *Factory) CreateTransferLeaderProcedure(cxt context.Context, request *Tr
 	return procedure, nil
 }
 
-func (f *Factory) CreateCreateTableProcedure(cxt context.Context, request *CreateTableRequest) (Procedure, error) {
-	id, err := f.allocProcedureID(cxt)
+func (f *Factory) CreateCreateTableProcedure(ctx context.Context, request *CreateTableRequest) (Procedure, error) {
+	id, err := f.allocProcedureID(ctx)
 	if err != nil {
 		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
@@ -73,5 +73,5 @@ func (f *Factory) CreateCreateTableProcedure(cxt context.Context, request *Creat
 }
 
 func (f *Factory) allocProcedureID(ctx context.Context) (uint64, error) {
-	return f.IDAllocator.Alloc(ctx)
+	return f.idAllocator.Alloc(ctx)
 }
