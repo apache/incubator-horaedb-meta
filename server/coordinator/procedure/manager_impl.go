@@ -27,8 +27,8 @@ type ManagerImpl struct {
 	storage  Storage
 	dispatch eventdispatch.Dispatch
 
-	procedureQueue   chan Procedure
-	resultChannelMap map[uint64]chan error
+	procedureQueue chan Procedure
+	resultChannels map[uint64]chan error
 }
 
 func (m *ManagerImpl) Start(ctx context.Context) error {
@@ -39,7 +39,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 		return nil
 	}
 	m.procedureQueue = make(chan Procedure, queueSize)
-	m.resultChannelMap = make(map[uint64]chan error, 0)
+	m.resultChannels = make(map[uint64]chan error, 0)
 	go m.startProcedureWorker(ctx, m.procedureQueue)
 	err := m.retryAll(ctx)
 	if err != nil {
@@ -67,7 +67,7 @@ func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) (<-chan err
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	resultChannel := make(chan error, 1)
-	m.resultChannelMap[procedure.ID()] = resultChannel
+	m.resultChannels[procedure.ID()] = resultChannel
 	m.procedures = append(m.procedures, procedure)
 	m.procedureQueue <- procedure
 
@@ -129,8 +129,8 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 func (m *ManagerImpl) startProcedureWorker(ctx context.Context, procedures <-chan Procedure) {
 	for procedure := range procedures {
 		err := procedure.Start(ctx)
-		m.resultChannelMap[procedure.ID()] <- err
-		delete(m.resultChannelMap, procedure.ID())
+		m.resultChannels[procedure.ID()] <- err
+		delete(m.resultChannels, procedure.ID())
 	}
 }
 
