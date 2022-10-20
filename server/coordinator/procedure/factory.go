@@ -35,6 +35,10 @@ type CreateTableRequest struct {
 	SchemaName string
 	NodeName   string
 	CreateSQL  string
+
+	// TODO: correct callback input params
+	onSuccess func() error
+	onFailed  func() error
 }
 
 // nolint
@@ -69,7 +73,7 @@ func (f *Factory) CreateCreateTableProcedure(ctx context.Context, request *Creat
 		return nil, errors.WithMessage(err, "alloc procedure id")
 	}
 	procedure := NewCreateTableProcedure(f.dispatch, request.Cluster, id,
-		&metaservicepb.CreateTableRequest{SchemaName: request.SchemaName, Name: request.NodeName, CreateSql: request.CreateSQL})
+		&metaservicepb.CreateTableRequest{SchemaName: request.SchemaName, Name: request.NodeName, CreateSql: request.CreateSQL}, request.onSuccess, request.onFailed)
 	return procedure, nil
 }
 

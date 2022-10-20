@@ -28,7 +28,6 @@ type ManagerImpl struct {
 	dispatch eventdispatch.Dispatch
 
 	procedureQueue chan Procedure
-	resultChannels map[uint64]chan error
 }
 
 func (m *ManagerImpl) Start(ctx context.Context) error {
@@ -39,7 +38,6 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 		return nil
 	}
 	m.procedureQueue = make(chan Procedure, queueSize)
-	m.resultChannels = make(map[uint64]chan error, 0)
 	go m.startProcedureWorker(ctx, m.procedureQueue)
 	err := m.retryAll(ctx)
 	if err != nil {
@@ -63,15 +61,11 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) (<-chan error, error) {
+func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	resultChannel := make(chan error, 1)
-	m.resultChannels[procedure.ID()] = resultChannel
 	m.procedures = append(m.procedures, procedure)
-	m.procedureQueue <- procedure
-
-	return resultChannel, nil
+	return nil
 }
 
 func (m *ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
@@ -80,10 +74,14 @@ func (m *ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
 	for _, procedure := range m.procedures {
 		if procedure.ID() == procedureID {
 			err := procedure.Cancel(ctx)
-			return errors.WithMessagef(err, "cancel procedure failed, procedureID:%d", procedureID)
+			if err != nil {
+				return errors.WithMessagef(err, "cancel procedure failed, procedureID:%d", procedureID)
+			}
+			return nil
 		}
 	}
-	return nil
+	log.Error("procedure not found", zap.Uint64("procedureID", procedureID))
+	return ErrProcedureNotFound
 }
 
 func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
@@ -129,8 +127,9 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 func (m *ManagerImpl) startProcedureWorker(ctx context.Context, procedures <-chan Procedure) {
 	for procedure := range procedures {
 		err := procedure.Start(ctx)
-		m.resultChannels[procedure.ID()] <- err
-		delete(m.resultChannels, procedure.ID())
+		if err != nil {
+			log.Error("procedure start failed", zap.Error(err))
+		}
 
 		m.lock.Lock()
 		index := -1

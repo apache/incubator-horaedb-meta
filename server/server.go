@@ -236,7 +236,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) {
 				log.Error("create scatter procedure failed")
 				return
 			}
-			if _, err := srv.procedureManager.Submit(ctx, scatterProcedure); err != nil {
+			if err := srv.procedureManager.Submit(ctx, scatterProcedure); err != nil {
 				log.Error("submit scatter procedure failed")
 				return
 			}
