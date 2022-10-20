@@ -4,14 +4,14 @@ package procedure
 
 import (
 	"context"
-	"github.com/CeresDB/ceresmeta/pkg/log"
-	"go.uber.org/zap"
 	"sync"
 
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.uber.org/zap"
 )
 
 const (
@@ -27,15 +27,14 @@ type ManagerImpl struct {
 	storage  Storage
 	dispatch eventdispatch.Dispatch
 
-	procedureQueue     chan<- Procedure
-	resultChannelQueue <-chan <-chan error
+	procedureQueue   chan Procedure
+	resultChannelMap map[uint64]chan error
 }
 
 func (m *ManagerImpl) Start(ctx context.Context) error {
-	procedureQueue := make(chan Procedure, queueSize)
-	m.procedureQueue = procedureQueue
-	resultQueue := make(chan chan error, queueSize)
-	go startProcedureWorker(ctx, procedureQueue, resultQueue)
+	m.procedureQueue = make(chan Procedure, queueSize)
+	m.resultChannelMap = make(map[uint64]chan error, 0)
+	go m.startProcedureWorker(ctx, m.procedureQueue)
 	err := m.retryAll(ctx)
 	if err != nil {
 		return errors.WithMessage(err, "retry all running procedure failed")
@@ -46,6 +45,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 func (m *ManagerImpl) Stop(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	close(m.procedureQueue)
 	for _, procedure := range m.procedures {
 		if procedure.State() == StateRunning {
 			err := procedure.Cancel(ctx)
@@ -60,9 +60,11 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) (<-chan error, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	resultChannel := make(chan error, 1)
+	m.resultChannelMap[procedure.ID()] = resultChannel
 	m.procedures = append(m.procedures, procedure)
 	m.procedureQueue <- procedure
-	resultChannel := <-m.resultChannelQueue
+
 	return resultChannel, nil
 }
 
@@ -118,16 +120,11 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 	return nil
 }
 
-func startProcedureWorker(ctx context.Context, procedures <-chan Procedure, results chan chan error) {
-	for {
-		select {
-		case procedure := <-procedures:
-			err := procedure.Start(ctx)
-			resultChannel := make(chan error, 1)
-			resultChannel <- err
-			results <- resultChannel
-		}
-
+func (m *ManagerImpl) startProcedureWorker(ctx context.Context, procedures <-chan Procedure) {
+	for procedure := range procedures {
+		err := procedure.Start(ctx)
+		m.resultChannelMap[procedure.ID()] <- err
+		delete(m.resultChannelMap, procedure.ID())
 	}
 }
 
