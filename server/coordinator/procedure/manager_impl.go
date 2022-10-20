@@ -19,7 +19,7 @@ const (
 )
 
 type ManagerImpl struct {
-	// This lock is used to protect the field `procedures`.
+	// This lock is used to protect the field `procedures` and `running`.
 	lock       sync.RWMutex
 	procedures []Procedure
 	running    bool
@@ -69,20 +69,16 @@ func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) error {
 }
 
 func (m *ManagerImpl) Cancel(ctx context.Context, procedureID uint64) error {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	for _, procedure := range m.procedures {
-		if procedure.ID() == procedureID {
-			m.removeProcedure(procedure)
-			err := procedure.Cancel(ctx)
-			if err != nil {
-				return errors.WithMessagef(err, "cancel procedure failed, procedureID:%d", procedureID)
-			}
-			return nil
-		}
+	procedure := m.removeProcedure(procedureID)
+	if procedure == nil {
+		log.Error("procedure not found", zap.Uint64("procedureID", procedureID))
+		return ErrProcedureNotFound
 	}
-	log.Error("procedure not found", zap.Uint64("procedureID", procedureID))
-	return ErrProcedureNotFound
+	err := procedure.Cancel(ctx)
+	if err != nil {
+		return errors.WithMessagef(ErrProcedureNotFound, "cancel procedure failed, procedureID:%d", procedureID)
+	}
+	return nil
 }
 
 func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
@@ -132,23 +128,27 @@ func (m *ManagerImpl) startProcedureWorker(ctx context.Context, procedures <-cha
 			log.Error("procedure start failed", zap.Error(err))
 		}
 
-		m.removeProcedure(procedure)
+		m.removeProcedure(procedure.ID())
 	}
 }
 
-func (m *ManagerImpl) removeProcedure(procedure Procedure) {
+func (m *ManagerImpl) removeProcedure(id uint64) Procedure {
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	index := -1
 	for i, p := range m.procedures {
-		if p.ID() == procedure.ID() {
+		if p.ID() == id {
 			index = i
 			break
 		}
 	}
 	if index != -1 {
+		result := m.procedures[index]
 		m.procedures = append(m.procedures[:index], m.procedures[index+1:]...)
+		return result
 	}
-	m.lock.Unlock()
+	return nil
 }
 
 func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
