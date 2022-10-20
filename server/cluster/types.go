@@ -45,6 +45,12 @@ type GetNodesResult struct {
 	NodeShards             []*NodeShard
 }
 
+type ShardVersionInfo struct {
+	ID          uint32
+	CurrVersion uint64
+	PrevVersion uint64
+}
+
 func ConvertShardsInfoToPB(shard *ShardInfo) *metaservicepb.ShardInfo {
 	return &metaservicepb.ShardInfo{
 		Id:      shard.ID,

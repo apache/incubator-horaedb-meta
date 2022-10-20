@@ -23,7 +23,13 @@ type CloseShardRequest struct {
 	ShardID uint32
 }
 
+type UpdateShardInfo struct {
+	CurrShardInfo *cluster.ShardInfo
+	PrevVersion   uint64
+}
+
 type CreateTableOnShardRequest struct {
+	UpdateShardInfo  *UpdateShardInfo
 	TableInfo        *cluster.TableInfo
 	EncodedSchema    []byte
 	Engine           string
@@ -32,7 +38,6 @@ type CreateTableOnShardRequest struct {
 }
 
 type DropTableOnShardRequest struct {
-	ShardInfo   *cluster.ShardInfo
-	PrevVersion uint64
-	TableInfo   *cluster.TableInfo
+	UpdateShardInfo *UpdateShardInfo
+	TableInfo       *cluster.TableInfo
 }
