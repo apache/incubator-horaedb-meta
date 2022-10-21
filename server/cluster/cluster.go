@@ -387,66 +387,67 @@ func (c *Cluster) GetTable(ctx context.Context, schemaName, tableName string) (*
 	return nil, false, nil
 }
 
-func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName string, tableName string) (*Table, *ShardVersionInfo, error) {
+func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName string, tableName string) (*CreateTableResult, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	// Check provided schema if exists.
 	schema, exists := c.getSchemaLocked(schemaName)
 	if !exists {
-		return nil, nil, ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
+		return nil, ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 	}
 
 	// check if exists
 	_, exists = c.getTableLocked(schemaName, tableName)
 	if exists {
-		return nil, nil, ErrTableAlreadyExists
+		return nil, ErrTableAlreadyExists
 	}
 
 	shardID, err := c.pickOneShardOnNode(nodeName)
 	if err != nil {
-		return nil, nil, errors.WithMessagef(err, "pick one shard on node, clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", c.Name(), schemaName, tableName, nodeName)
+		return nil, errors.WithMessagef(err, "pick one shard on node, clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", c.Name(), schemaName, tableName, nodeName)
 	}
 
 	prevShard, err := c.getShardByIDLocked(shardID)
 	if err != nil {
-		return nil, nil, errors.WithMessagef(err, "get shard, clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", c.Name(), schemaName, tableName, nodeName)
+		return nil, errors.WithMessagef(err, "get shard, clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", c.Name(), schemaName, tableName, nodeName)
 	}
 
 	// Alloc table id.
 	tableID, err := c.allocTableID(ctx)
 	if err != nil {
-		return nil, nil, errors.WithMessagef(err, "alloc table id, schemaName:%s, tableName:%s", schemaName, tableName)
+		return nil, errors.WithMessagef(err, "alloc table id, schemaName:%s, tableName:%s", schemaName, tableName)
 	}
 
 	// Save table in storage.
 	tablePb := &clusterpb.Table{Id: tableID, Name: tableName, SchemaId: schema.GetID(), ShardId: shardID}
 	tablePb, err = c.storage.CreateTable(ctx, c.clusterID, schema.GetID(), tablePb)
 	if err != nil {
-		return nil, nil, errors.WithMessage(err, "cluster CreateTable")
+		return nil, errors.WithMessage(err, "cluster CreateTable")
 	}
 
 	// Update shardTopology in storage.
 	shardTopologies, err := c.storage.ListShardTopologies(ctx, c.clusterID, []uint32{shardID})
 	if err != nil {
-		return nil, nil, errors.WithMessage(err, "get shard topology from storage")
+		return nil, errors.WithMessage(err, "get shard topology from storage")
 	}
 	if len(shardTopologies) != 1 {
-		return nil, nil, ErrGetShardTopology.WithCausef("shard has more than one shardTopology, shardID:%d, shardTopologies:%v",
+		return nil, ErrGetShardTopology.WithCausef("shard has more than one shardTopology, shardID:%d, shardTopologies:%v",
 			shardID, shardTopologies)
 	}
 
 	shardTopology := shardTopologies[0]
 	shardTopology.TableIds = append(shardTopology.TableIds, tableID)
 	oldVersion := shardTopology.Version
-	shardTopology.Version = shardTopology.GetVersion() + 1
+	shardTopology.Version = oldVersion + 1
 	if err = c.storage.PutShardTopology(ctx, c.clusterID, oldVersion, shardTopology); err != nil {
-		return nil, nil, errors.WithMessage(err, "put shard topology")
+		return nil, errors.WithMessage(err, "put shard topology")
 	}
 
 	// Update tableCache in memory.
 	table := c.updateTableCacheLocked(shardID, schema, tablePb)
-	return table, &ShardVersionInfo{
+	return &CreateTableResult{
+		Table:       table,
 		ID:          shardID,
 		CurrVersion: shardTopology.GetVersion(),
 		PrevVersion: prevShard.version,

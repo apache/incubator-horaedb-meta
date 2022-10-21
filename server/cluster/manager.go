@@ -169,13 +169,13 @@ func (m *managerImpl) AllocTableID(ctx context.Context, clusterName, schemaName,
 		return table, true, nil
 	}
 
-	table, _, err = cluster.CreateTable(ctx, nodeName, schemaName, tableName)
+	ret, err := cluster.CreateTable(ctx, nodeName, schemaName, tableName)
 	if err != nil {
 		log.Error("fail to create table", zap.Error(err))
 		return nil, false, errors.WithMessagef(err, "create table, "+
 			"clusterName:%s, schemaName:%s, tableName:%s, nodeName:%s", clusterName, schemaName, tableName, nodeName)
 	}
-	return table, false, nil
+	return ret.Table, false, nil
 }
 
 func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error) {

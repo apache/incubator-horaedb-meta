@@ -52,13 +52,13 @@ func createTablePrepareCallback(event *fsm.Event) {
 		return
 	}
 
-	table, shardVersionInfo, err := req.cluster.CreateTable(req.ctx, req.rawReq.GetHeader().GetNode(), req.rawReq.GetSchemaName(), req.rawReq.GetName())
+	ret, err := req.cluster.CreateTable(req.ctx, req.rawReq.GetHeader().GetNode(), req.rawReq.GetSchemaName(), req.rawReq.GetName())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster get table")
 		return
 	}
 
-	shard, err := req.cluster.GetShardByID(table.GetShardID())
+	shard, err := req.cluster.GetShardByID(ret.Table.GetShardID())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster get shard by id")
 		return
@@ -73,17 +73,18 @@ func createTablePrepareCallback(event *fsm.Event) {
 	err = req.dispatch.CreateTableOnShard(req.ctx, leader.Node, &eventdispatch.CreateTableOnShardRequest{
 		UpdateShardInfo: &eventdispatch.UpdateShardInfo{
 			CurrShardInfo: &cluster.ShardInfo{
-				ID:      shardVersionInfo.ID,
+				ID: ret.ID,
+				// TODO: dispatch CreateTableOnShard to followers?
 				Role:    clusterpb.ShardRole_LEADER,
-				Version: shardVersionInfo.CurrVersion,
+				Version: ret.CurrVersion,
 			},
-			PrevVersion: shardVersionInfo.PrevVersion,
+			PrevVersion: ret.PrevVersion,
 		},
 		TableInfo: &cluster.TableInfo{
-			ID:         table.GetID(),
-			Name:       table.GetName(),
-			SchemaID:   table.GetSchemaID(),
-			SchemaName: table.GetSchemaName(),
+			ID:         ret.Table.GetID(),
+			Name:       ret.Table.GetName(),
+			SchemaID:   ret.Table.GetSchemaID(),
+			SchemaName: ret.Table.GetSchemaName(),
 		},
 		EncodedSchema:    req.rawReq.EncodedSchema,
 		Engine:           req.rawReq.Engine,
