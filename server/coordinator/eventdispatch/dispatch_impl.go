@@ -35,7 +35,7 @@ func (d *DispatchImpl) OpenShard(ctx context.Context, addr string, request *Open
 	if err != nil {
 		return errors.WithMessage(err, "open shard")
 	}
-	if resp.GetHeader().Code != 0 {
+	if resp.GetHeader().Code != 200 {
 		return ErrDispatch.WithCausef("open shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
@@ -52,7 +52,7 @@ func (d *DispatchImpl) CloseShard(ctx context.Context, addr string, request *Clo
 	if err != nil {
 		return errors.WithMessage(err, "close shard")
 	}
-	if resp.GetHeader().Code != 0 {
+	if resp.GetHeader().Code != 200 {
 		return ErrDispatch.WithCausef("close shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
@@ -67,7 +67,7 @@ func (d *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, requ
 	if err != nil {
 		return errors.WithMessage(err, "create table on shard")
 	}
-	if resp.GetHeader().Code != 0 {
+	if resp.GetHeader().Code != 200 {
 		return ErrDispatch.WithCausef("create table on shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil
@@ -82,7 +82,7 @@ func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, reques
 	if err != nil {
 		return errors.WithMessage(err, "drop table on shard")
 	}
-	if resp.GetHeader().Code != 0 {
+	if resp.GetHeader().Code != 200 {
 		return ErrDispatch.WithCausef("drop table on shard, err:%s", resp.GetHeader().GetError())
 	}
 	return nil

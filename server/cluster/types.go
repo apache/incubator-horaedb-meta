@@ -68,3 +68,14 @@ func ConvertTableInfoToPB(table *TableInfo) *metaservicepb.TableInfo {
 		SchemaName: table.SchemaName,
 	}
 }
+
+func ConvertNodeTOPB(node *Node) *clusterpb.Node {
+	return &clusterpb.Node{
+		Name:                  node.meta.Name,
+		NodeStats:             node.meta.NodeStats,
+		CreateTime:            node.meta.CreateTime,
+		LastTouchTime:         node.meta.LastTouchTime,
+		State:                 node.meta.State,
+		HeartbeatSamplingInfo: node.meta.HeartbeatSamplingInfo,
+	}
+}

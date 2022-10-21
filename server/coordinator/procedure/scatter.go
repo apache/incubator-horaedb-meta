@@ -73,22 +73,11 @@ func scatterPrepareCallback(event *fsm.Event) {
 
 	shardTopologies := make([]*clusterpb.ShardTopology, 0, len(shards))
 	for _, shard := range shards {
-		openShardRequest := &eventdispatch.OpenShardRequest{
-			Shard: &cluster.ShardInfo{
-				ID:   shard.GetId(),
-				Role: clusterpb.ShardRole_LEADER,
-			},
-		}
 		shardTopologies = append(shardTopologies, &clusterpb.ShardTopology{
 			ShardId:  shard.GetId(),
 			TableIds: []uint64{},
 			Version:  0,
 		})
-
-		if err := request.dispatch.OpenShard(ctx, shard.Node, openShardRequest); err != nil {
-			cancelEventWithLog(event, err, "open shard failed")
-			return
-		}
 	}
 
 	if err := c.CreateShardTopologies(ctx, shardTopologies); err != nil {
@@ -100,12 +89,31 @@ func scatterPrepareCallback(event *fsm.Event) {
 		cancelEventWithLog(event, err, "update cluster topology failed")
 		return
 	}
+
+	if err := request.cluster.Load(request.ctx); err != nil {
+		cancelEventWithLog(event, err, "cluster load data failed")
+		return
+	}
+
+	for _, shard := range shards {
+		openShardRequest := &eventdispatch.OpenShardRequest{
+			Shard: &cluster.ShardInfo{
+				ID:   shard.GetId(),
+				Role: clusterpb.ShardRole_LEADER,
+			},
+		}
+		if err := request.dispatch.OpenShard(ctx, shard.Node, openShardRequest); err != nil {
+			cancelEventWithLog(event, err, "open shard failed")
+			return
+		}
+	}
 }
 
 func waitForNodesReady(c *cluster.Cluster) {
 	for {
 		time.Sleep(defaultCheckNodeNumTimeInterval)
-		currNodeNum := uint32(c.GetAvailableNodesSize())
+		nodes := c.GetNodes()
+		currNodeNum := getAvailableNodesNum(nodes)
 		expectNodeNum := c.GetClusterMinNodeCount()
 		log.Warn("wait for cluster node register", zap.Uint32("currNodeNum", currNodeNum), zap.Uint32("expectNodeNum", expectNodeNum))
 		if currNodeNum < expectNodeNum {
@@ -113,6 +121,16 @@ func waitForNodesReady(c *cluster.Cluster) {
 		}
 		break
 	}
+}
+
+func getAvailableNodesNum(nodes []*cluster.Node) uint32 {
+	nodeSize := uint32(0)
+	for _, node := range nodes {
+		if node.IsAvailable() {
+			nodeSize++
+		}
+	}
+	return nodeSize
 }
 
 func allocNodeShards(_ context.Context, shardTotal uint32, minNodeCount uint32, nodeList []*clusterpb.Node, shardIDs []uint32) ([]*clusterpb.Shard, error) {
@@ -141,12 +159,8 @@ func allocNodeShards(_ context.Context, shardTotal uint32, minNodeCount uint32, 
 }
 
 func scatterSuccessCallback(event *fsm.Event) {
-	request := event.Args[0].(*ScatterCallbackRequest)
+	// request := event.Args[0].(*ScatterCallbackRequest)
 
-	if err := request.cluster.Load(request.ctx); err != nil {
-		cancelEventWithLog(event, err, "cluster load data failed")
-		return
-	}
 	log.Info("scatter procedure execute finish")
 }
 

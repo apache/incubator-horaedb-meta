@@ -41,32 +41,14 @@ type Cluster struct {
 	shardIDAlloc  id.Allocator
 }
 
-func (c *Cluster) GetAvailableNodesSize() int {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	nodeSize := 0
-	for _, node := range c.nodesCache {
-		if node.IsAvailable() {
-			nodeSize++
-		}
-	}
-	return nodeSize
-}
-
 func (c *Cluster) GetNodes() []*Node {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	nodes := make([]*Node, 0, len(c.nodesCache))
 	for _, node := range c.nodesCache {
 		nodes = append(nodes, &Node{
-			meta: &clusterpb.Node{
-				Name:                  node.meta.Name,
-				NodeStats:             node.meta.NodeStats,
-				CreateTime:            node.meta.CreateTime,
-				LastTouchTime:         node.meta.LastTouchTime,
-				State:                 node.meta.State,
-				HeartbeatSamplingInfo: node.meta.HeartbeatSamplingInfo,
-			},
+			meta:     ConvertNodeTOPB(node),
 			shardIDs: node.shardIDs,
 		})
 	}
@@ -76,6 +58,7 @@ func (c *Cluster) GetNodes() []*Node {
 func (c *Cluster) GetClusterNodeCache() map[string]*Node {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	newNodes := make(map[string]*Node)
 	for key, value := range c.nodesCache {
 		newNodes[key] = value
@@ -86,6 +69,7 @@ func (c *Cluster) GetClusterNodeCache() map[string]*Node {
 func (c *Cluster) GetClusterShardView() ([]*clusterpb.Shard, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	shardView := c.metaData.clusterTopology.ShardView
 	newShardView := make([]*clusterpb.Shard, 0)
 	// TODO: We need to use the general deep copy tool method to replace
@@ -644,7 +628,14 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 
 	schema, ok := c.schemasCache[schemaName]
 	if !ok {
-		return nil, ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
+		// TODO: add
+		// return nil, ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
+		routeEntries := make(map[string]*RouteEntry)
+
+		return &RouteTablesResult{
+			Version:      c.metaData.clusterTopology.Version,
+			RouteEntries: routeEntries,
+		}, nil
 	}
 
 	routeEntries := make(map[string]*RouteEntry, len(tableNames))
@@ -723,24 +714,28 @@ func (c *Cluster) GetNodeShards(_ context.Context) (*GetNodeShardsResult, error)
 func (c *Cluster) GetClusterVersion() uint64 {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	return c.metaData.clusterTopology.Version
 }
 
 func (c *Cluster) GetClusterMinNodeCount() uint32 {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	return c.metaData.cluster.MinNodeCount
 }
 
 func (c *Cluster) GetClusterShardTotal() uint32 {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	return c.metaData.cluster.ShardTotal
 }
 
 func (c *Cluster) GetClusterState() clusterpb.ClusterTopology_ClusterState {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	return c.metaData.clusterTopology.State
 }
 
@@ -762,7 +757,10 @@ func (c *Cluster) UpdateClusterTopology(ctx context.Context, state clusterpb.Clu
 
 func (c *Cluster) CreateShardTopologies(ctx context.Context, shardTopologies []*clusterpb.ShardTopology) error {
 	_, err := c.storage.CreateShardTopologies(ctx, c.clusterID, shardTopologies)
-	return err
+	if err != nil {
+		return errors.WithMessage(err, "cluster create shard topologies failed")
+	}
+	return nil
 }
 
 type ShardWithLock struct {
@@ -809,14 +807,10 @@ func (c *Cluster) UnlockShardByID(shardID uint32) {
 }
 
 func (c *Cluster) UpdateNodeState(ctx context.Context, state clusterpb.NodeState, node string) error {
-	nodes, err := c.storage.ListNodes(ctx, c.clusterID)
-	if err != nil {
-		return errors.WithMessage(err, "list nodes failed")
-	}
-	for _, n := range nodes {
-		if n.Name == node {
-			n.State = state
-			_, err := c.storage.CreateOrUpdateNode(ctx, c.clusterID, n)
+	for _, n := range c.nodesCache {
+		if n.GetMeta().GetName() == node {
+			n.GetMeta().State = state
+			_, err := c.storage.CreateOrUpdateNode(ctx, c.clusterID, n.GetMeta())
 			if err != nil {
 				return errors.WithMessage(err, "update node state failed")
 			}
