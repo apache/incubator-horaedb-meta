@@ -53,8 +53,10 @@ func scatterPrepareCallback(event *fsm.Event) {
 	shardTotal := c.GetClusterShardTotal()
 	minNodeCount := c.GetClusterMinNodeCount()
 
+	// When CeresMeta leader node restart after CSE cluster has been initialized, clusterTopology state is STABLE, and it's not an illegal state.
+	// Just print some warning log and return, do not cancel event
 	if !(c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
-		cancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster topology state is not empty")
+		log.Warn("cluster topology state is not empty")
 		return
 	}
 
@@ -69,6 +71,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 		return
 	}
 
+	shardTopologies := make([]*clusterpb.ShardTopology, 0)
 	for _, shard := range shards {
 		openShardRequest := &eventdispatch.OpenShardRequest{
 			Shard: &cluster.ShardInfo{
@@ -76,11 +79,21 @@ func scatterPrepareCallback(event *fsm.Event) {
 				Role: clusterpb.ShardRole_LEADER,
 			},
 		}
+		shardTopologies = append(shardTopologies, &clusterpb.ShardTopology{
+			ShardId:  shard.GetId(),
+			TableIds: make([]uint64, 0),
+			Version:  0,
+		})
 
 		if err := request.dispatch.OpenShard(ctx, shard.Node, openShardRequest); err != nil {
 			cancelEventWithLog(event, err, "open shard failed")
 			return
 		}
+	}
+
+	if err := c.CreateShardTopologies(ctx, shardTopologies); err != nil {
+		cancelEventWithLog(event, err, "create shard topologies failed")
+		return
 	}
 
 	if err := c.UpdateClusterTopology(ctx, clusterpb.ClusterTopology_STABLE, shards); err != nil {
@@ -94,8 +107,8 @@ func waitForNodesReady(c *cluster.Cluster) {
 		time.Sleep(defaultCheckNodeNumTimeInterval)
 		currNodeNum := uint32(c.GetNodesSize())
 		expectNodeNum := c.GetClusterMinNodeCount()
+		log.Warn("wait for cluster node register", zap.Uint32("currNodeNum", currNodeNum), zap.Uint32("expectNodeNum", expectNodeNum))
 		if currNodeNum < expectNodeNum {
-			log.Warn("wait for cluster node register", zap.Uint32("currNodeNum", currNodeNum), zap.Uint32("expectNodeNum", expectNodeNum))
 			continue
 		}
 		break
@@ -134,6 +147,7 @@ func scatterSuccessCallback(event *fsm.Event) {
 		cancelEventWithLog(event, err, "cluster load data failed")
 		return
 	}
+	log.Info("scatter procedure execute finish")
 }
 
 func scatterFailedCallback(_ *fsm.Event) {

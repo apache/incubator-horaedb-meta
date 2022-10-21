@@ -29,6 +29,7 @@ type Manager interface {
 	// Stop must be called before manager is dropped.
 	Stop(ctx context.Context) error
 
+	ListClusters(ctx context.Context) ([]*Cluster, error)
 	CreateCluster(ctx context.Context, clusterName string, nodeCount, replicationFactor, shardTotal uint32) (*Cluster, error)
 	GetCluster(ctx context.Context, clusterName string) (*Cluster, error)
 	// AllocSchemaID means get or create schema.
@@ -42,7 +43,7 @@ type Manager interface {
 	RegisterNode(ctx context.Context, clusterName string, nodeInfo *metaservicepb.NodeInfo) error
 	GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error)
 	RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (*RouteTablesResult, error)
-	GetNodes(ctx context.Context, clusterName string) (*GetNodesResult, error)
+	GetNodeShards(ctx context.Context, clusterName string) (*GetNodeShardsResult, error)
 }
 
 type managerImpl struct {
@@ -73,6 +74,16 @@ func NewManagerImpl(storage storage.Storage, kv clientv3.KV, rootPath string, id
 	return manager, nil
 }
 
+func (m *managerImpl) ListClusters(_ context.Context) ([]*Cluster, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	clusters := make([]*Cluster, 0)
+	for _, cluster := range m.clusters {
+		clusters = append(clusters, cluster)
+	}
+	return clusters, nil
+}
+
 func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, initialNodeCount,
 	replicationFactor, shardTotal uint32,
 ) (*Cluster, error) {
@@ -84,10 +95,10 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	_, ok := m.clusters[clusterName]
+	cluster, ok := m.clusters[clusterName]
 	if ok {
-		log.Error("cluster already exists", zap.String("clusterName", clusterName))
-		return nil, ErrClusterAlreadyExists
+		// log.Error("cluster already exists", zap.String("clusterName", clusterName))
+		return cluster, ErrClusterAlreadyExists
 	}
 
 	clusterID, err := m.allocClusterID(ctx)
@@ -109,7 +120,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusters:%v", clusterPb)
 	}
 
-	cluster := NewCluster(clusterPb, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
+	cluster = NewCluster(clusterPb, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
 
 	if err = cluster.init(ctx); err != nil {
 		log.Error("fail to init cluster", zap.Error(err))
@@ -183,6 +194,17 @@ func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName strin
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
 		return nil, errors.WithMessage(err, "cluster manager GetTables")
+	}
+
+	if cluster.GetClusterState() == clusterpb.ClusterTopology_EMPTY {
+		ret := make(map[uint32]*ShardTables, len(shardIDs))
+		for _, shardID := range shardIDs {
+			ret[shardID] = &ShardTables{
+				Tables: nil,
+				Shard:  &ShardInfo{ID: shardID, Role: clusterpb.ShardRole_LEADER},
+			}
+		}
+		return ret, nil
 	}
 
 	shardTablesWithRole, err := cluster.GetTables(ctx, shardIDs, nodeName)
@@ -329,13 +351,13 @@ func (m *managerImpl) RouteTables(ctx context.Context, clusterName, schemaName s
 	return ret, nil
 }
 
-func (m *managerImpl) GetNodes(ctx context.Context, clusterName string) (*GetNodesResult, error) {
+func (m *managerImpl) GetNodeShards(ctx context.Context, clusterName string) (*GetNodeShardsResult, error) {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		return nil, errors.WithMessage(err, "cluster manager GetNodes")
 	}
 
-	ret, err := cluster.GetNodes(ctx)
+	ret, err := cluster.GetNodeShards(ctx)
 	if err != nil {
 		return nil, errors.WithMessage(err, "cluster manager GetNodes")
 	}

@@ -47,7 +47,7 @@ type RouteTablesResult struct {
 	RouteEntries map[string]*RouteEntry
 }
 
-type GetNodesResult struct {
+type GetNodeShardsResult struct {
 	ClusterTopologyVersion uint64
 	NodeShards             []*NodeShard
 }

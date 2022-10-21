@@ -295,7 +295,7 @@ func (c *leadershipEventCallbacks) BeforeTransfer(ctx context.Context) {
 		panic(fmt.Sprintf("cluster manager fail to stop, err:%v", err))
 	}
 
-	if err := c.srv.clusterManager.Stop(ctx); err != nil {
+	if err := c.srv.procedureManager.Stop(ctx); err != nil {
 		panic(fmt.Sprintf("procedure manager fail to stop, err:%v", err))
 	}
 }

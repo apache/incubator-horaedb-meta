@@ -14,6 +14,7 @@ var (
 	ErrTableNotFound           = coderr.NewCodeError(coderr.NotFound, "Table not found")
 	ErrShardNotFound           = coderr.NewCodeError(coderr.NotFound, "shard not found")
 	ErrNodeNotFound            = coderr.NewCodeError(coderr.NotFound, "node not found")
+	ErrNodeIsEmpty             = coderr.NewCodeError(coderr.NotFound, "cluster nodes list is empty")
 	ErrNodeShardsIsEmpty       = coderr.NewCodeError(coderr.Internal, "node's shard list is empty")
 	ErrGetShardTopology        = coderr.NewCodeError(coderr.Internal, "get shard topology")
 	ErrTableAlreadyExists      = coderr.NewCodeError(coderr.Internal, "table already exists")

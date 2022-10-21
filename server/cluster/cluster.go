@@ -44,7 +44,33 @@ type Cluster struct {
 func (c *Cluster) GetNodesSize() int {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return len(c.nodesCache)
+	nodeSize := 0
+	for _, node := range c.nodesCache {
+		if node.IsAvailable() {
+			nodeSize++
+		}
+	}
+	return nodeSize
+}
+
+func (c *Cluster) GetNodes() []*Node {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	nodes := make([]*Node, 0)
+	for _, node := range c.nodesCache {
+		nodes = append(nodes, &Node{
+			meta: &clusterpb.Node{
+				Name:                  node.meta.Name,
+				NodeStats:             node.meta.NodeStats,
+				CreateTime:            node.meta.CreateTime,
+				LastTouchTime:         node.meta.LastTouchTime,
+				State:                 node.meta.State,
+				HeartbeatSamplingInfo: node.meta.HeartbeatSamplingInfo,
+			},
+			shardIDs: node.shardIDs,
+		})
+	}
+	return nodes
 }
 
 func (c *Cluster) GetClusterNodeCache() map[string]*Node {
@@ -116,18 +142,6 @@ func (c *Cluster) init(ctx context.Context) error {
 	}
 
 	c.metaData.clusterTopology = clusterTopologyPb
-
-	shardTopologies := make([]*clusterpb.ShardTopology, 0, c.metaData.cluster.ShardTotal)
-	for i := uint32(0); i < c.metaData.cluster.ShardTotal; i++ {
-		shardTopologies = append(shardTopologies, &clusterpb.ShardTopology{
-			ShardId:  i,
-			TableIds: make([]uint64, 0),
-			Version:  0,
-		})
-	}
-	if shardTopologies, err := c.storage.CreateShardTopologies(ctx, c.clusterID, shardTopologies); err != nil {
-		return errors.WithMessagef(err, "cluster init shard topolgies, shardTopologies:%v", shardTopologies)
-	}
 	return nil
 }
 
@@ -668,7 +682,7 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 	}, nil
 }
 
-func (c *Cluster) GetNodes(_ context.Context) (*GetNodesResult, error) {
+func (c *Cluster) GetNodeShards(_ context.Context) (*GetNodeShardsResult, error) {
 	nodeShards := make([]*NodeShard, 0, len(c.nodesCache))
 
 	c.lock.RLock()
@@ -700,7 +714,7 @@ func (c *Cluster) GetNodes(_ context.Context) (*GetNodesResult, error) {
 		}
 	}
 
-	return &GetNodesResult{
+	return &GetNodeShardsResult{
 		ClusterTopologyVersion: c.metaData.clusterTopology.GetVersion(),
 		NodeShards:             nodeShards,
 	}, nil
@@ -746,6 +760,11 @@ func (c *Cluster) UpdateClusterTopology(ctx context.Context, state clusterpb.Clu
 	return nil
 }
 
+func (c *Cluster) CreateShardTopologies(ctx context.Context, shardTopologies []*clusterpb.ShardTopology) error {
+	_, err := c.storage.CreateShardTopologies(ctx, c.clusterID, shardTopologies)
+	return err
+}
+
 type ShardWithLock struct {
 	shardID uint32
 	lock    sync.Mutex
@@ -787,4 +806,21 @@ func (c *Cluster) UnlockShardByID(shardID uint32) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	delete(c.shardLock, shardID)
+}
+
+func (c *Cluster) UpdateNodeState(ctx context.Context, state clusterpb.NodeState, node string) error {
+	nodes, err := c.storage.ListNodes(ctx, c.clusterID)
+	if err != nil {
+		return errors.WithMessage(err, "list nodes failed")
+	}
+	for _, n := range nodes {
+		if n.Name == node {
+			n.State = state
+			_, err1 := c.storage.CreateOrUpdateNode(ctx, c.clusterID, n)
+			if err1 != nil {
+				return errors.WithMessage(err, "update node state failed")
+			}
+		}
+	}
+	return ErrNodeNotFound
 }
