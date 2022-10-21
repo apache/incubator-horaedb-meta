@@ -41,7 +41,7 @@ type Cluster struct {
 	shardIDAlloc  id.Allocator
 }
 
-func (c *Cluster) GetNodesSize() int {
+func (c *Cluster) GetAvailableNodesSize() int {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	nodeSize := 0
@@ -56,7 +56,7 @@ func (c *Cluster) GetNodesSize() int {
 func (c *Cluster) GetNodes() []*Node {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	nodes := make([]*Node, 0)
+	nodes := make([]*Node, 0, len(c.nodesCache))
 	for _, node := range c.nodesCache {
 		nodes = append(nodes, &Node{
 			meta: &clusterpb.Node{
@@ -816,8 +816,8 @@ func (c *Cluster) UpdateNodeState(ctx context.Context, state clusterpb.NodeState
 	for _, n := range nodes {
 		if n.Name == node {
 			n.State = state
-			_, err1 := c.storage.CreateOrUpdateNode(ctx, c.clusterID, n)
-			if err1 != nil {
+			_, err := c.storage.CreateOrUpdateNode(ctx, c.clusterID, n)
+			if err != nil {
 				return errors.WithMessage(err, "update node state failed")
 			}
 		}

@@ -53,7 +53,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 	shardTotal := c.GetClusterShardTotal()
 	minNodeCount := c.GetClusterMinNodeCount()
 
-	// When CeresMeta leader node restart after CSE cluster has been initialized, clusterTopology state is STABLE, and it's not an illegal state.
+	// When CeresMeta leader node restarts after the cluster has been initialized, the clusterTopology state is STABLE which is not an illegal state, that is to say, there is no need to do scatter work.
 	// Just print some warning log and return, do not cancel event
 	if !(c.GetClusterState() == clusterpb.ClusterTopology_EMPTY) {
 		log.Warn("cluster topology state is not empty")
@@ -71,7 +71,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 		return
 	}
 
-	shardTopologies := make([]*clusterpb.ShardTopology, 0)
+	shardTopologies := make([]*clusterpb.ShardTopology, 0, len(shards))
 	for _, shard := range shards {
 		openShardRequest := &eventdispatch.OpenShardRequest{
 			Shard: &cluster.ShardInfo{
@@ -81,7 +81,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 		}
 		shardTopologies = append(shardTopologies, &clusterpb.ShardTopology{
 			ShardId:  shard.GetId(),
-			TableIds: make([]uint64, 0),
+			TableIds: []uint64{},
 			Version:  0,
 		})
 
@@ -105,7 +105,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 func waitForNodesReady(c *cluster.Cluster) {
 	for {
 		time.Sleep(defaultCheckNodeNumTimeInterval)
-		currNodeNum := uint32(c.GetNodesSize())
+		currNodeNum := uint32(c.GetAvailableNodesSize())
 		expectNodeNum := c.GetClusterMinNodeCount()
 		log.Warn("wait for cluster node register", zap.Uint32("currNodeNum", currNodeNum), zap.Uint32("expectNodeNum", expectNodeNum))
 		if currNodeNum < expectNodeNum {

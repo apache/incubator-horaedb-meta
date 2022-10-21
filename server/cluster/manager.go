@@ -77,7 +77,7 @@ func NewManagerImpl(storage storage.Storage, kv clientv3.KV, rootPath string, id
 func (m *managerImpl) ListClusters(_ context.Context) ([]*Cluster, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
-	clusters := make([]*Cluster, 0)
+	clusters := make([]*Cluster, 0, len(m.clusters))
 	for _, cluster := range m.clusters {
 		clusters = append(clusters, cluster)
 	}
@@ -97,7 +97,6 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 
 	cluster, ok := m.clusters[clusterName]
 	if ok {
-		// log.Error("cluster already exists", zap.String("clusterName", clusterName))
 		return cluster, ErrClusterAlreadyExists
 	}
 
@@ -196,11 +195,14 @@ func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName strin
 		return nil, errors.WithMessage(err, "cluster manager GetTables")
 	}
 
+	// Avoid GetTables throw error when ScatterProcedure send OpenShardRequest to CeresDB.
+	// When clusterState == EMPTY, shard has not yet been created, return an empty struct instead of nil.
+	// Call Stack : ScatterProcedure -> OpenShard -> GetTablesOfShards -> GetTables
 	if cluster.GetClusterState() == clusterpb.ClusterTopology_EMPTY {
 		ret := make(map[uint32]*ShardTables, len(shardIDs))
 		for _, shardID := range shardIDs {
 			ret[shardID] = &ShardTables{
-				Tables: nil,
+				Tables: make([]*TableInfo, 0),
 				Shard:  &ShardInfo{ID: shardID, Role: clusterpb.ShardRole_LEADER},
 			}
 		}
