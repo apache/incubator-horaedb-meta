@@ -81,13 +81,13 @@ func dropTablePrepareCallback(event *fsm.Event) {
 		return
 	}
 
-	request.ret = table.GetTableInfo()
+	request.ret = table.GetInfo()
 }
 
 func dropTableSuccessCallback(event *fsm.Event) {
 	req := event.Args[0].(*dropTableCallbackRequest)
 
-	if err := req.onSucceeded(req.ret); err != nil {
+	if err := req.onSucceeded(&req.ret); err != nil {
 		log.Error("exec success callback failed")
 	}
 }
@@ -111,7 +111,7 @@ type dropTableCallbackRequest struct {
 	onSucceeded func(*cluster.TableInfo) error
 	onFailed    func(error) error
 
-	ret *cluster.TableInfo
+	ret cluster.TableInfo
 }
 
 func NewDropTableProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, req *metaservicepb.DropTableRequest, onSucceeded func(*cluster.TableInfo) error, onFailed func(error) error) Procedure {

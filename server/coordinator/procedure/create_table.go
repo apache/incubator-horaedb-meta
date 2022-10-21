@@ -42,17 +42,17 @@ var (
 
 func createTablePrepareCallback(event *fsm.Event) {
 	req := event.Args[0].(*createTableCallbackRequest)
-	_, exists, err := req.cluster.GetTable(req.ctx, req.rawReq.GetSchemaName(), req.rawReq.GetName())
+	_, exists, err := req.cluster.GetTable(req.ctx, req.sourceReq.GetSchemaName(), req.sourceReq.GetName())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster get table")
 		return
 	}
 	if exists {
-		log.Warn("create an existing table", zap.String("schema", req.rawReq.GetSchemaName()), zap.String("table", req.rawReq.GetName()))
+		log.Warn("create an existing table", zap.String("schema", req.sourceReq.GetSchemaName()), zap.String("table", req.sourceReq.GetName()))
 		return
 	}
 
-	createTableResult, err := req.cluster.CreateTable(req.ctx, req.rawReq.GetHeader().GetNode(), req.rawReq.GetSchemaName(), req.rawReq.GetName())
+	createTableResult, err := req.cluster.CreateTable(req.ctx, req.sourceReq.GetHeader().GetNode(), req.sourceReq.GetSchemaName(), req.sourceReq.GetName())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster get table")
 		return
@@ -86,10 +86,10 @@ func createTablePrepareCallback(event *fsm.Event) {
 			SchemaID:   createTableResult.Table.GetSchemaID(),
 			SchemaName: createTableResult.Table.GetSchemaName(),
 		},
-		EncodedSchema:    req.rawReq.EncodedSchema,
-		Engine:           req.rawReq.Engine,
-		CreateIfNotExist: req.rawReq.CreateIfNotExist,
-		Options:          req.rawReq.Options,
+		EncodedSchema:    req.sourceReq.EncodedSchema,
+		Engine:           req.sourceReq.Engine,
+		CreateIfNotExist: req.sourceReq.CreateIfNotExist,
+		Options:          req.sourceReq.Options,
 	})
 	if err != nil {
 		cancelEventWithLog(event, err, "dispatch create table on shard")
@@ -114,9 +114,9 @@ func createTableFailedCallback(event *fsm.Event) {
 		log.Error("exec failed callback failed")
 	}
 
-	table, exists, err := req.cluster.GetTable(req.ctx, req.rawReq.GetSchemaName(), req.rawReq.GetName())
+	table, exists, err := req.cluster.GetTable(req.ctx, req.sourceReq.GetSchemaName(), req.sourceReq.GetName())
 	if err != nil {
-		log.Error("create table failed, get table failed", zap.String("schemaName", req.rawReq.GetSchemaName()), zap.String("tableName", req.rawReq.GetName()))
+		log.Error("create table failed, get table failed", zap.String("schemaName", req.sourceReq.GetSchemaName()), zap.String("tableName", req.sourceReq.GetName()))
 		return
 	}
 	if !exists {
@@ -137,7 +137,7 @@ type createTableCallbackRequest struct {
 	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
 
-	rawReq *metaservicepb.CreateTableRequest
+	sourceReq *metaservicepb.CreateTableRequest
 
 	onSucceeded func(*cluster.CreateTableResult) error
 	onFailed    func(error) error
@@ -184,7 +184,7 @@ func (p *CreateTableProcedure) Start(ctx context.Context) error {
 		cluster:     p.cluster,
 		ctx:         ctx,
 		dispatch:    p.dispatch,
-		rawReq:      p.req,
+		sourceReq:   p.req,
 		onSucceeded: p.onSucceeded,
 		onFailed:    p.onFailed,
 	}

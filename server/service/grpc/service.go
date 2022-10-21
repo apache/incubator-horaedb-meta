@@ -136,7 +136,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 
 	procedure, err := factory.CreateCreateTableProcedure(ctx, &procedure.CreateTableRequest{
 		Cluster:     c,
-		Req:         req,
+		SourceReq:   req,
 		OnSucceeded: onSucceeded,
 		OnFailed:    onFailed,
 	})
@@ -196,7 +196,7 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 
 	procedure, err := factory.CreateDropTableProcedure(ctx, &procedure.DropTableRequest{
 		Cluster:     c,
-		Req:         req,
+		SourceReq:   req,
 		OnSucceeded: onSucceeded,
 		OnFailed:    onFailed,
 	})

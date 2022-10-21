@@ -30,19 +30,19 @@ type TransferLeaderRequest struct {
 }
 
 type CreateTableRequest struct {
-	Cluster *cluster.Cluster
-	Req     *metaservicepb.CreateTableRequest
+	Cluster   *cluster.Cluster
+	SourceReq *metaservicepb.CreateTableRequest
 
-	OnSucceeded func(ret *cluster.CreateTableResult) error
-	OnFailed    func(err error) error
+	OnSucceeded func(*cluster.CreateTableResult) error
+	OnFailed    func(error) error
 }
 
 type DropTableRequest struct {
-	Cluster *cluster.Cluster
-	Req     *metaservicepb.DropTableRequest
+	Cluster   *cluster.Cluster
+	SourceReq *metaservicepb.DropTableRequest
 
-	OnSucceeded func(ret *cluster.TableInfo) error
-	OnFailed    func(err error) error
+	OnSucceeded func(*cluster.TableInfo) error
+	OnFailed    func(error) error
 }
 
 func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch) *Factory {
@@ -76,7 +76,7 @@ func (f *Factory) CreateCreateTableProcedure(ctx context.Context, request *Creat
 		return nil, err
 	}
 	procedure := NewCreateTableProcedure(f.dispatch, request.Cluster, id,
-		request.Req, request.OnSucceeded, request.OnFailed)
+		request.SourceReq, request.OnSucceeded, request.OnFailed)
 	return procedure, nil
 }
 
@@ -86,7 +86,7 @@ func (f *Factory) CreateDropTableProcedure(ctx context.Context, request *DropTab
 		return nil, err
 	}
 	procedure := NewDropTableProcedure(f.dispatch, request.Cluster, id,
-		request.Req, request.OnSucceeded, request.OnFailed)
+		request.SourceReq, request.OnSucceeded, request.OnFailed)
 	return procedure, nil
 }
 
