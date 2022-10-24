@@ -59,7 +59,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 		err := reopenShards(ctx, c, request.dispatch)
 		// If rebuild topology failed, cancel event.
 		if err != nil {
-			cancelEventWithLog(event, err, "update cluster topology state failed")
+			cancelEventWithLog(event, err, "reopen shards failed")
 			return
 		}
 	}
@@ -259,7 +259,7 @@ func (p *ScatterProcedure) updateStateWithLock(state State) {
 func reopenShards(ctx context.Context, c *cluster.Cluster, dispatch eventdispatch.Dispatch) error {
 	nodeShardsResult, err := c.GetNodeShards(ctx)
 	if err != nil {
-		return errors.WithMessage(err, "get cluster shard view failed")
+		return errors.WithMessage(err, "get cluster node shards result failed")
 	}
 	for _, nodeShard := range nodeShardsResult.NodeShards {
 		err := dispatch.OpenShard(ctx, nodeShard.Endpoint, &eventdispatch.OpenShardRequest{
