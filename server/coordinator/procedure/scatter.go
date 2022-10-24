@@ -158,9 +158,7 @@ func allocNodeShards(_ context.Context, shardTotal uint32, minNodeCount uint32, 
 	return shards, nil
 }
 
-func scatterSuccessCallback(event *fsm.Event) {
-	// request := event.Args[0].(*ScatterCallbackRequest)
-
+func scatterSuccessCallback(_ *fsm.Event) {
 	log.Info("scatter procedure execute finish")
 }
 

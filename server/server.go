@@ -213,24 +213,24 @@ func (srv *Server) createDefaultCluster(ctx context.Context) {
 
 	// Create default cluster by the leader.
 	if leaderResp.IsLocal {
-		cluster, err := srv.clusterManager.CreateCluster(ctx, srv.cfg.DefaultClusterName, uint32(srv.cfg.DefaultClusterNodeCount), uint32(srv.cfg.DefaultClusterReplicationFactor), uint32(srv.cfg.DefaultClusterShardTotal))
+		c, err := srv.clusterManager.CreateCluster(ctx, srv.cfg.DefaultClusterName, uint32(srv.cfg.DefaultClusterNodeCount), uint32(srv.cfg.DefaultClusterReplicationFactor), uint32(srv.cfg.DefaultClusterShardTotal))
 		if err != nil {
 			log.Warn("create default cluster failed", zap.Error(err))
 		} else {
-			log.Info("create default cluster succeed", zap.String("cluster", cluster.Name()))
+			log.Info("create default cluster succeed", zap.String("cluster", c.Name()))
 		}
 		// Create and submit scatter procedure for default cluster
-		if cluster != nil {
+		if defaultCluster, err := srv.clusterManager.GetCluster(ctx, srv.cfg.DefaultClusterName); err != nil {
 			shardIDs := make([]uint32, 0)
-			for i := uint32(0); i < cluster.GetClusterShardTotal(); i++ {
-				shardID, err := cluster.AllocShardID(ctx)
+			for i := uint32(0); i < defaultCluster.GetClusterShardTotal(); i++ {
+				shardID, err := defaultCluster.AllocShardID(ctx)
 				if err != nil {
 					log.Error("alloc shard id failed")
 					return
 				}
 				shardIDs = append(shardIDs, shardID)
 			}
-			scatterRequest := &procedure.ScatterRequest{Cluster: cluster, ShardIDs: shardIDs}
+			scatterRequest := &procedure.ScatterRequest{Cluster: defaultCluster, ShardIDs: shardIDs}
 			scatterProcedure, err := srv.procedureFactory.CreateScatterProcedure(ctx, scatterRequest)
 			if err != nil {
 				log.Error("create scatter procedure failed")
