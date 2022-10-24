@@ -102,8 +102,9 @@ func scatterPrepareCallback(event *fsm.Event) {
 	for _, shard := range shards {
 		openShardRequest := &eventdispatch.OpenShardRequest{
 			Shard: &cluster.ShardInfo{
-				ID:   shard.GetId(),
-				Role: clusterpb.ShardRole_LEADER,
+				ID:      shard.GetId(),
+				Role:    clusterpb.ShardRole_LEADER,
+				Version: uint64(0),
 			},
 		}
 		if err := request.dispatch.OpenShard(ctx, shard.Node, openShardRequest); err != nil {
@@ -262,7 +263,7 @@ func reopenShards(ctx context.Context, c *cluster.Cluster, dispatch eventdispatc
 	}
 	for _, shardView := range shardViews {
 		err := dispatch.OpenShard(ctx, shardView.GetNode(), &eventdispatch.OpenShardRequest{
-			Shard: &cluster.ShardInfo{ID: shardView.GetId(), Role: shardView.GetShardRole()},
+			Shard: &cluster.ShardInfo{ID: shardView.GetId(), Role: shardView.GetShardRole(), Version: uint64(0)},
 		})
 		if err != nil {
 			return errors.WithMessage(err, "open shard failed")
