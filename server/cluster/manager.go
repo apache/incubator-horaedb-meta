@@ -39,7 +39,7 @@ type Manager interface {
 	// The second output parameter bool: Returns true if the table was newly created.
 	AllocTableID(ctx context.Context, clusterName, schemaName, tableName, nodeName string) (*Table, bool, error)
 	GetTables(ctx context.Context, clusterName, nodeName string, shardIDs []uint32) (map[uint32]*ShardTables, error)
-	DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error
+	DropTable(ctx context.Context, clusterName, schemaName, tableName string) error
 	RegisterNode(ctx context.Context, clusterName string, nodeInfo *metaservicepb.NodeInfo) error
 	GetShards(ctx context.Context, clusterName, nodeName string) ([]uint32, error)
 	RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (*RouteTablesResult, error)
@@ -218,16 +218,17 @@ func (m *managerImpl) GetTables(ctx context.Context, clusterName, nodeName strin
 	return ret, nil
 }
 
-func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, tableName string, tableID uint64) error {
+func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, tableName string) error {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.Error(err))
 		return errors.WithMessage(err, "cluster manager DropTable")
 	}
 
-	if err := cluster.DropTable(ctx, schemaName, tableName, tableID); err != nil {
-		return errors.WithMessagef(err, "cluster manager DropTable, clusterName:%s, schemaName:%s, tableName:%s, tableID:%d",
-			clusterName, schemaName, tableName, tableID)
+	_, err = cluster.DropTable(ctx, schemaName, tableName)
+	if err != nil {
+		return errors.WithMessagef(err, "cluster manager DropTable, clusterName:%s, schemaName:%s, tableName:%s",
+			clusterName, schemaName, tableName)
 	}
 
 	return nil

@@ -280,7 +280,7 @@ func (s *metaStorageImpl) GetTable(ctx context.Context, clusterID uint32, schema
 
 	table := &clusterpb.Table{}
 	if err = proto.Unmarshal([]byte(value), table); err != nil {
-		return nil, false, ErrEncodeTable.WithCausef("fail to encode table, clusterID:%d, schemaID:%d, tableID:%d, err:%v", clusterID, schemaID, tableID, err)
+		return nil, false, ErrDecodeTable.WithCausef("fail to decode table, clusterID:%d, schemaID:%d, tableID:%d, err:%v", clusterID, schemaID, tableID, err)
 	}
 
 	return table, true, nil
@@ -292,10 +292,10 @@ func (s *metaStorageImpl) ListTables(ctx context.Context, clusterID uint32, sche
 	rangeLimit := s.opts.MaxScanLimit
 
 	tables := make([]*clusterpb.Table, 0)
-	do := func(_ string, value []byte) error {
+	do := func(key string, value []byte) error {
 		table := &clusterpb.Table{}
 		if err := proto.Unmarshal(value, table); err != nil {
-			return ErrEncodeTable.WithCausef("fail to encode table, clusterID:%d, schemaID:%d, err:%v", clusterID, schemaID, err)
+			return ErrDecodeTable.WithCausef("fail to decode table, clusterID:%d, schemaID:%d, key:%s, err:%v", clusterID, schemaID, key, err)
 		}
 
 		tables = append(tables, table)

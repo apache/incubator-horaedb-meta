@@ -37,6 +37,12 @@ type CreateTableResult struct {
 	PrevVersion uint64
 }
 
+type DropTableResult struct {
+	ShardID     uint32
+	CurrVersion uint64
+	PrevVersion uint64
+}
+
 type RouteEntry struct {
 	Table      *TableInfo
 	NodeShards []*NodeShard
