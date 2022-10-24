@@ -553,11 +553,6 @@ func (c *Cluster) GetShardByID(id uint32) (*Shard, error) {
 // GetShardByID return immutable `Shard`.
 func (c *Cluster) getShardByIDLocked(id uint32) (*Shard, error) {
 	shard, ok := c.shardsCache[id]
-	for leaderID, s := range c.shardsCache {
-		if leaderID == id {
-			return s, nil
-		}
-	}
 	if !ok {
 		return nil, ErrShardNotFound.WithCausef("cluster GetShardByID, shardID:%s", id)
 	}

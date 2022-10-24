@@ -90,6 +90,11 @@ func scatterPrepareCallback(event *fsm.Event) {
 		return
 	}
 
+	if err := request.cluster.Load(request.ctx); err != nil {
+		cancelEventWithLog(event, err, "cluster load data failed")
+		return
+	}
+
 	for _, shard := range shards {
 		openShardRequest := &eventdispatch.OpenShardRequest{
 			Shard: &cluster.ShardInfo{
