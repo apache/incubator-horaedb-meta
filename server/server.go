@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"sync"
 	"sync/atomic"
 
@@ -216,7 +217,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) error {
 		defaultCluster, err := srv.clusterManager.CreateCluster(ctx, srv.cfg.DefaultClusterName, uint32(srv.cfg.DefaultClusterNodeCount), uint32(srv.cfg.DefaultClusterReplicationFactor), uint32(srv.cfg.DefaultClusterShardTotal))
 		if err != nil {
 			log.Warn("create default cluster failed", zap.Error(err))
-			if err == cluster.ErrClusterAlreadyExists {
+			if coderr.Is(err, cluster.ErrClusterAlreadyExists.Code()) {
 				defaultCluster, err = srv.clusterManager.GetCluster(ctx, srv.cfg.DefaultClusterName)
 				if err != nil {
 					return errors.WithMessage(err, "get default cluster failed")
@@ -226,7 +227,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) error {
 			log.Info("create default cluster succeed", zap.String("cluster", defaultCluster.Name()))
 		}
 		// Create and submit scatter procedure for default cluster.
-		shardIDs := make([]uint32, 0)
+		var shardIDs []uint32
 		for i := uint32(0); i < defaultCluster.GetClusterShardTotal(); i++ {
 			shardID, err := defaultCluster.AllocShardID(ctx)
 			if err != nil {

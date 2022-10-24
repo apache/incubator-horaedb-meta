@@ -60,7 +60,7 @@ func (c *Cluster) GetClusterNodeCache() map[string]*Node {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	newNodes := make(map[string]*Node)
+	newNodes := map[string]*Node{}
 	for key, value := range c.nodesCache {
 		newNodes[key] = value
 	}
@@ -464,7 +464,7 @@ func (c *Cluster) loadClusterTopologyLocked(ctx context.Context) (map[uint32][]*
 		return nil, nil, ErrClusterTopologyNotFound.WithCausef("cluster:%v", c)
 	}
 
-	shardMap := make(map[uint32][]*clusterpb.Shard)
+	shardMap := map[uint32][]*clusterpb.Shard{}
 	for _, shard := range c.metaData.clusterTopology.ShardView {
 		shardMap[shard.Id] = append(shardMap[shard.Id], shard)
 	}
