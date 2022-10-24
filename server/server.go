@@ -5,11 +5,11 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"sync"
 	"sync/atomic"
 
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
+	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/config"
