@@ -107,7 +107,6 @@ func scatterPrepareCallback(event *fsm.Event) {
 			return
 		}
 	}
-
 }
 
 func waitForNodesReady(c *cluster.Cluster) {
