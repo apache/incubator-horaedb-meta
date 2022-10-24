@@ -90,11 +90,6 @@ func scatterPrepareCallback(event *fsm.Event) {
 		return
 	}
 
-	if err := request.cluster.Load(request.ctx); err != nil {
-		cancelEventWithLog(event, err, "cluster load data failed")
-		return
-	}
-
 	for _, shard := range shards {
 		openShardRequest := &eventdispatch.OpenShardRequest{
 			Shard: &cluster.ShardInfo{
@@ -107,6 +102,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 			return
 		}
 	}
+
 }
 
 func waitForNodesReady(c *cluster.Cluster) {
@@ -158,7 +154,13 @@ func allocNodeShards(_ context.Context, shardTotal uint32, minNodeCount uint32, 
 	return shards, nil
 }
 
-func scatterSuccessCallback(_ *fsm.Event) {
+func scatterSuccessCallback(event *fsm.Event) {
+	request := event.Args[0].(*ScatterCallbackRequest)
+
+	if err := request.cluster.Load(request.ctx); err != nil {
+		cancelEventWithLog(event, err, "cluster load data failed")
+		return
+	}
 	log.Info("scatter procedure execute finish")
 }
 

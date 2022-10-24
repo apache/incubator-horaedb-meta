@@ -4,6 +4,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"path"
 	"sync"
@@ -482,8 +483,8 @@ func (c *Cluster) loadShardTopologyLocked(ctx context.Context, shardIDs []uint32
 		return nil, errors.WithMessage(err, "cluster loadShardTopologyLocked")
 	}
 	shardTopologyMap := make(map[uint32]*clusterpb.ShardTopology, len(shardIDs))
-	for i, topology := range topologies {
-		shardTopologyMap[shardIDs[i]] = topology
+	for _, topology := range topologies {
+		shardTopologyMap[topology.GetShardId()] = topology
 	}
 	return shardTopologyMap, nil
 }
@@ -552,6 +553,11 @@ func (c *Cluster) GetShardByID(id uint32) (*Shard, error) {
 // GetShardByID return immutable `Shard`.
 func (c *Cluster) getShardByIDLocked(id uint32) (*Shard, error) {
 	shard, ok := c.shardsCache[id]
+	for leaderID, s := range c.shardsCache {
+		if leaderID == id {
+			return s, nil
+		}
+	}
 	if !ok {
 		return nil, ErrShardNotFound.WithCausef("cluster GetShardByID, shardID:%s", id)
 	}
@@ -642,7 +648,10 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 	for _, tableName := range tableNames {
 		table, exists := schema.getTable(tableName)
 		if exists {
-			shard := c.shardsCache[table.GetShardID()]
+			shard, err := c.GetShardByID(table.GetShardID())
+			if err != nil {
+				return nil, errors.WithMessage(err, fmt.Sprintf("shard not found, shardID:%d", table.GetShardID()))
+			}
 
 			nodeShards := make([]*NodeShard, 0, len(shard.nodes))
 			for i, node := range shard.nodes {

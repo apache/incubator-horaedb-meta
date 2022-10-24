@@ -220,7 +220,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) {
 			log.Info("create default cluster succeed", zap.String("cluster", c.Name()))
 		}
 		// Create and submit scatter procedure for default cluster
-		if defaultCluster, err := srv.clusterManager.GetCluster(ctx, srv.cfg.DefaultClusterName); err != nil {
+		if defaultCluster, err := srv.clusterManager.GetCluster(ctx, srv.cfg.DefaultClusterName); err == nil {
 			shardIDs := make([]uint32, 0)
 			for i := uint32(0); i < defaultCluster.GetClusterShardTotal(); i++ {
 				shardID, err := defaultCluster.AllocShardID(ctx)
