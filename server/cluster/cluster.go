@@ -49,7 +49,7 @@ func (c *Cluster) GetNodes() []*Node {
 	nodes := make([]*Node, 0, len(c.nodesCache))
 	for _, node := range c.nodesCache {
 		nodes = append(nodes, &Node{
-			meta:     ConvertNodeTOPB(node),
+			meta:     ConvertNodeToPB(node),
 			shardIDs: node.shardIDs,
 		})
 	}
@@ -629,8 +629,6 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 
 	schema, ok := c.schemasCache[schemaName]
 	if !ok {
-		// TODO: add
-		// return nil, ErrSchemaNotFound.WithCausef("schemaName:%s", schemaName)
 		routeEntries := make(map[string]*RouteEntry)
 
 		return &RouteTablesResult{
@@ -810,7 +808,7 @@ func (c *Cluster) UnlockShardByID(shardID uint32) {
 	delete(c.shardLock, shardID)
 }
 
-func (c *Cluster) UpdateNodeState(ctx context.Context, state clusterpb.NodeState, node string) error {
+func (c *Cluster) UpdateNodeState(ctx context.Context, node string, state clusterpb.NodeState) error {
 	for _, n := range c.nodesCache {
 		if n.GetMeta().GetName() == node {
 			n.GetMeta().State = state

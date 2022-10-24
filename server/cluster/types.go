@@ -69,7 +69,7 @@ func ConvertTableInfoToPB(table *TableInfo) *metaservicepb.TableInfo {
 	}
 }
 
-func ConvertNodeTOPB(node *Node) *clusterpb.Node {
+func ConvertNodeToPB(node *Node) *clusterpb.Node {
 	return &clusterpb.Node{
 		Name:                  node.meta.Name,
 		NodeStats:             node.meta.NodeStats,
