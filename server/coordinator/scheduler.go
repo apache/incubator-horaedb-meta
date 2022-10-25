@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	heartbeatCheckInterval     = 10 * time.Second
-	heartbeatKeepAliveInterval = 15 * time.Second
+	heartbeatCheckInterval               = 10 * time.Second
+	heartbeatKeepAliveIntervalSec uint64 = 15
 )
 
 type Scheduler struct {
@@ -80,7 +80,7 @@ func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 			nodes := c.GetRegisteredNodes()
 			nodeShards, err := c.GetNodeShards(ctx)
 			if err != nil {
-				log.Error("get node shards failed")
+				log.Error("get node shards failed", zap.Error(err))
 				continue
 			}
 			nodeShardsMapping := map[string][]*cluster.ShardInfo{}
@@ -98,8 +98,8 @@ func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 
 func (s *Scheduler) processNodes(ctx context.Context, nodes []*cluster.RegisteredNode, t time.Time, nodeShardsMapping map[string][]*cluster.ShardInfo) {
 	for _, node := range nodes {
-		// Determines whether node is online by compares heartbeatKeepAliveInterval with time.now() - lastTouchTime.
-		if !node.IsExpired(uint64(t.Unix()), uint64((heartbeatKeepAliveInterval).Seconds())) {
+		// Determines whether node is expired.
+		if !node.IsExpired(uint64(t.Unix()), heartbeatKeepAliveIntervalSec) {
 			// Shard versions of CeresDB and CeresMeta may be inconsistent. And close extra shards and open missing shards if so.
 			realShards := node.GetShardInfos()
 			expectShards := nodeShardsMapping[node.GetMeta().GetName()]

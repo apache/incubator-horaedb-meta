@@ -31,5 +31,5 @@ func (n *RegisteredNode) IsOnline() bool {
 }
 
 func (n RegisteredNode) IsExpired(now uint64, aliveThreshold uint64) bool {
-	return now-n.GetMeta().LastTouchTime >= aliveThreshold
+	return now >= aliveThreshold+n.GetMeta().LastTouchTime
 }
