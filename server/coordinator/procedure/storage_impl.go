@@ -72,7 +72,7 @@ func (e EtcdStorageImpl) List(ctx context.Context, batchSize int) ([]*Meta, erro
 	do := func(key string, value []byte) error {
 		meta := &Meta{}
 		if err := decode(meta, string(value)); err != nil {
-			return errors.WithMessagef(err, "decode meta failed, key:%s, value:%s", key, string(value))
+			return errors.WithMessagef(err, "decode meta failed, key:%s, value:%v", key, value)
 		}
 
 		metas = append(metas, meta)

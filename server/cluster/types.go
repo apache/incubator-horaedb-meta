@@ -31,15 +31,15 @@ type NodeShard struct {
 }
 
 type CreateTableResult struct {
-	Table        *Table
-	ShardVersion *ShardVersion
+	Table              *Table
+	ShardVersionUpdate *ShardVersionUpdate
 }
 
 type DropTableResult struct {
-	ShardVersion *ShardVersion
+	ShardVersionUpdate *ShardVersionUpdate
 }
 
-type ShardVersion struct {
+type ShardVersionUpdate struct {
 	ShardID     uint32
 	CurrVersion uint64
 	PrevVersion uint64

@@ -51,7 +51,7 @@ func dropTablePrepareCallback(event *fsm.Event) {
 		log.Warn("drop non-existing table", zap.String("schema", request.rawReq.GetSchemaName()), zap.String("table", request.rawReq.GetName()))
 		return
 	}
-	ret, err := request.cluster.DropTable(request.ctx, request.rawReq.GetSchemaName(), request.rawReq.GetName())
+	result, err := request.cluster.DropTable(request.ctx, request.rawReq.GetSchemaName(), request.rawReq.GetName())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster drop table")
 		return
@@ -72,11 +72,11 @@ func dropTablePrepareCallback(event *fsm.Event) {
 	err = request.dispatch.DropTableOnShard(request.ctx, leader.Node, &eventdispatch.DropTableOnShardRequest{
 		UpdateShardInfo: &eventdispatch.UpdateShardInfo{
 			CurrShardInfo: &cluster.ShardInfo{
-				ID:      ret.ShardVersion.ShardID,
+				ID:      result.ShardVersionUpdate.ShardID,
 				Role:    clusterpb.ShardRole_LEADER,
-				Version: ret.ShardVersion.CurrVersion,
+				Version: result.ShardVersionUpdate.CurrVersion,
 			},
-			PrevVersion: ret.ShardVersion.PrevVersion,
+			PrevVersion: result.ShardVersionUpdate.PrevVersion,
 		},
 		TableInfo: &cluster.TableInfo{
 			ID:         table.GetID(),
