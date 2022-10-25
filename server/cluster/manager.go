@@ -266,18 +266,18 @@ func (m *managerImpl) GetRegisteredNode(_ context.Context, clusterName string, n
 
 	node, ok := cluster.GetRegisteredNode(nodeName)
 	if !ok {
-		return nil, ErrNodeNotFound.WithCausef("Node is not found, node:%s, cluster:%s", nodeName, clusterName)
+		return nil, ErrNodeNotFound.WithCausef("node is not found, node:%s, cluster:%s", nodeName, clusterName)
 	}
-	nodeMeta := node.GetMeta()
+	meta := node.GetMeta()
 	shardInfos := make([]*metaservicepb.ShardInfo, 0, len(node.GetShardInfos()))
 	for _, shardInfo := range node.GetShardInfos() {
 		shardInfos = append(shardInfos, ConvertShardsInfoToPB(shardInfo))
 	}
 	nodeInfo := metaservicepb.NodeInfo{
-		Endpoint:      nodeMeta.Name,
-		Lease:         nodeMeta.NodeStats.Lease,
-		Zone:          nodeMeta.NodeStats.Zone,
-		BinaryVersion: nodeMeta.NodeStats.NodeVersion,
+		Endpoint:      meta.Name,
+		Lease:         meta.NodeStats.Lease,
+		Zone:          meta.NodeStats.Zone,
+		BinaryVersion: meta.NodeStats.NodeVersion,
 		ShardInfos:    shardInfos,
 	}
 

@@ -105,7 +105,7 @@ func TestAllocNodeShard(t *testing.T) {
 
 	minNodeCount = 2
 	shardTotal = 3
-	nodeList = make([]*cluster.RegisteredNode, 0)
+	nodeList = make([]*cluster.RegisteredNode, 0, minNodeCount)
 	for i := 0; i < minNodeCount; i++ {
 		nodeMeta := &clusterpb.Node{
 			Name: fmt.Sprintf("node%d", i),

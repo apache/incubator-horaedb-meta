@@ -26,11 +26,11 @@ type Cluster struct {
 	clusterID uint32
 
 	// RWMutex is used to protect following fields.
-	// TODO: Encapsulated maps as a specific struct
+	// TODO: Encapsulated maps as a specific struct.
 	lock     sync.RWMutex
 	metaData *metaData
 	// The two fields describes the whole topology of the cluster.
-	// TODO: merge `shardsCache` & `nodeShardsCache` into the whole topology
+	// TODO: merge `shardsCache` & `nodeShardsCache` into the whole topology.
 	shardsCache     map[uint32]*Shard        // shardID -> shard
 	nodeShardsCache map[string]*ShardsOfNode // nodeName -> shards of the node
 
@@ -56,7 +56,7 @@ func (c *Cluster) GetClusterShardView() ([]*clusterpb.Shard, error) {
 	// FIXME: Should use the shardsCache & nodeShardsCache to build the view.
 	shardView := c.metaData.clusterTopology.ShardView
 	newShardView := make([]*clusterpb.Shard, 0, len(shardView))
-	// TODO: We need to use the general deep copy tool method to replace
+	// TODO: We need to use the general deep copy tool method to replace.
 	for _, shard := range shardView {
 		copyShard := &clusterpb.Shard{
 			Id:        shard.Id,
@@ -82,7 +82,7 @@ func NewCluster(meta *clusterpb.Cluster, storage storage.Storage, kv clientv3.KV
 		registeredNodesCache: map[string]*RegisteredNode{},
 		schemaIDAlloc:        id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocSchemaIDPrefix), idAllocatorStep),
 		tableIDAlloc:         id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocTableIDPrefix), idAllocatorStep),
-		// TODO: Load ShardTopology when cluster create, pass exist shardID to allocator
+		// TODO: Load ShardTopology when cluster create, pass exist shardID to allocator.
 		shardIDAlloc: id.NewReusableAllocatorImpl(make([]uint64, 0), MinShardID),
 
 		storage: storage,
@@ -227,7 +227,7 @@ func (c *Cluster) loadCacheLocked(
 		}
 	}
 
-	// Load RegisteredNodeCache
+	// Load registeredNodeCache.
 	for _, node := range nodesLoaded {
 		registerNode := NewRegisteredNode(node, []*ShardInfo{})
 		c.registeredNodesCache[node.Name] = registerNode
@@ -652,7 +652,7 @@ func (c *Cluster) GetShardByID(id uint32) (*Shard, error) {
 func (c *Cluster) getShardByIDLocked(id uint32) (*Shard, error) {
 	shard, ok := c.shardsCache[id]
 	if !ok {
-		return nil, ErrShardNotFound.WithCausef("cluster GetShardByID, shardID:%v", id)
+		return nil, ErrShardNotFound.WithCausef("cluster GetShardByIDLocked, shardID:%d", id)
 	}
 	return shard, nil
 }

@@ -18,7 +18,7 @@ type Shard struct {
 	version uint64
 }
 
-// / FIXME: avoid returning *clusterpb.Shard.
+// FIXME: avoid returning *clusterpb.Shard.
 func (s *Shard) FindShardByNode(nodeName string) (*clusterpb.Shard, bool) {
 	for i := range s.nodes {
 		if s.nodes[i].GetName() == nodeName {
