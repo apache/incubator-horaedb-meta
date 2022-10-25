@@ -30,6 +30,6 @@ func (n *RegisteredNode) IsOnline() bool {
 	return n.meta.State == clusterpb.NodeState_ONLINE
 }
 
-func (n Node) IsExpire(now uint64, aliveThreshold uint64) bool {
+func (n RegisteredNode) IsExpire(now uint64, aliveThreshold uint64) bool {
 	return now-n.GetMeta().LastTouchTime >= aliveThreshold
 }

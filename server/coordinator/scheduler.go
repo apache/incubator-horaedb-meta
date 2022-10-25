@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -49,7 +48,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if !s.running {
+	if s.running {
 		log.Warn("scheduler has already been started")
 		return nil
 	}
@@ -72,7 +71,6 @@ func (s *Scheduler) ProcessHeartbeat(_ context.Context, _ *metaservicepb.NodeInf
 
 func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 	for t := range ticker.C {
-		log.Info("procedure scheduler checkNodeState")
 		clusters, err := s.clusterManager.ListClusters(ctx)
 		if err != nil {
 			log.Error("list clusters failed", zap.Error(err))
@@ -85,36 +83,36 @@ func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 				log.Error("get node shards failed")
 				continue
 			}
-			nodeShardsMapping := make(map[string][]*cluster.ShardInfo)
+			nodeShardsMapping := map[string][]*cluster.ShardInfo{}
 			for _, nodeShard := range nodeShards.NodeShards {
 				_, exists := nodeShardsMapping[nodeShard.Endpoint]
 				if !exists {
-					nodeShardsMapping[nodeShard.Endpoint] = make([]*cluster.ShardInfo, 0)
+					nodeShardsMapping[nodeShard.Endpoint] = []*cluster.ShardInfo{}
 				}
 				nodeShardsMapping[nodeShard.Endpoint] = append(nodeShardsMapping[nodeShard.Endpoint], nodeShard.ShardInfo)
 			}
-			for _, node := range nodes {
-				if node.GetMeta().GetState() == clusterpb.NodeState_OFFLINE {
-					continue
-				}
-				// Determines whether node is online by compares heartbeatKeepAliveInterval with time.now() - lastTouchTime.
-				if !node.IsExpire(uint64(t.Unix()), uint64((heartbeatKeepAliveInterval).Seconds())) {
-					// Shard versions of CeresDB and CeresMeta may be inconsistent. And close extra shards and open missing shards if so.
-					realShards := node.GetShardInfos()
-					expectShards := nodeShardsMapping[node.GetMeta().GetName()]
-					err := s.applyMetadataShardInfo(ctx, node.GetMeta().GetName(), realShards, expectShards)
-					if err != nil {
-						log.Error("apply metadata failed", zap.Error(err))
-					}
-				}
-			}
+			s.processNodes(ctx, nodes, t, nodeShardsMapping)
 		}
-		log.Info("procedure scheduler checkNodeState finish")
 	}
 }
 
-// applyMetadata verify shardInfo in heartbeats and metadata, they are forcibly synchronized to the latest version if they are inconsistent.
-// TODO: Encapsulate the following logic as a standalone ApplyProcedure
+func (s *Scheduler) processNodes(ctx context.Context, nodes []*cluster.RegisteredNode, t time.Time, nodeShardsMapping map[string][]*cluster.ShardInfo) {
+	for _, node := range nodes {
+		// Determines whether node is online by compares heartbeatKeepAliveInterval with time.now() - lastTouchTime.
+		if !node.IsExpire(uint64(t.Unix()), uint64((heartbeatKeepAliveInterval).Seconds())) {
+			// Shard versions of CeresDB and CeresMeta may be inconsistent. And close extra shards and open missing shards if so.
+			realShards := node.GetShardInfos()
+			expectShards := nodeShardsMapping[node.GetMeta().GetName()]
+			err := s.applyMetadataShardInfo(ctx, node.GetMeta().GetName(), realShards, expectShards)
+			if err != nil {
+				log.Error("apply metadata failed", zap.Error(err))
+			}
+		}
+	}
+}
+
+// applyMetadataShardInfo verify shardInfo in heartbeats and metadata, they are forcibly synchronized to the latest version if they are inconsistent.
+// TODO: Encapsulate the following logic as a standalone ApplyProcedure.
 func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, realShards []*cluster.ShardInfo, expectShards []*cluster.ShardInfo) error {
 	realShardInfoMapping := make(map[uint32]*cluster.ShardInfo, len(realShards))
 	expectShardInfoMapping := make(map[uint32]*cluster.ShardInfo, len(expectShards))
@@ -126,35 +124,39 @@ func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, rea
 	}
 
 	// This includes the following cases:
-	// 1. Shard exists in metadata and not exists in node, reopen lack shards on node.
-	// 2. Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.
-	// 3. Shard exists in both metadata and node, versions are consistent, do nothing.
 	for _, expectShard := range expectShards {
 		realShard, exists := realShardInfoMapping[expectShard.ID]
+
+		// 1. Shard exists in metadata and not exists in node, reopen lack shards on node.
 		if !exists {
 			if err := s.dispatch.OpenShard(ctx, node, &eventdispatch.OpenShardRequest{Shard: expectShard}); err != nil {
 				return errors.WithMessagef(err, "reopen shard failed, shardInfo:%d", expectShard.ID)
 			}
-		} else {
-			if realShard.Version != expectShard.Version {
-				if err := s.dispatch.CloseShard(ctx, node, &eventdispatch.CloseShardRequest{ShardID: expectShard.ID}); err != nil {
-					return errors.WithMessagef(err, "close shard failed, shardInfo:%d", expectShard.ID)
-				}
-				if err := s.dispatch.OpenShard(ctx, node, &eventdispatch.OpenShardRequest{Shard: expectShard}); err != nil {
-					return errors.WithMessagef(err, "reopen shard failed, shardInfo:%d", expectShard.ID)
-				}
-			}
+			continue
+		}
+
+		// 2. Shard exists in both metadata and node, versions are consistent, do nothing.
+		if realShard.Version == expectShard.Version {
+			continue
+		}
+
+		// 3. Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.
+		if err := s.dispatch.CloseShard(ctx, node, &eventdispatch.CloseShardRequest{ShardID: expectShard.ID}); err != nil {
+			return errors.WithMessagef(err, "close shard failed, shardInfo:%d", expectShard.ID)
+		}
+		if err := s.dispatch.OpenShard(ctx, node, &eventdispatch.OpenShardRequest{Shard: expectShard}); err != nil {
+			return errors.WithMessagef(err, "reopen shard failed, shardInfo:%d", expectShard.ID)
 		}
 	}
 
-	// This includes the following cases:
-	// 1. Shard exists in node and not exists in metadata, close extra shard on node.
+	// 4. Shard exists in node and not exists in metadata, close extra shard on node.
 	for _, realShard := range realShards {
-		_, exists := expectShardInfoMapping[realShard.ID]
-		if !exists {
-			if err := s.dispatch.CloseShard(ctx, node, &eventdispatch.CloseShardRequest{ShardID: realShard.ID}); err != nil {
-				return errors.WithMessagef(err, "close shard failed, shardInfo:%d", realShard.ID)
-			}
+		_, ok := expectShardInfoMapping[realShard.ID]
+		if ok {
+			continue
+		}
+		if err := s.dispatch.CloseShard(ctx, node, &eventdispatch.CloseShardRequest{ShardID: realShard.ID}); err != nil {
+			return errors.WithMessagef(err, "close shard failed, shardInfo:%d", realShard.ID)
 		}
 	}
 
