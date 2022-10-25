@@ -25,8 +25,9 @@ func newClusterAndRegisterNode(t *testing.T) *cluster.Cluster {
 		ShardInfos: nil,
 	}
 
-	shardIDs := make([]uint32, 0)
-	for i := uint32(0); i < cluster.GetTotalShardNum(); i++ {
+	totalShardNum := cluster.GetTotalShardNum()
+	shardIDs := make([]uint32, 0, totalShardNum)
+	for i := uint32(0); i < totalShardNum; i++ {
 		shardIDs = append(shardIDs, i)
 	}
 	p := NewScatterProcedure(dispatch, cluster, 1, shardIDs)
@@ -83,7 +84,7 @@ func TestAllocNodeShard(t *testing.T) {
 
 	minNodeCount := 4
 	shardTotal := 2
-	nodeList := make([]*cluster.RegisteredNode, 0)
+	nodeList := make([]*cluster.RegisteredNode, 0, minNodeCount)
 	for i := 0; i < minNodeCount; i++ {
 		nodeMeta := &clusterpb.Node{
 			Name: fmt.Sprintf("node%d", i),
@@ -91,7 +92,7 @@ func TestAllocNodeShard(t *testing.T) {
 		node := cluster.NewRegisteredNode(nodeMeta, []*cluster.ShardInfo{})
 		nodeList = append(nodeList, node)
 	}
-	shardIDs := make([]uint32, 0)
+	shardIDs := make([]uint32, 0, shardTotal)
 	for i := uint32(0); i < uint32(shardTotal); i++ {
 		shardIDs = append(shardIDs, i)
 	}

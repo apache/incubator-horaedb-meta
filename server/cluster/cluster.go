@@ -83,7 +83,7 @@ func NewCluster(meta *clusterpb.Cluster, storage storage.Storage, kv clientv3.KV
 		schemaIDAlloc:        id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocSchemaIDPrefix), idAllocatorStep),
 		tableIDAlloc:         id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocTableIDPrefix), idAllocatorStep),
 		// TODO: Load ShardTopology when cluster create, pass exist shardID to allocator.
-		shardIDAlloc: id.NewReusableAllocatorImpl(make([]uint64, 0), MinShardID),
+		shardIDAlloc: id.NewReusableAllocatorImpl([]uint64{}, MinShardID),
 
 		storage: storage,
 		kv:      kv,
