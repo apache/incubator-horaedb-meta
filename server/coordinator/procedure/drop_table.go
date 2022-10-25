@@ -72,11 +72,11 @@ func dropTablePrepareCallback(event *fsm.Event) {
 	err = request.dispatch.DropTableOnShard(request.ctx, leader.Node, &eventdispatch.DropTableOnShardRequest{
 		UpdateShardInfo: &eventdispatch.UpdateShardInfo{
 			CurrShardInfo: &cluster.ShardInfo{
-				ID:      ret.ShardID,
+				ID:      ret.ShardVersion.ShardID,
 				Role:    clusterpb.ShardRole_LEADER,
-				Version: ret.CurrVersion,
+				Version: ret.ShardVersion.CurrVersion,
 			},
-			PrevVersion: ret.PrevVersion,
+			PrevVersion: ret.ShardVersion.PrevVersion,
 		},
 		TableInfo: &cluster.TableInfo{
 			ID:         table.GetID(),

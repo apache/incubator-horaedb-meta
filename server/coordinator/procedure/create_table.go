@@ -49,8 +49,10 @@ func createTablePrepareCallback(event *fsm.Event) {
 	}
 	if exists {
 		req.createTableResult = &cluster.CreateTableResult{
-			Table:   table,
-			ShardID: table.GetShardID(),
+			Table: table,
+			ShardVersion: &cluster.ShardVersion{
+				ShardID: table.GetShardID(),
+			},
 		}
 		log.Warn("create an existing table", zap.String("schema", req.sourceReq.GetSchemaName()), zap.String("table", req.sourceReq.GetName()))
 		return
@@ -77,12 +79,12 @@ func createTablePrepareCallback(event *fsm.Event) {
 	err = req.dispatch.CreateTableOnShard(req.ctx, leader.Node, &eventdispatch.CreateTableOnShardRequest{
 		UpdateShardInfo: &eventdispatch.UpdateShardInfo{
 			CurrShardInfo: &cluster.ShardInfo{
-				ID: createTableResult.ShardID,
+				ID: createTableResult.ShardVersion.ShardID,
 				// TODO: dispatch CreateTableOnShard to followers?
 				Role:    clusterpb.ShardRole_LEADER,
-				Version: createTableResult.CurrVersion,
+				Version: createTableResult.ShardVersion.CurrVersion,
 			},
-			PrevVersion: createTableResult.PrevVersion,
+			PrevVersion: createTableResult.ShardVersion.PrevVersion,
 		},
 		TableInfo: &cluster.TableInfo{
 			ID:         createTableResult.Table.GetID(),

@@ -262,7 +262,7 @@ func (m *managerImpl) GetShards(_ context.Context, clusterName, nodeName string)
 		return nil, errors.WithMessage(err, "cluster manager GetShards")
 	}
 
-	shardIDs, err := cluster.GetShardIDs(nodeName)
+	shardIDs, err := cluster.GetShardIDsByNode(nodeName)
 	if err != nil {
 		return nil, errors.WithMessage(err, "cluster manager GetShards")
 	}
@@ -323,9 +323,6 @@ func (m *managerImpl) Stop(_ context.Context) error {
 
 	if !m.running {
 		return nil
-	}
-	for _, cluster := range m.clusters {
-		cluster.stop()
 	}
 
 	m.clusters = make(map[string]*Cluster)

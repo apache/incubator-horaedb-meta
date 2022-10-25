@@ -161,9 +161,9 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 				SchemaName: ret.Table.GetSchemaName(),
 			},
 			ShardInfo: &metaservicepb.ShardInfo{
-				Id:      ret.ShardID,
+				Id:      ret.ShardVersion.ShardID,
 				Role:    clusterpb.ShardRole_LEADER,
-				Version: ret.CurrVersion,
+				Version: ret.ShardVersion.CurrVersion,
 			},
 		}, nil
 	case err = <-errorCh:
