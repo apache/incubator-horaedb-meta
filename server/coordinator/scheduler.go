@@ -4,7 +4,6 @@ package coordinator
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -49,6 +48,12 @@ func NewScheduler(clusterManager cluster.Manager, procedureManager procedure.Man
 func (s *Scheduler) Start(ctx context.Context) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	if !s.running {
+		log.Warn("scheduler has already been started")
+		return nil
+	}
+
 	s.running = true
 	ticker := time.NewTicker(heartbeatCheckInterval)
 	s.checkNodeTicker = ticker
@@ -93,9 +98,7 @@ func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 					continue
 				}
 				// Determines whether node is online by compares heartbeatKeepAliveInterval with time.now() - lastTouchTime.
-				if uint64(t.Unix())-node.GetMeta().LastTouchTime >= uint64((heartbeatKeepAliveInterval).Seconds()) {
-					node.GetMeta().State = clusterpb.NodeState_OFFLINE
-				} else {
+				if !node.IsExpire(uint64(t.Unix()), uint64((heartbeatKeepAliveInterval).Seconds())) {
 					// Shard versions of CeresDB and CeresMeta may be inconsistent. And close extra shards and open missing shards if so.
 					realShards := node.GetShardInfos()
 					expectShards := nodeShardsMapping[node.GetMeta().GetName()]
@@ -113,6 +116,7 @@ func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 // applyMetadata verify shardInfo in heartbeats and metadata, they are forcibly synchronized to the latest version if they are inconsistent.
 // TODO: Encapsulate the following logic as a standalone ApplyProcedure
 func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, realShards []*cluster.ShardInfo, expectShards []*cluster.ShardInfo) error {
+	// Create mapping for
 	realShardInfoMapping := make(map[uint32]*cluster.ShardInfo, len(realShards))
 	expectShardInfoMapping := make(map[uint32]*cluster.ShardInfo, len(expectShards))
 	for _, realShard := range realShards {
@@ -121,30 +125,39 @@ func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, rea
 	for _, expectShard := range expectShards {
 		expectShardInfoMapping[expectShard.ID] = expectShard
 	}
+
+	// This includes the following cases:
+	// 1. Shard exists in metadata and not exists in node, reopen lack shards on node.
+	// 2. Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.
+	// 3. Shard exists in both metadata and node, versions are consistent, do nothing.
 	for _, expectShard := range expectShards {
 		realShard, exists := realShardInfoMapping[expectShard.ID]
 		if !exists {
 			if err := s.dispatch.OpenShard(ctx, node, &eventdispatch.OpenShardRequest{Shard: expectShard}); err != nil {
-				return errors.WithMessage(err, fmt.Sprintf("reopen shard failed, shardInfo:%d", expectShard.ID))
+				return errors.WithMessagef(err, "reopen shard failed, shardInfo:%d", expectShard.ID)
 			}
 		} else {
 			if realShard.Version != expectShard.Version {
 				if err := s.dispatch.CloseShard(ctx, node, &eventdispatch.CloseShardRequest{ShardID: expectShard.ID}); err != nil {
-					return errors.WithMessage(err, fmt.Sprintf("close shard failed, shardInfo:%d", expectShard.ID))
+					return errors.WithMessagef(err, "close shard failed, shardInfo:%d", expectShard.ID)
 				}
 				if err := s.dispatch.OpenShard(ctx, node, &eventdispatch.OpenShardRequest{Shard: expectShard}); err != nil {
-					return errors.WithMessage(err, fmt.Sprintf("reopen shard failed, shardInfo:%d", expectShard.ID))
+					return errors.WithMessagef(err, "reopen shard failed, shardInfo:%d", expectShard.ID)
 				}
 			}
 		}
 	}
+
+	// This includes the following cases:
+	// 1. Shard exists in node and not exists in metadata, close extra shard on node.
 	for _, realShard := range realShards {
 		_, exists := expectShardInfoMapping[realShard.ID]
 		if !exists {
 			if err := s.dispatch.CloseShard(ctx, node, &eventdispatch.CloseShardRequest{ShardID: realShard.ID}); err != nil {
-				return errors.WithMessage(err, fmt.Sprintf("close shard failed, shardInfo:%d", realShard.ID))
+				return errors.WithMessagef(err, "close shard failed, shardInfo:%d", realShard.ID)
 			}
 		}
 	}
+
 	return nil
 }
