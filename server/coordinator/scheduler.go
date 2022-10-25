@@ -116,7 +116,6 @@ func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 // applyMetadata verify shardInfo in heartbeats and metadata, they are forcibly synchronized to the latest version if they are inconsistent.
 // TODO: Encapsulate the following logic as a standalone ApplyProcedure
 func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, realShards []*cluster.ShardInfo, expectShards []*cluster.ShardInfo) error {
-	// Create mapping for
 	realShardInfoMapping := make(map[uint32]*cluster.ShardInfo, len(realShards))
 	expectShardInfoMapping := make(map[uint32]*cluster.ShardInfo, len(expectShards))
 	for _, realShard := range realShards {
