@@ -195,6 +195,12 @@ func (c *Cluster) loadCacheLocked(
 		}
 	}
 
+	// Load registeredNodeCache.
+	for _, node := range nodesLoaded {
+		registerNode := NewRegisteredNode(node, []*ShardInfo{})
+		c.registeredNodesCache[node.Name] = registerNode
+	}
+
 	// Load shardsCache.
 	for shardID, shardTopology := range shardTopologies {
 		tables := make(map[uint64]*Table, len(shardTopology.TableIds))
@@ -225,12 +231,6 @@ func (c *Cluster) loadCacheLocked(
 			tables:  tables,
 			version: shardTopology.Version,
 		}
-	}
-
-	// Load registeredNodeCache.
-	for _, node := range nodesLoaded {
-		registerNode := NewRegisteredNode(node, []*ShardInfo{})
-		c.registeredNodesCache[node.Name] = registerNode
 	}
 
 	return nil
