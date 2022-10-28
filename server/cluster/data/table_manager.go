@@ -9,13 +9,16 @@ import (
 	"github.com/CeresDB/ceresmeta/server/storage"
 )
 
+// TableManager manages table metadata by schema.
+type TableManager interface{}
+
 // nolint
-type Schema struct {
+type TableManagerImpl struct {
 	storage storage.Storage
 
 	// RWMutex is used to protect following fields.
 	lock         sync.RWMutex
-	meta         *clusterpb.Schema  // schema meta info in storage
+	schemaMeta   *clusterpb.Schema  // schema meta info in storage
 	schemaTables map[string]*Tables // schemaName -> tables
 }
 

@@ -9,13 +9,15 @@ import (
 	"github.com/CeresDB/ceresmeta/server/storage"
 )
 
+// TopologyManager manages the cluster topology, including the mapping relationship between shards, nodes, and tables.
+type TopologyManager interface{}
+
 // nolint
-type Topology struct {
+type TopologyManagerImpl struct {
 	storage storage.Storage
 
 	// RWMutex is used to protect following fields.
-	lock        sync.RWMutex
-	clusterMeta *clusterpb.Cluster // schema meta info in storage
+	lock sync.RWMutex
 	// ClusterTopology in memory.
 	shardNodesMapping map[uint32][]*clusterpb.Shard // shardID -> nodes of the shard
 	nodeShardsMapping map[string][]*clusterpb.Shard // nodeName -> shards of the node
