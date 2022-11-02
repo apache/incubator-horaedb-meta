@@ -6,6 +6,7 @@ import (
 	"context"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
@@ -109,20 +110,31 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusterName:%s", clusterName)
 	}
 
-	clusterPb := &clusterpb.Cluster{
+	clusterPB := &clusterpb.Cluster{
 		Id:                clusterID,
 		Name:              clusterName,
 		MinNodeCount:      initialNodeCount,
 		ReplicationFactor: replicationFactor,
 		ShardTotal:        shardTotal,
 	}
-	clusterPb, err = m.storage.CreateCluster(ctx, clusterPb)
+
+	clusterMetadata := storage.Cluster{
+		ID:                storage.ClusterID(clusterID),
+		Name:              clusterName,
+		MinNodeCount:      initialNodeCount,
+		ReplicationFactor: replicationFactor,
+		ShardTotal:        shardTotal,
+		CreatedAt:         uint64(time.Now().UnixMilli()),
+	}
+	err = m.storage.CreateCluster(ctx, storage.CreateClusterRequest{
+		Cluster: clusterMetadata,
+	})
 	if err != nil {
 		log.Error("fail to create cluster", zap.Error(err))
-		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusters:%v", clusterPb)
+		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusters:%v", clusterPB)
 	}
 
-	cluster = NewCluster(clusterPb, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
+	cluster = NewCluster(clusterMetadata, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
 
 	if err = cluster.init(ctx); err != nil {
 		log.Error("fail to init cluster", zap.Error(err))
@@ -331,14 +343,14 @@ func (m *managerImpl) Start(ctx context.Context) error {
 		return errors.WithMessage(err, "cluster manager start")
 	}
 
-	m.clusters = make(map[string]*Cluster, len(clusters))
-	for _, clusterPb := range clusters {
-		log.Info("cluster manager start, new cluster", zap.String("cluster", clusterPb.GetName()))
-		cluster := NewCluster(clusterPb, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
+	m.clusters = make(map[string]*Cluster, len(clusters.Clusters))
+	for _, cluster := range clusters.Clusters {
+		cluster := NewCluster(cluster, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
 		if err := cluster.Load(ctx); err != nil {
-			log.Error("cluster manager fail to start, fail to load cluster", zap.Error(err))
-			return errors.WithMessagef(err, "cluster manager start, clusters:%v", cluster)
+			log.Error("fail to load cluster", zap.String("cluster", cluster.Name()), zap.Error(err))
+			return errors.WithMessagef(err, "fail to load cluster:%v", cluster.Name())
 		}
+		log.Info("open cluster successfully", zap.String("cluster", cluster.Name()))
 		m.clusters[cluster.Name()] = cluster
 	}
 	m.running = true
