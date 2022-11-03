@@ -4,10 +4,12 @@ package storage
 
 import (
 	"context"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// MetaStorage defines the storage operations on the ceresdb cluster meta info.
-type MetaStorage interface {
+// Storage defines the storage operations on the ceresdb cluster meta info.
+type Storage interface {
 	// ListClusters list all clusters.
 	ListClusters(ctx context.Context) (ListClustersResult, error)
 	// CreateCluster create new cluster, return error if cluster already exists.
@@ -45,4 +47,9 @@ type MetaStorage interface {
 	ListNodes(ctx context.Context, req ListNodesRequest) (ListNodesResult, error)
 	// CreateOrUpdateNode create or update node in specified cluster.
 	CreateOrUpdateNode(ctx context.Context, req CreateOrUpdateNodeRequest) error
+}
+
+// NewStorageWithEtcdBackend creates a new storage with etcd backend.
+func NewStorageWithEtcdBackend(client *clientv3.Client, rootPath string, opts Options) Storage {
+	return newEtcdStorage(client, rootPath, opts)
 }
