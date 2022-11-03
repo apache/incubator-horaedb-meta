@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -110,14 +109,6 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusterName:%s", clusterName)
 	}
 
-	clusterPB := &clusterpb.Cluster{
-		Id:                clusterID,
-		Name:              clusterName,
-		MinNodeCount:      initialNodeCount,
-		ReplicationFactor: replicationFactor,
-		ShardTotal:        shardTotal,
-	}
-
 	clusterMetadata := storage.Cluster{
 		ID:                storage.ClusterID(clusterID),
 		Name:              clusterName,
@@ -131,7 +122,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 	})
 	if err != nil {
 		log.Error("fail to create cluster", zap.Error(err))
-		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusters:%v", clusterPB)
+		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusters:%v", clusterMetadata)
 	}
 
 	cluster = NewCluster(clusterMetadata, m.storage, m.kv, m.rootPath, m.idAllocatorStep)

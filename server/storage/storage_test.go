@@ -32,7 +32,7 @@ func TestStorage_CreateAndListCluster(t *testing.T) {
 	ctx := context.Background()
 
 	// Test to create expectClusters.
-	expectClusters := make([]Cluster, 0)
+	expectClusters := make([]Cluster, 0, defaultCount)
 	for i := 0; i < defaultCount; i++ {
 		cluster := Cluster{
 			ID:                ClusterID(i),
@@ -122,7 +122,7 @@ func TestStorage_CreateAndListScheme(t *testing.T) {
 	defer cancel()
 
 	// Test to create expectSchemas.
-	expectSchemas := make([]Schema, 0)
+	expectSchemas := make([]Schema, 0, defaultCount)
 	for i := 0; i < defaultCount; i++ {
 		schema := Schema{
 			ID:        SchemaID(i),
@@ -159,7 +159,7 @@ func TestStorage_CreateAndGetAndListTable(t *testing.T) {
 	defer cancel()
 
 	// Test to create tables.
-	expectTables := make([]Table, 0)
+	expectTables := make([]Table, 0, defaultCount)
 	for i := 0; i < defaultCount; i++ {
 		table := Table{
 			ID:       TableID(i),
@@ -229,8 +229,8 @@ func TestStorage_CreateAndListShardView(t *testing.T) {
 	defer cancel()
 
 	// Test to create shard topologies.
-	expectShardViews := make([]ShardView, 0)
-	shardIDs := make([]ShardID, 0)
+	expectShardViews := make([]ShardView, 0, defaultCount)
+	var shardIDs []ShardID
 	for i := 0; i < defaultCount; i++ {
 		shardView := ShardView{
 			ShardID:   ShardID(i),

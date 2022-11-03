@@ -110,7 +110,7 @@ func (c *Cluster) init(ctx context.Context) error {
 
 	err := c.storage.CreateClusterView(ctx, storage.CreateClusterViewRequest{ClusterView: clusterView})
 	if err != nil {
-		return errors.WithMessage(err, "create cluster topology")
+		return errors.WithMessage(err, "create cluster view")
 	}
 
 	clusterTopology := storage.ConvertClusterViewToPB(clusterView)
