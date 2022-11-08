@@ -20,7 +20,7 @@ type Storage interface {
 	// GetClusterView get cluster view by cluster id.
 	GetClusterView(ctx context.Context, req GetClusterViewRequest) (GetClusterViewResult, error)
 	// UpdateClusterView update cluster view.
-	UpdateClusterView(ctx context.Context, req PutClusterViewRequest) error
+	UpdateClusterView(ctx context.Context, req UpdateClusterViewRequest) error
 
 	// ListSchemas list all schemas in specified cluster.
 	ListSchemas(ctx context.Context, req ListSchemasRequest) (ListSchemasResult, error)

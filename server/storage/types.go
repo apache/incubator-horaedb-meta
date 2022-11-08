@@ -51,7 +51,7 @@ type GetClusterViewResult struct {
 	ClusterView ClusterView
 }
 
-type PutClusterViewRequest struct {
+type UpdateClusterViewRequest struct {
 	ClusterID     ClusterID
 	ClusterView   ClusterView
 	LatestVersion uint64
@@ -247,7 +247,7 @@ func convertShardRoleToPB(role ShardRole) clusterpb.ShardRole {
 	return clusterpb.ShardRole_FOLLOWER
 }
 
-func convertShardRolePB(role clusterpb.ShardRole) ShardRole {
+func ConvertShardRolePB(role clusterpb.ShardRole) ShardRole {
 	switch role {
 	case clusterpb.ShardRole_LEADER:
 		return Leader
@@ -270,7 +270,7 @@ func convertShardNodeToPB(shardNode ShardNode) clusterpb.Shard {
 func ConvertShardNodePB(shardNode *clusterpb.Shard) ShardNode {
 	return ShardNode{
 		ID:        ShardID(shardNode.Id),
-		ShardRole: convertShardRolePB(shardNode.ShardRole),
+		ShardRole: ConvertShardRolePB(shardNode.ShardRole),
 		Node:      shardNode.Node,
 	}
 }
@@ -434,7 +434,7 @@ func ConvertNodeToPB(node Node) clusterpb.Node {
 	}
 }
 
-func convertNodePB(node *clusterpb.Node) Node {
+func ConvertNodePB(node *clusterpb.Node) Node {
 	nodeStats := convertNodeStatsPB(node.NodeStats)
 	return Node{
 		Name:          node.Name,

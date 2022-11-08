@@ -8,17 +8,17 @@ import (
 
 type RegisteredNode struct {
 	meta       *clusterpb.Node
-	shardInfos []*ShardInfo
+	shardInfos []ShardInfo
 }
 
-func NewRegisteredNode(meta *clusterpb.Node, shardInfos []*ShardInfo) *RegisteredNode {
-	return &RegisteredNode{
+func NewRegisteredNode(meta *clusterpb.Node, shardInfos []ShardInfo) RegisteredNode {
+	return RegisteredNode{
 		meta,
 		shardInfos,
 	}
 }
 
-func (n *RegisteredNode) GetShardInfos() []*ShardInfo {
+func (n *RegisteredNode) GetShardInfos() []ShardInfo {
 	return n.shardInfos
 }
 

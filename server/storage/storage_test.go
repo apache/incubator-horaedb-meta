@@ -98,7 +98,7 @@ func TestStorage_CreateAndGetClusterView(t *testing.T) {
 
 	// Test to put cluster view.
 	expectClusterView.Version = uint64(1)
-	putReq := PutClusterViewRequest{
+	putReq := UpdateClusterViewRequest{
 		ClusterID:     defaultClusterID,
 		ClusterView:   expectClusterView,
 		LatestVersion: 0,

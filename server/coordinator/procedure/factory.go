@@ -5,6 +5,8 @@ package procedure
 import (
 	"context"
 
+	"github.com/CeresDB/ceresmeta/server/storage"
+
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
@@ -19,14 +21,14 @@ type Factory struct {
 
 type ScatterRequest struct {
 	Cluster  *cluster.Cluster
-	ShardIDs []uint32
+	ShardIDs []storage.ShardID
 }
 
 type CreateTableRequest struct {
 	Cluster   *cluster.Cluster
 	SourceReq *metaservicepb.CreateTableRequest
 
-	OnSucceeded func(*cluster.CreateTableResult) error
+	OnSucceeded func(cluster.CreateTableResult) error
 	OnFailed    func(error) error
 }
 
@@ -34,7 +36,7 @@ type DropTableRequest struct {
 	Cluster   *cluster.Cluster
 	SourceReq *metaservicepb.DropTableRequest
 
-	OnSucceeded func(*cluster.TableInfo) error
+	OnSucceeded func(cluster.TableInfo) error
 	OnFailed    func(error) error
 }
 

@@ -19,5 +19,5 @@ var (
 	ErrNodeShardsIsEmpty        = coderr.NewCodeError(coderr.Internal, "node's shard list is empty")
 	ErrGetShardView             = coderr.NewCodeError(coderr.Internal, "get shard view")
 	ErrTableAlreadyExists       = coderr.NewCodeError(coderr.Internal, "table already exists")
-	ErrShardViewVersionNotMatch = coderr.NewCodeError(coderr.Internal, "shard view version not match")
+	ErrShardViewVersionNotMatch = coderr.NewCodeError(coderr.Internal, "shard view versions not match")
 )

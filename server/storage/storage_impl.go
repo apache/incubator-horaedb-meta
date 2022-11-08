@@ -143,7 +143,7 @@ func (s *metaStorageImpl) GetClusterView(ctx context.Context, req GetClusterView
 	}, nil
 }
 
-func (s *metaStorageImpl) UpdateClusterView(ctx context.Context, req PutClusterViewRequest) error {
+func (s *metaStorageImpl) UpdateClusterView(ctx context.Context, req UpdateClusterViewRequest) error {
 	clusterViewPB := ConvertClusterViewToPB(req.ClusterView)
 
 	value, err := proto.Marshal(&clusterViewPB)
@@ -446,7 +446,7 @@ func (s *metaStorageImpl) ListNodes(ctx context.Context, req ListNodesRequest) (
 		if err := proto.Unmarshal(value, nodePB); err != nil {
 			return ErrDecode.WithCausef("decode node, key:%s, value:%v, clusterID:%d, err:%v", key, value, req.ClusterID, err)
 		}
-		node := convertNodePB(nodePB)
+		node := ConvertNodePB(nodePB)
 		nodes = append(nodes, node)
 		return nil
 	}
