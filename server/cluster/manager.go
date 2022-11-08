@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -41,7 +40,7 @@ type Manager interface {
 	GetNodeShards(ctx context.Context, clusterName string) (GetNodeShardsResult, error)
 
 	RegisterNode(ctx context.Context, clusterName string, nodeName storage.Node, shardInfos []ShardInfo) error
-	GetRegisteredNode(ctx context.Context, clusterName string, node string) (*metaservicepb.NodeInfo, error)
+	GetRegisteredNode(ctx context.Context, clusterName string, node string) (RegisteredNode, error)
 }
 
 type managerImpl struct {
@@ -106,7 +105,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 	}
 
 	clusterMetadata := storage.Cluster{
-		ID:                storage.ClusterID(clusterID),
+		ID:                clusterID,
 		Name:              clusterName,
 		MinNodeCount:      initialNodeCount,
 		ReplicationFactor: replicationFactor,
@@ -160,7 +159,7 @@ func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 	schema, exists, err := cluster.GetOrCreateSchema(ctx, schemaName)
 	if err != nil {
 		log.Error("fail to create schema", zap.Error(err))
-		return 0, false, errors.WithMessagef(err, "cluster manager AllocSchemaID, "+
+		return 0, false, errors.WithMessagef(err, "get or create schema, "+
 			"clusterName:%s, schemaName:%s", clusterName, schemaName)
 	}
 	return schema.ID, exists, nil
@@ -179,13 +178,13 @@ func (m *managerImpl) GetTables(clusterName, nodeName string, shardIDs []storage
 func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, tableName string) error {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
-		log.Error("cluster not found", zap.Error(err))
-		return errors.WithMessage(err, "cluster manager drop table")
+		log.Error("get cluster", zap.Error(err))
+		return errors.WithMessage(err, "get cluster")
 	}
 
 	_, err = cluster.DropTable(ctx, schemaName, tableName)
 	if err != nil {
-		return errors.WithMessagef(err, "cluster manager drop table, clusterName:%s, schemaName:%s, tableName:%s",
+		return errors.WithMessagef(err, "cluster drop table, clusterName:%s, schemaName:%s, tableName:%s",
 			clusterName, schemaName, tableName)
 	}
 
@@ -202,42 +201,30 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName string, node
 
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
-		log.Error("cluster not found", zap.Error(err))
-		return errors.WithMessage(err, "cluster manager RegisterNode")
+		log.Error("get cluster", zap.Error(err))
+		return errors.WithMessage(err, "get cluster")
 	}
 	err = cluster.RegisterNode(ctx, node, shardInfos)
 	if err != nil {
-		return errors.WithMessage(err, "cluster manager RegisterNode")
+		return errors.WithMessage(err, "cluster register node")
 	}
 
 	return nil
 }
 
-func (m *managerImpl) GetRegisteredNode(_ context.Context, clusterName string, nodeName string) (*metaservicepb.NodeInfo, error) {
+func (m *managerImpl) GetRegisteredNode(_ context.Context, clusterName string, nodeName string) (RegisteredNode, error) {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
-		log.Error("cluster not found", zap.Error(err))
-		return nil, errors.WithMessage(err, "cluster manager GetRegisteredNode")
+		log.Error("get cluster", zap.Error(err))
+		return RegisteredNode{}, errors.WithMessage(err, "get cluster")
 	}
 
-	node, ok := cluster.GetRegisteredNode(nodeName)
+	registeredNode, ok := cluster.GetRegisteredNodeByName(nodeName)
 	if !ok {
-		return nil, ErrNodeNotFound.WithCausef("node is not found, node:%s, cluster:%s", nodeName, clusterName)
-	}
-	meta := node.GetMeta()
-	shardInfos := make([]*metaservicepb.ShardInfo, 0, len(node.GetShardInfos()))
-	for _, shardInfo := range node.GetShardInfos() {
-		shardInfos = append(shardInfos, ConvertShardsInfoToPB(shardInfo))
-	}
-	nodeInfo := metaservicepb.NodeInfo{
-		Endpoint:      meta.Name,
-		Lease:         meta.NodeStats.Lease,
-		Zone:          meta.NodeStats.Zone,
-		BinaryVersion: meta.NodeStats.NodeVersion,
-		ShardInfos:    shardInfos,
+		return RegisteredNode{}, ErrNodeNotFound.WithCausef("registeredNode is not found, registeredNode:%s, cluster:%s", nodeName, clusterName)
 	}
 
-	return &nodeInfo, nil
+	return registeredNode, nil
 }
 
 func (m *managerImpl) getCluster(clusterName string) (*Cluster, error) {
@@ -245,17 +232,17 @@ func (m *managerImpl) getCluster(clusterName string) (*Cluster, error) {
 	cluster, ok := m.clusters[clusterName]
 	m.lock.RUnlock()
 	if !ok {
-		return nil, ErrClusterNotFound.WithCausef("cluster manager getCluster, clusterName:%s", clusterName)
+		return nil, ErrClusterNotFound.WithCausef("cluster name:%s", clusterName)
 	}
 	return cluster, nil
 }
 
-func (m *managerImpl) allocClusterID(ctx context.Context) (uint32, error) {
+func (m *managerImpl) allocClusterID(ctx context.Context) (storage.ClusterID, error) {
 	ID, err := m.alloc.Alloc(ctx)
 	if err != nil {
-		return 0, errors.WithMessagef(err, "alloc cluster id failed")
+		return 0, errors.WithMessagef(err, "alloc cluster id")
 	}
-	return uint32(ID), nil
+	return storage.ClusterID(ID), nil
 }
 
 func (m *managerImpl) Start(ctx context.Context) error {
@@ -304,14 +291,14 @@ func (m *managerImpl) Stop(_ context.Context) error {
 func (m *managerImpl) RouteTables(ctx context.Context, clusterName, schemaName string, tableNames []string) (RouteTablesResult, error) {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
-		log.Error("cluster not found", zap.Error(err))
-		return RouteTablesResult{}, errors.WithMessage(err, "cluster manager routeTables")
+		log.Error("get cluster", zap.Error(err))
+		return RouteTablesResult{}, errors.WithMessage(err, "get cluster")
 	}
 
 	ret, err := cluster.RouteTables(ctx, schemaName, tableNames)
 	if err != nil {
-		log.Error("cluster manager RouteTables", zap.Error(err))
-		return RouteTablesResult{}, errors.WithMessage(err, "cluster manager routeTables")
+		log.Error("cluster manager route tables", zap.Error(err))
+		return RouteTablesResult{}, errors.WithMessage(err, "cluster manager route tables")
 	}
 
 	return ret, nil
@@ -320,12 +307,13 @@ func (m *managerImpl) RouteTables(ctx context.Context, clusterName, schemaName s
 func (m *managerImpl) GetNodeShards(ctx context.Context, clusterName string) (GetNodeShardsResult, error) {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
-		return GetNodeShardsResult{}, errors.WithMessage(err, "cluster manager GetNodes")
+		log.Error("get cluster", zap.Error(err))
+		return GetNodeShardsResult{}, errors.WithMessage(err, "get cluster")
 	}
 
 	ret, err := cluster.GetNodeShards(ctx)
 	if err != nil {
-		return GetNodeShardsResult{}, errors.WithMessage(err, "cluster manager GetNodes")
+		return GetNodeShardsResult{}, errors.WithMessage(err, "cluster get NodeShards")
 	}
 
 	return ret, nil

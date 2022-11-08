@@ -7,13 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/server/storage"
-
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -108,8 +107,8 @@ func (s *Scheduler) processNodes(ctx context.Context, nodes []cluster.Registered
 		if !node.IsExpired(uint64(t.Unix()), heartbeatKeepAliveIntervalSec) {
 			// Shard versions of CeresDB and CeresMeta may be inconsistent. And close extra shards and open missing shards if so.
 			realShards := node.GetShardInfos()
-			expectShards := nodeShardsMapping[node.GetMeta().GetName()]
-			err := s.applyMetadataShardInfo(ctx, node.GetMeta().GetName(), realShards, expectShards)
+			expectShards := nodeShardsMapping[node.GetNode().Name]
+			err := s.applyMetadataShardInfo(ctx, node.GetNode().Name, realShards, expectShards)
 			if err != nil {
 				log.Error("apply metadata failed", zap.Error(err))
 			}

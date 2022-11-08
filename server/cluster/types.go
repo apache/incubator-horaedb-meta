@@ -12,11 +12,6 @@ const (
 	MinShardID = 0
 )
 
-type TableWitchSchema struct {
-	Table  storage.Table
-	Schema storage.Schema
-}
-
 type TableInfo struct {
 	ID         storage.TableID
 	Name       string
@@ -33,11 +28,6 @@ type ShardInfo struct {
 	ID      storage.ShardID
 	Role    storage.ShardRole
 	Version uint64
-}
-
-type ShardsOfNode struct {
-	Endpoint string
-	ShardIDs []uint32
 }
 
 type ShardNodeWithVersion struct {
@@ -97,16 +87,5 @@ func ConvertTableInfoToPB(table TableInfo) *metaservicepb.TableInfo {
 		Name:       table.Name,
 		SchemaId:   uint32(table.SchemaID),
 		SchemaName: table.SchemaName,
-	}
-}
-
-func ConvertNodeToPB(node *RegisteredNode) *clusterpb.Node {
-	return &clusterpb.Node{
-		Name:                  node.meta.Name,
-		NodeStats:             node.meta.NodeStats,
-		CreateTime:            node.meta.CreateTime,
-		LastTouchTime:         node.meta.LastTouchTime,
-		State:                 node.meta.State,
-		HeartbeatSamplingInfo: node.meta.HeartbeatSamplingInfo,
 	}
 }

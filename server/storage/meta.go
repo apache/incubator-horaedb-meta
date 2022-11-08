@@ -41,7 +41,7 @@ type Storage interface {
 	// ListShardViews list all shard views in specified cluster.
 	ListShardViews(ctx context.Context, req ListShardViewsRequest) (ListShardViewsResult, error)
 	// UpdateShardView update shard views in specified cluster.
-	UpdateShardView(ctx context.Context, req PutShardViewRequest) error
+	UpdateShardView(ctx context.Context, req UpdateShardViewRequest) error
 
 	// ListNodes list all nodes in specified cluster.
 	ListNodes(ctx context.Context, req ListNodesRequest) (ListNodesResult, error)

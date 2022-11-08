@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/server/storage"
-
 	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/pkg/commonpb"
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
@@ -17,6 +15,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/member"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"go.uber.org/zap"
 )
 

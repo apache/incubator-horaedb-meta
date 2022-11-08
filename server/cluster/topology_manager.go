@@ -13,21 +13,32 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TopologyManager manages the cluster topology, including the mapping relationship between shards, nodes, and Tables.
+// TopologyManager manages the cluster topology, including the mapping relationship between shards, nodes, and tables.
 type TopologyManager interface {
-	Load(context.Context) error
-	// GetVersion get cluster view versions.
+	// Load load cluster topology from storage.
+	Load(ctx context.Context) error
+	// GetVersion get cluster view version.
 	GetVersion() uint64
+	// GetClusterState get cluster view state.
 	GetClusterState() storage.ClusterState
+	// GetTableIDs get shardNode and tablesIDs with shardID and nodeName.
 	GetTableIDs(shardIDs []storage.ShardID, nodeName string) map[storage.ShardID]ShardTableIDs
+	// AddTable add table to cluster topology.
 	AddTable(ctx context.Context, nodeName string, table storage.Table) (ShardVersionUpdate, error)
-	RemoveTable(context.Context, storage.TableID) (ShardVersionUpdate, error)
-	GetShardNodesByID(storage.ShardID) ([]storage.ShardNode, error)
+	// RemoveTable remove table from cluster topology.
+	RemoveTable(ctx context.Context, tableID storage.TableID) (ShardVersionUpdate, error)
+	// GetShardNodesByID get shardNodes with shardID.
+	GetShardNodesByID(shardID storage.ShardID) ([]storage.ShardNode, error)
+	// GetShardNodesByTableIDs get shardNodes with tableIDs.
 	GetShardNodesByTableIDs(tableID []storage.TableID) (GetShardNodesByTableIDsResult, error)
+	// GetShardNodes get all shardNodes in cluster topology.
 	GetShardNodes() GetShardNodesResult
-	InitClusterView(context.Context) error
-	UpdateClusterView(context.Context, storage.ClusterState, []storage.ShardNode) error
-	CreateShardViews(context.Context, []CreateShardView) error
+	// InitClusterView init cluster view when create new cluster.
+	InitClusterView(ctx context.Context) error
+	// UpdateClusterView update cluster view with shardNodes.
+	UpdateClusterView(ctx context.Context, state storage.ClusterState, shardNodes []storage.ShardNode) error
+	// CreateShardViews create shardViews.
+	CreateShardViews(ctx context.Context, shardViews []CreateShardView) error
 }
 
 type ShardTableIDs struct {
@@ -55,24 +66,21 @@ type CreateShardView struct {
 	Tables  []storage.TableID
 }
 
-// nolint
 type TopologyManagerImpl struct {
 	storage      storage.Storage
 	clusterID    storage.ClusterID
 	shardIDAlloc id.Allocator
 
 	// RWMutex is used to protect following fields.
-	lock sync.RWMutex
-	// ClusterView in memory.
-	clusterView       storage.ClusterView
+	lock              sync.RWMutex
+	clusterView       storage.ClusterView                     // ClusterView in memory.
 	shardNodesMapping map[storage.ShardID][]storage.ShardNode // ShardID -> nodes of the shard
 	nodeShardsMapping map[string][]storage.ShardNode          // nodeName -> shards of the node
 	// ShardView in memory.
 	shardTablesMapping map[storage.ShardID]*storage.ShardView // ShardID -> shardTopology
 	tableShardMapping  map[storage.TableID]storage.ShardID    // tableID -> ShardID
 
-	// Node in memory.
-	nodes map[string]storage.Node
+	nodes map[string]storage.Node // Node in memory.
 }
 
 func NewTopologyManagerImpl(storage storage.Storage, clusterID storage.ClusterID, shardIDAlloc id.Allocator) TopologyManager {
@@ -91,12 +99,12 @@ func (m *TopologyManagerImpl) Load(ctx context.Context) error {
 		return errors.WithMessage(err, "load cluster view")
 	}
 
-	if err := m.loadShardView(ctx); err != nil {
-		return errors.WithMessage(err, "load shard view")
+	if err := m.loadShardViews(ctx); err != nil {
+		return errors.WithMessage(err, "load shard views")
 	}
 
-	if err := m.loadNode(ctx); err != nil {
-		return errors.WithMessage(err, "load node")
+	if err := m.loadNodes(ctx); err != nil {
+		return errors.WithMessage(err, "load nodes")
 	}
 	return nil
 }
@@ -167,7 +175,7 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, nodeName string, tab
 	}
 
 	// Update shard view in storage.
-	err := m.storage.UpdateShardView(ctx, storage.PutShardViewRequest{
+	err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
 		ClusterID:     m.clusterID,
 		ShardView:     newShardView,
 		LatestVersion: prevVersion,
@@ -210,7 +218,7 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, tableID storage.T
 	}
 
 	// Update shardView in storage.
-	if err := m.storage.UpdateShardView(ctx, storage.PutShardViewRequest{
+	if err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
 		ClusterID: m.clusterID,
 		ShardView: storage.ShardView{
 			ShardID:   shardView.ShardID,
@@ -220,7 +228,7 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, tableID storage.T
 		},
 		LatestVersion: prevVersion,
 	}); err != nil {
-		return ShardVersionUpdate{}, errors.WithMessage(err, "update shard view in storage")
+		return ShardVersionUpdate{}, errors.WithMessage(err, "storage update shard view")
 	}
 
 	// Update shardView in memory.
@@ -306,7 +314,7 @@ func (m *TopologyManagerImpl) InitClusterView(ctx context.Context) error {
 
 	err := m.storage.CreateClusterView(ctx, storage.CreateClusterViewRequest{ClusterView: clusterView})
 	if err != nil {
-		return errors.WithMessage(err, "create cluster view")
+		return errors.WithMessage(err, "storage create cluster view")
 	}
 	return nil
 }
@@ -328,7 +336,7 @@ func (m *TopologyManagerImpl) UpdateClusterView(ctx context.Context, state stora
 		ClusterView:   newClusterView,
 		LatestVersion: m.clusterView.Version,
 	}); err != nil {
-		return errors.WithMessage(err, "update cluster view")
+		return errors.WithMessage(err, "storage update cluster view")
 	}
 
 	// Load cluster view into memory.
@@ -356,11 +364,11 @@ func (m *TopologyManagerImpl) CreateShardViews(ctx context.Context, createShardV
 		ClusterID:  m.clusterID,
 		ShardViews: shardViews,
 	}); err != nil {
-		return errors.WithMessage(err, "create shard view")
+		return errors.WithMessage(err, "storage create shard view")
 	}
 
 	// Load shard view into memory.
-	if err := m.loadShardView(ctx); err != nil {
+	if err := m.loadShardViews(ctx); err != nil {
 		return errors.WithMessage(err, "load shard view")
 	}
 	return nil
@@ -371,7 +379,7 @@ func (m *TopologyManagerImpl) loadClusterView(ctx context.Context) error {
 		ClusterID: m.clusterID,
 	})
 	if err != nil {
-		return errors.WithMessage(err, "get cluster view")
+		return errors.WithMessage(err, "storage get cluster view")
 	}
 
 	m.shardNodesMapping = make(map[storage.ShardID][]storage.ShardNode, len(clusterViewResult.ClusterView.ShardNodes))
@@ -385,7 +393,7 @@ func (m *TopologyManagerImpl) loadClusterView(ctx context.Context) error {
 	return nil
 }
 
-func (m *TopologyManagerImpl) loadShardView(ctx context.Context) error {
+func (m *TopologyManagerImpl) loadShardViews(ctx context.Context) error {
 	shardIDs := make([]storage.ShardID, 0, len(m.shardNodesMapping))
 	for id := range m.shardNodesMapping {
 		shardIDs = append(shardIDs, id)
@@ -396,9 +404,10 @@ func (m *TopologyManagerImpl) loadShardView(ctx context.Context) error {
 		ShardIDs:  shardIDs,
 	})
 	if err != nil {
-		return errors.WithMessage(err, "list shard views")
+		return errors.WithMessage(err, "storage list shard views")
 	}
 
+	// Reset data in memory.
 	m.shardTablesMapping = make(map[storage.ShardID]*storage.ShardView, len(shardViewsResult.ShardViews))
 	m.tableShardMapping = make(map[storage.TableID]storage.ShardID, 0)
 	for _, shardView := range shardViewsResult.ShardViews {
@@ -412,12 +421,13 @@ func (m *TopologyManagerImpl) loadShardView(ctx context.Context) error {
 	return nil
 }
 
-func (m *TopologyManagerImpl) loadNode(ctx context.Context) error {
+func (m *TopologyManagerImpl) loadNodes(ctx context.Context) error {
 	nodesResult, err := m.storage.ListNodes(ctx, storage.ListNodesRequest{ClusterID: m.clusterID})
 	if err != nil {
-		return errors.WithMessage(err, "list nodes")
+		return errors.WithMessage(err, "storage list nodes")
 	}
 
+	// Reset data in memory.
 	m.nodes = make(map[string]storage.Node, len(nodesResult.Nodes))
 	for _, node := range nodesResult.Nodes {
 		m.nodes[node.Name] = node

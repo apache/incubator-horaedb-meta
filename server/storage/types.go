@@ -116,7 +116,7 @@ type ListShardViewsResult struct {
 	ShardViews []ShardView
 }
 
-type PutShardViewRequest struct {
+type UpdateShardViewRequest struct {
 	ClusterID     ClusterID
 	ShardView     ShardView
 	LatestVersion uint64
@@ -193,6 +193,27 @@ type Node struct {
 	State         NodeState
 }
 
+func ConvertShardRolePB(role clusterpb.ShardRole) ShardRole {
+	switch role {
+	case clusterpb.ShardRole_LEADER:
+		return Leader
+	case clusterpb.ShardRole_FOLLOWER:
+		return Follower
+	}
+	return Follower
+}
+
+func convertNodeToPB(node Node) clusterpb.Node {
+	nodeStats := convertNodeStatsToPB(node.NodeStats)
+	return clusterpb.Node{
+		Name:          node.Name,
+		NodeStats:     &nodeStats,
+		CreateTime:    node.CreatedAt,
+		LastTouchTime: node.LastTouchTime,
+		State:         convertNodeStateToPB(node.State),
+	}
+}
+
 func convertClusterPB(cluster *clusterpb.Cluster) Cluster {
 	return Cluster{
 		ID:                ClusterID(cluster.Id),
@@ -225,9 +246,7 @@ func convertClusterStateToPB(state ClusterState) clusterpb.ClusterTopology_Clust
 	return clusterpb.ClusterTopology_EMPTY
 }
 
-// FIXME: not expose this function after refactoring cluster module.
-
-func ConvertClusterStatePB(state clusterpb.ClusterTopology_ClusterState) ClusterState {
+func convertClusterStatePB(state clusterpb.ClusterTopology_ClusterState) ClusterState {
 	switch state {
 	case clusterpb.ClusterTopology_EMPTY:
 		return Empty
@@ -247,16 +266,6 @@ func convertShardRoleToPB(role ShardRole) clusterpb.ShardRole {
 	return clusterpb.ShardRole_FOLLOWER
 }
 
-func ConvertShardRolePB(role clusterpb.ShardRole) ShardRole {
-	switch role {
-	case clusterpb.ShardRole_LEADER:
-		return Leader
-	case clusterpb.ShardRole_FOLLOWER:
-		return Follower
-	}
-	return Follower
-}
-
 func convertShardNodeToPB(shardNode ShardNode) clusterpb.Shard {
 	return clusterpb.Shard{
 		Id:        uint32(shardNode.ID),
@@ -265,9 +274,7 @@ func convertShardNodeToPB(shardNode ShardNode) clusterpb.Shard {
 	}
 }
 
-// FIXME: not expose this function after refactoring cluster module.
-
-func ConvertShardNodePB(shardNode *clusterpb.Shard) ShardNode {
+func convertShardNodePB(shardNode *clusterpb.Shard) ShardNode {
 	return ShardNode{
 		ID:        ShardID(shardNode.Id),
 		ShardRole: ConvertShardRolePB(shardNode.ShardRole),
@@ -275,9 +282,7 @@ func ConvertShardNodePB(shardNode *clusterpb.Shard) ShardNode {
 	}
 }
 
-// FIXME: not expose this function after refactoring cluster module.
-
-func ConvertClusterViewToPB(view ClusterView) clusterpb.ClusterTopology {
+func convertClusterViewToPB(view ClusterView) clusterpb.ClusterTopology {
 	shardViews := make([]*clusterpb.Shard, 0, len(view.ShardNodes))
 	for _, shardNode := range view.ShardNodes {
 		shardNodePB := convertShardNodeToPB(shardNode)
@@ -298,22 +303,20 @@ func ConvertClusterViewToPB(view ClusterView) clusterpb.ClusterTopology {
 func convertClusterViewPB(view *clusterpb.ClusterTopology) ClusterView {
 	shardNodes := make([]ShardNode, 0, len(view.ShardView))
 	for _, shardNodePB := range view.ShardView {
-		shardNode := ConvertShardNodePB(shardNodePB)
+		shardNode := convertShardNodePB(shardNodePB)
 		shardNodes = append(shardNodes, shardNode)
 	}
 
 	return ClusterView{
 		ClusterID:  ClusterID(view.ClusterId),
 		Version:    view.Version,
-		State:      ConvertClusterStatePB(view.State),
+		State:      convertClusterStatePB(view.State),
 		ShardNodes: shardNodes,
 		CreatedAt:  view.CreatedAt,
 	}
 }
 
-// FIXME: not expose this function after refactoring cluster module.
-
-func ConvertSchemaToPB(schema Schema) clusterpb.Schema {
+func convertSchemaToPB(schema Schema) clusterpb.Schema {
 	return clusterpb.Schema{
 		Id:        uint32(schema.ID),
 		ClusterId: uint32(schema.ClusterID),
@@ -331,9 +334,7 @@ func convertSchemaPB(schema *clusterpb.Schema) Schema {
 	}
 }
 
-// FIXME: not expose this function after refactoring cluster module.
-
-func ConvertTableToPB(table Table) clusterpb.Table {
+func convertTableToPB(table Table) clusterpb.Table {
 	return clusterpb.Table{
 		Id:        uint64(table.ID),
 		Name:      table.Name,
@@ -344,9 +345,7 @@ func ConvertTableToPB(table Table) clusterpb.Table {
 	}
 }
 
-// FIXME: not expose this function after refactoring cluster module.
-
-func ConvertTablePB(table *clusterpb.Table) Table {
+func convertTablePB(table *clusterpb.Table) Table {
 	return Table{
 		ID:        TableID(table.Id),
 		Name:      table.Name,
@@ -355,7 +354,7 @@ func ConvertTablePB(table *clusterpb.Table) Table {
 	}
 }
 
-func ConvertShardViewToPB(view ShardView) clusterpb.ShardTopology {
+func convertShardViewToPB(view ShardView) clusterpb.ShardTopology {
 	tableIDs := make([]uint64, 0, len(view.TableIDs))
 	for _, id := range view.TableIDs {
 		tableIDs = append(tableIDs, uint64(id))
@@ -369,9 +368,7 @@ func ConvertShardViewToPB(view ShardView) clusterpb.ShardTopology {
 	}
 }
 
-// FIXME: not expose this function after refactoring cluster module.
-
-func ConvertShardViewPB(shardTopology *clusterpb.ShardTopology) ShardView {
+func convertShardViewPB(shardTopology *clusterpb.ShardTopology) ShardView {
 	tableIDs := make([]TableID, 0, len(shardTopology.TableIds))
 	for _, id := range shardTopology.TableIds {
 		tableIDs = append(tableIDs, TableID(id))
@@ -421,20 +418,7 @@ func convertNodeStatePB(state clusterpb.NodeState) NodeState {
 	return Offline
 }
 
-// FIXME: not expose this function after refactoring cluster module.
-
-func ConvertNodeToPB(node Node) clusterpb.Node {
-	nodeStats := convertNodeStatsToPB(node.NodeStats)
-	return clusterpb.Node{
-		Name:          node.Name,
-		NodeStats:     &nodeStats,
-		CreateTime:    node.CreatedAt,
-		LastTouchTime: node.LastTouchTime,
-		State:         convertNodeStateToPB(node.State),
-	}
-}
-
-func ConvertNodePB(node *clusterpb.Node) Node {
+func convertNodePB(node *clusterpb.Node) Node {
 	nodeStats := convertNodeStatsPB(node.NodeStats)
 	return Node{
 		Name:          node.Name,

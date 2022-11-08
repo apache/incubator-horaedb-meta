@@ -7,11 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/server/storage"
-
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -142,7 +141,7 @@ func allocNodeShards(shardTotal uint32, minNodeCount uint32, allNodes []cluster.
 				shards = append(shards, storage.ShardNode{
 					ID:        shardID,
 					ShardRole: storage.Leader,
-					Node:      allNodes[i].GetMeta().GetName(),
+					Node:      allNodes[i].GetNode().Name,
 				})
 			}
 		}

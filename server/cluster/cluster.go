@@ -119,7 +119,7 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 	// Remove dropped table in shard view.
 	updateVersion, err := c.topologyManager.RemoveTable(ctx, table.ID)
 	if err != nil {
-		return DropTableResult{}, errors.WithMessagef(err, "topology manager drop table")
+		return DropTableResult{}, errors.WithMessagef(err, "topology manager remove table")
 	}
 
 	return DropTableResult{
@@ -127,11 +127,12 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 	}, nil
 }
 
-// GetOrCreateSchema the second output parameter bool: Returns true if the schema was newly created.
+// GetOrCreateSchema the second output parameter bool: returns true if the schema was newly created.
 func (c *Cluster) GetOrCreateSchema(ctx context.Context, schemaName string) (storage.Schema, bool, error) {
 	return c.tableManager.GetOrCreateSchema(ctx, schemaName)
 }
 
+// GetTable the second output parameter bool: returns true if the table exists.
 func (c *Cluster) GetTable(schemaName, tableName string) (storage.Table, bool, error) {
 	return c.tableManager.GetTable(schemaName, tableName)
 }
@@ -189,8 +190,7 @@ func (c *Cluster) RegisterNode(ctx context.Context, node storage.Node, shardInfo
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	nodePB := storage.ConvertNodeToPB(node)
-	newRegisterNode := NewRegisteredNode(&nodePB, shardInfos)
+	newRegisterNode := NewRegisteredNode(node, shardInfos)
 	c.registeredNodesCache[node.Name] = newRegisterNode
 
 	return nil
@@ -207,7 +207,7 @@ func (c *Cluster) GetRegisteredNodes() []RegisteredNode {
 	return nodes
 }
 
-func (c *Cluster) GetRegisteredNode(nodeName string) (RegisteredNode, bool) {
+func (c *Cluster) GetRegisteredNodeByName(nodeName string) (RegisteredNode, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -229,7 +229,7 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 	for _, tableName := range tableNames {
 		table, exists, err := c.tableManager.GetTable(schemaName, tableName)
 		if err != nil {
-			return RouteTablesResult{}, errors.WithMessage(err, "get table")
+			return RouteTablesResult{}, errors.WithMessage(err, "table manager get table")
 		}
 		if exists {
 			tables[table.ID] = table
@@ -239,7 +239,7 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 
 	tableShardNodesWithShardViewVersion, err := c.topologyManager.GetShardNodesByTableIDs(tableIDs)
 	if err != nil {
-		return RouteTablesResult{}, errors.WithMessagef(err, "topology get shard nodes by table ids, Tables:%v", tables)
+		return RouteTablesResult{}, errors.WithMessagef(err, "topology get shard nodes by table ids, tables:%v", tables)
 	}
 	routeEntries := make(map[string]RouteEntry, len(tableNames))
 	for tableID, value := range tableShardNodesWithShardViewVersion.ShardNodes {
@@ -315,7 +315,7 @@ func (c *Cluster) UpdateClusterView(ctx context.Context, state storage.ClusterSt
 
 func (c *Cluster) CreateShardViews(ctx context.Context, views []CreateShardView) error {
 	if err := c.topologyManager.CreateShardViews(ctx, views); err != nil {
-		return errors.WithMessage(err, "create shard views")
+		return errors.WithMessage(err, "topology manager create shard views")
 	}
 
 	return nil
@@ -330,7 +330,7 @@ func (c *Cluster) init(ctx context.Context) error {
 	return c.topologyManager.InitClusterView(ctx)
 }
 
-// Load cluster meta from storage to memory.
+// Load cluster node from storage into memory.
 func (c *Cluster) load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()

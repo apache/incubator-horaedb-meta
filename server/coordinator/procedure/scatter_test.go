@@ -8,10 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/server/storage"
-
-	"github.com/CeresDB/ceresdbproto/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,7 +80,7 @@ func TestAllocNodeShard(t *testing.T) {
 	shardTotal := 2
 	nodeList := make([]cluster.RegisteredNode, 0, minNodeCount)
 	for i := 0; i < minNodeCount; i++ {
-		nodeMeta := &clusterpb.Node{
+		nodeMeta := storage.Node{
 			Name: fmt.Sprintf("node%d", i),
 		}
 		node := cluster.NewRegisteredNode(nodeMeta, []cluster.ShardInfo{})
@@ -104,7 +102,7 @@ func TestAllocNodeShard(t *testing.T) {
 	shardTotal = 3
 	nodeList = make([]cluster.RegisteredNode, 0, minNodeCount)
 	for i := 0; i < minNodeCount; i++ {
-		nodeMeta := &clusterpb.Node{
+		nodeMeta := storage.Node{
 			Name: fmt.Sprintf("node%d", i),
 		}
 		node := cluster.NewRegisteredNode(nodeMeta, []cluster.ShardInfo{})

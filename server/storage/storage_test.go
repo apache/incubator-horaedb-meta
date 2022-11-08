@@ -263,7 +263,7 @@ func TestStorage_CreateAndListShardView(t *testing.T) {
 	// Test to put shard topologies.
 	for i := 0; i < defaultCount; i++ {
 		expectShardViews[i].Version = newVersion
-		err = s.UpdateShardView(ctx, PutShardViewRequest{
+		err = s.UpdateShardView(ctx, UpdateShardViewRequest{
 			ClusterID:     defaultClusterID,
 			ShardView:     expectShardViews[i],
 			LatestVersion: defaultVersion,

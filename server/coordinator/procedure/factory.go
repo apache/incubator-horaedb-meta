@@ -5,12 +5,11 @@ package procedure
 import (
 	"context"
 
-	"github.com/CeresDB/ceresmeta/server/storage"
-
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/id"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
 
