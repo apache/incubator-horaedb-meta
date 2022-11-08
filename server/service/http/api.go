@@ -4,7 +4,6 @@ package http
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -39,12 +38,7 @@ func (a *API) NewAPIRouter() *Router {
 // printRequestInsmt used for printing every request information.
 func printRequestInsmt(handlerName string, handler http.HandlerFunc) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		body, err := io.ReadAll(request.Body)
-		if err != nil {
-			log.Error("parse http body failed", zap.String("handlerName", handlerName))
-			body = []byte("")
-		}
-		log.Info("receive http request", zap.String("handlerName", handlerName), zap.String("client host", request.RemoteAddr), zap.String("method", request.Method), zap.String("params", request.Form.Encode()), zap.String("body", string(body)))
+		log.Info("receive http request", zap.String("handlerName", handlerName), zap.String("client host", request.RemoteAddr), zap.String("method", request.Method), zap.String("params", request.Form.Encode()))
 		handler.ServeHTTP(writer, request)
 	}
 }
