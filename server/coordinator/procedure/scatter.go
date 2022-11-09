@@ -49,7 +49,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 
 	waitForNodesReady(c)
 
-	if c.GetClusterState() == storage.Stable {
+	if c.GetClusterState() == storage.ClusterStateStable {
 		return
 	}
 
@@ -71,7 +71,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 		})
 	}
 
-	if err := c.UpdateClusterView(ctx, storage.Stable, shardNodes); err != nil {
+	if err := c.UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes); err != nil {
 		cancelEventWithLog(event, err, "update cluster view")
 		return
 	}
@@ -85,11 +85,11 @@ func scatterPrepareCallback(event *fsm.Event) {
 		openShardRequest := eventdispatch.OpenShardRequest{
 			Shard: cluster.ShardInfo{
 				ID:      shard.ID,
-				Role:    storage.Leader,
+				Role:    storage.ShardRoleLeader,
 				Version: 0,
 			},
 		}
-		if err := request.dispatch.OpenShard(ctx, shard.Node, openShardRequest); err != nil {
+		if err := request.dispatch.OpenShard(ctx, shard.NodeName, openShardRequest); err != nil {
 			cancelEventWithLog(event, err, "open shard failed")
 			return
 		}
@@ -140,8 +140,8 @@ func allocNodeShards(shardTotal uint32, minNodeCount uint32, allNodes []cluster.
 				// TODO: consider nodesCache state
 				shards = append(shards, storage.ShardNode{
 					ID:        shardID,
-					ShardRole: storage.Leader,
-					Node:      allNodes[i].GetNode().Name,
+					ShardRole: storage.ShardRoleLeader,
+					NodeName:  allNodes[i].Node.Name,
 				})
 			}
 		}

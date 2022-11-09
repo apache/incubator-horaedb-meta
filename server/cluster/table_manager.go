@@ -35,8 +35,8 @@ type TableManager interface {
 }
 
 type Tables struct {
-	tables     map[string]storage.Table
-	tablesByID map[storage.TableID]storage.Table
+	tables     map[string]storage.Table          // tableName -> table
+	tablesByID map[storage.TableID]storage.Table // tableID -> table
 }
 
 type TableManagerImpl struct {
@@ -48,7 +48,7 @@ type TableManagerImpl struct {
 	// RWMutex is used to protect following fields.
 	lock         sync.RWMutex
 	schemas      map[string]storage.Schema    // schemaName -> schema
-	schemaTables map[storage.SchemaID]*Tables // schemaName -> Tables
+	schemaTables map[storage.SchemaID]*Tables // schemaName -> tables
 }
 
 func NewTableManagerImpl(storage storage.Storage, clusterID storage.ClusterID, schemaIDAlloc id.Allocator, tableIDAlloc id.Allocator) TableManager {
@@ -121,7 +121,7 @@ func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, t
 
 	id, err := m.tableIDAlloc.Alloc(ctx)
 	if err != nil {
-		return storage.Table{}, errors.WithMessage(err, "alloc table id")
+		return storage.Table{}, errors.WithMessagef(err, "alloc table id, table name:%s", tableName)
 	}
 
 	table := storage.Table{
@@ -137,7 +137,7 @@ func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, t
 	})
 
 	if err != nil {
-		return storage.Table{}, errors.WithMessage(err, "create table in storage")
+		return storage.Table{}, errors.WithMessage(err, "storage create table")
 	}
 
 	// Update table in memory.
@@ -176,8 +176,7 @@ func (m *TableManagerImpl) DropTable(ctx context.Context, schemaName string, tab
 		TableName: tableName,
 	})
 	if err != nil {
-		return errors.WithMessagef(err, "storage delete table, clusterID:%d, schema:%s, tableName:%s",
-			m.clusterID, schemaName, tableName)
+		return errors.WithMessagef(err, "storage delete table")
 	}
 
 	tables := m.schemaTables[schema.ID]
@@ -230,7 +229,7 @@ func (m *TableManagerImpl) GetOrCreateSchema(ctx context.Context, schemaName str
 		ClusterID: m.clusterID,
 		Schema:    schema,
 	}); err != nil {
-		return storage.Schema{}, false, errors.WithMessage(err, "create schema in storage")
+		return storage.Schema{}, false, errors.WithMessage(err, "storage create schema")
 	}
 	// Update schema in memory.
 	m.schemas[schemaName] = schema

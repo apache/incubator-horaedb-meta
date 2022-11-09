@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
@@ -48,8 +49,7 @@ func createTablePrepareCallback(event *fsm.Event) {
 		return
 	}
 	if exists {
-		log.Warn("create an existing table", zap.String("schema", req.sourceReq.GetSchemaName()), zap.String("table", req.sourceReq.GetName()))
-		cancelEventWithLog(event, ErrTableAlreadyExists, "cluster get table")
+		cancelEventWithLog(event, ErrTableAlreadyExists, fmt.Sprintf("create an existing table, schemaName:%s, tableName:%s", req.sourceReq.GetSchemaName(), req.sourceReq.GetName()))
 		return
 	}
 
@@ -68,23 +68,23 @@ func createTablePrepareCallback(event *fsm.Event) {
 	leader := storage.ShardNode{}
 	found := false
 	for _, shardNode := range shardNodes {
-		if shardNode.ShardRole == storage.Leader {
+		if shardNode.ShardRole == storage.ShardRoleLeader {
 			found = true
 			leader = shardNode
 			break
 		}
 	}
 	if !found {
-		cancelEventWithLog(event, ErrShardLeaderNotFound, "shard node can't find leader")
+		cancelEventWithLog(event, ErrShardLeaderNotFound, fmt.Sprintf("shard node can't find leader, shardID:%d", createTableResult.ShardVersionUpdate.ShardID))
 		return
 	}
 
-	err = req.dispatch.CreateTableOnShard(req.ctx, leader.Node, eventdispatch.CreateTableOnShardRequest{
+	err = req.dispatch.CreateTableOnShard(req.ctx, leader.NodeName, eventdispatch.CreateTableOnShardRequest{
 		UpdateShardInfo: eventdispatch.UpdateShardInfo{
 			CurrShardInfo: cluster.ShardInfo{
 				ID: createTableResult.ShardVersionUpdate.ShardID,
 				// TODO: dispatch CreateTableOnShard to followers?
-				Role:    storage.Leader,
+				Role:    storage.ShardRoleLeader,
 				Version: createTableResult.ShardVersionUpdate.CurrVersion,
 			},
 			PrevVersion: createTableResult.ShardVersionUpdate.PrevVersion,
@@ -101,7 +101,7 @@ func createTablePrepareCallback(event *fsm.Event) {
 		Options:          req.sourceReq.Options,
 	})
 	if err != nil {
-		cancelEventWithLog(event, err, "dispatch create table on shardNode")
+		cancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}
 

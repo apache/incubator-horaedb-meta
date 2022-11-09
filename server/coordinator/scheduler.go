@@ -86,11 +86,11 @@ func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 			}
 			nodeShardsMapping := map[string][]cluster.ShardInfo{}
 			for _, nodeShard := range nodeShards.NodeShards {
-				_, exists := nodeShardsMapping[nodeShard.ShardNode.Node]
+				_, exists := nodeShardsMapping[nodeShard.ShardNode.NodeName]
 				if !exists {
-					nodeShardsMapping[nodeShard.ShardNode.Node] = []cluster.ShardInfo{}
+					nodeShardsMapping[nodeShard.ShardNode.NodeName] = []cluster.ShardInfo{}
 				}
-				nodeShardsMapping[nodeShard.ShardNode.Node] = append(nodeShardsMapping[nodeShard.ShardNode.Node], cluster.ShardInfo{
+				nodeShardsMapping[nodeShard.ShardNode.NodeName] = append(nodeShardsMapping[nodeShard.ShardNode.NodeName], cluster.ShardInfo{
 					ID:      nodeShard.ShardNode.ID,
 					Role:    nodeShard.ShardNode.ShardRole,
 					Version: nodeShards.ClusterTopologyVersion,
@@ -106,9 +106,9 @@ func (s *Scheduler) processNodes(ctx context.Context, nodes []cluster.Registered
 		// Determines whether node is expired.
 		if !node.IsExpired(uint64(t.Unix()), heartbeatKeepAliveIntervalSec) {
 			// Shard versions of CeresDB and CeresMeta may be inconsistent. And close extra shards and open missing shards if so.
-			realShards := node.GetShardInfos()
-			expectShards := nodeShardsMapping[node.GetNode().Name]
-			err := s.applyMetadataShardInfo(ctx, node.GetNode().Name, realShards, expectShards)
+			realShards := node.ShardInfos
+			expectShards := nodeShardsMapping[node.Node.Name]
+			err := s.applyMetadataShardInfo(ctx, node.Node.Name, realShards, expectShards)
 			if err != nil {
 				log.Error("apply metadata failed", zap.Error(err))
 			}

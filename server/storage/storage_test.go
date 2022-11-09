@@ -76,7 +76,7 @@ func TestStorage_CreateAndGetClusterView(t *testing.T) {
 	expectClusterView := ClusterView{
 		ClusterID:  defaultClusterID,
 		Version:    defaultVersion,
-		State:      Empty,
+		State:      ClusterStateEmpty,
 		ShardNodes: nil,
 		CreatedAt:  uint64(time.Now().UnixMilli()),
 	}

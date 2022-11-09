@@ -10,25 +10,23 @@ type (
 	ShardID      uint32
 	TableID      uint64
 	ClusterState int
+	ShardRole    int
+	NodeState    int
 )
 
 const (
-	Empty ClusterState = iota + 1
-	Stable
+	ClusterStateEmpty ClusterState = iota + 1
+	ClusterStateStable
 )
 
-type ShardRole int
-
 const (
-	Leader ShardRole = iota + 1
-	Follower
+	ShardRoleLeader ShardRole = iota + 1
+	ShardRoleFollower
 )
 
-type NodeState int
-
 const (
-	Online NodeState = iota + 1
-	Offline
+	NodeStateOnline NodeState = iota + 1
+	NodeStateOffline
 )
 
 type ListClustersResult struct {
@@ -147,7 +145,7 @@ type Cluster struct {
 type ShardNode struct {
 	ID        ShardID
 	ShardRole ShardRole
-	Node      string
+	NodeName  string
 }
 
 type ClusterView struct {
@@ -196,11 +194,11 @@ type Node struct {
 func ConvertShardRolePB(role clusterpb.ShardRole) ShardRole {
 	switch role {
 	case clusterpb.ShardRole_LEADER:
-		return Leader
+		return ShardRoleLeader
 	case clusterpb.ShardRole_FOLLOWER:
-		return Follower
+		return ShardRoleFollower
 	}
-	return Follower
+	return ShardRoleFollower
 }
 
 func convertNodeToPB(node Node) clusterpb.Node {
@@ -238,9 +236,9 @@ func convertClusterToPB(cluster Cluster) clusterpb.Cluster {
 
 func convertClusterStateToPB(state ClusterState) clusterpb.ClusterTopology_ClusterState {
 	switch state {
-	case Empty:
+	case ClusterStateEmpty:
 		return clusterpb.ClusterTopology_EMPTY
-	case Stable:
+	case ClusterStateStable:
 		return clusterpb.ClusterTopology_STABLE
 	}
 	return clusterpb.ClusterTopology_EMPTY
@@ -249,18 +247,18 @@ func convertClusterStateToPB(state ClusterState) clusterpb.ClusterTopology_Clust
 func convertClusterStatePB(state clusterpb.ClusterTopology_ClusterState) ClusterState {
 	switch state {
 	case clusterpb.ClusterTopology_EMPTY:
-		return Empty
+		return ClusterStateEmpty
 	case clusterpb.ClusterTopology_STABLE:
-		return Stable
+		return ClusterStateStable
 	}
-	return Empty
+	return ClusterStateEmpty
 }
 
 func convertShardRoleToPB(role ShardRole) clusterpb.ShardRole {
 	switch role {
-	case Leader:
+	case ShardRoleLeader:
 		return clusterpb.ShardRole_LEADER
-	case Follower:
+	case ShardRoleFollower:
 		return clusterpb.ShardRole_FOLLOWER
 	}
 	return clusterpb.ShardRole_FOLLOWER
@@ -270,7 +268,7 @@ func convertShardNodeToPB(shardNode ShardNode) clusterpb.Shard {
 	return clusterpb.Shard{
 		Id:        uint32(shardNode.ID),
 		ShardRole: convertShardRoleToPB(shardNode.ShardRole),
-		Node:      shardNode.Node,
+		Node:      shardNode.NodeName,
 	}
 }
 
@@ -278,7 +276,7 @@ func convertShardNodePB(shardNode *clusterpb.Shard) ShardNode {
 	return ShardNode{
 		ID:        ShardID(shardNode.Id),
 		ShardRole: ConvertShardRolePB(shardNode.ShardRole),
-		Node:      shardNode.Node,
+		NodeName:  shardNode.Node,
 	}
 }
 
@@ -400,9 +398,9 @@ func convertNodeStatsPB(stats *clusterpb.NodeStats) NodeStats {
 
 func convertNodeStateToPB(state NodeState) clusterpb.NodeState {
 	switch state {
-	case Online:
+	case NodeStateOnline:
 		return clusterpb.NodeState_ONLINE
-	case Offline:
+	case NodeStateOffline:
 		return clusterpb.NodeState_OFFLINE
 	}
 	return clusterpb.NodeState_OFFLINE
@@ -411,11 +409,11 @@ func convertNodeStateToPB(state NodeState) clusterpb.NodeState {
 func convertNodeStatePB(state clusterpb.NodeState) NodeState {
 	switch state {
 	case clusterpb.NodeState_ONLINE:
-		return Online
+		return NodeStateOnline
 	case clusterpb.NodeState_OFFLINE:
-		return Offline
+		return NodeStateOffline
 	}
-	return Offline
+	return NodeStateOffline
 }
 
 func convertNodePB(node *clusterpb.Node) Node {

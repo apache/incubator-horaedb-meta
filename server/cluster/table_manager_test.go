@@ -165,11 +165,13 @@ func testCreateCluster(ctx context.Context, re *require.Assertions, manager Mana
 func testRegisterNode(ctx context.Context, re *require.Assertions, manager Manager,
 	clusterName, nodeName string,
 ) {
-	err := manager.RegisterNode(ctx, clusterName, storage.Node{
-		Name:          nodeName,
-		LastTouchTime: uint64(time.Now().UnixMilli()),
-		State:         storage.Online,
-	}, []ShardInfo{})
+	err := manager.RegisterNode(ctx, clusterName, RegisteredNode{
+		storage.Node{
+			Name:          nodeName,
+			LastTouchTime: uint64(time.Now().UnixMilli()),
+			State:         storage.NodeStateOnline,
+		}, []ShardInfo{},
+	})
 	re.NoError(err)
 }
 
@@ -215,7 +217,7 @@ func testRouteTables(ctx context.Context, re *require.Assertions, manager Manage
 	re.Equal(len(tableNames), len(ret.RouteEntries))
 	for _, entry := range ret.RouteEntries {
 		re.Equal(1, len(entry.NodeShards))
-		re.Equal(storage.Leader, entry.NodeShards[0].ShardNode.ShardRole)
+		re.Equal(storage.ShardRoleLeader, entry.NodeShards[0].ShardNode.ShardRole)
 	}
 }
 

@@ -27,7 +27,7 @@ type Cluster struct {
 	topologyManager TopologyManager
 
 	// Manage the registered nodes from heartbeat.
-	registeredNodesCache map[string]RegisteredNode // nodeName -> node
+	registeredNodesCache map[string]RegisteredNode // nodeName -> NodeName
 
 	storage      storage.Storage
 	kv           clientv3.KV
@@ -177,21 +177,20 @@ func (c *Cluster) GetShardNodeByTableIDs(tableIDs []storage.TableID) (GetShardNo
 	return c.topologyManager.GetShardNodesByTableIDs(tableIDs)
 }
 
-func (c *Cluster) RegisterNode(ctx context.Context, node storage.Node, shardInfos []ShardInfo) error {
-	node.State = storage.Online
+func (c *Cluster) RegisterNode(ctx context.Context, registeredNode RegisteredNode) error {
+	registeredNode.Node.State = storage.NodeStateOnline
 	err := c.storage.CreateOrUpdateNode(ctx, storage.CreateOrUpdateNodeRequest{
 		ClusterID: c.clusterID,
-		Node:      node,
+		Node:      registeredNode.Node,
 	})
 	if err != nil {
-		return errors.WithMessagef(err, "create or update node, nodeName:%s", node.Name)
+		return errors.WithMessage(err, "create or update registered node")
 	}
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	newRegisterNode := NewRegisteredNode(node, shardInfos)
-	c.registeredNodesCache[node.Name] = newRegisterNode
+	c.registeredNodesCache[registeredNode.Node.Name] = registeredNode
 
 	return nil
 }
@@ -239,7 +238,7 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 
 	tableShardNodesWithShardViewVersion, err := c.topologyManager.GetShardNodesByTableIDs(tableIDs)
 	if err != nil {
-		return RouteTablesResult{}, errors.WithMessagef(err, "topology get shard nodes by table ids, tables:%v", tables)
+		return RouteTablesResult{}, errors.WithMessage(err, "topology get shard nodes by table ids")
 	}
 	routeEntries := make(map[string]RouteEntry, len(tableNames))
 	for tableID, value := range tableShardNodesWithShardViewVersion.ShardNodes {
@@ -330,7 +329,7 @@ func (c *Cluster) init(ctx context.Context) error {
 	return c.topologyManager.InitClusterView(ctx)
 }
 
-// Load cluster node from storage into memory.
+// Load cluster NodeName from storage into memory.
 func (c *Cluster) load(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()

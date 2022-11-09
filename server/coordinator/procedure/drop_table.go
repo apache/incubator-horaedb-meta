@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
@@ -65,7 +66,7 @@ func dropTablePrepareCallback(event *fsm.Event) {
 
 	shardNodes, ok := shardNodesResult.ShardNodes[table.ID]
 	if !ok {
-		cancelEventWithLog(event, ErrShardLeaderNotFound, "cluster get shard by table id")
+		cancelEventWithLog(event, ErrShardLeaderNotFound, fmt.Sprintf("cluster get shard by table id, table:%v", table))
 		return
 	}
 
@@ -73,7 +74,7 @@ func dropTablePrepareCallback(event *fsm.Event) {
 	leader := storage.ShardNode{}
 	found := false
 	for _, shardNode := range shardNodes {
-		if shardNode.ShardRole == storage.Leader {
+		if shardNode.ShardRole == storage.ShardRoleLeader {
 			found = true
 			leader = shardNode
 			break
@@ -91,11 +92,11 @@ func dropTablePrepareCallback(event *fsm.Event) {
 		SchemaID:   table.SchemaID,
 		SchemaName: request.rawReq.GetSchemaName(),
 	}
-	err = request.dispatch.DropTableOnShard(request.ctx, leader.Node, eventdispatch.DropTableOnShardRequest{
+	err = request.dispatch.DropTableOnShard(request.ctx, leader.NodeName, eventdispatch.DropTableOnShardRequest{
 		UpdateShardInfo: eventdispatch.UpdateShardInfo{
 			CurrShardInfo: cluster.ShardInfo{
 				ID:      result.ShardVersionUpdate.ShardID,
-				Role:    storage.Leader,
+				Role:    storage.ShardRoleLeader,
 				Version: result.ShardVersionUpdate.CurrVersion,
 			},
 			PrevVersion: result.ShardVersionUpdate.PrevVersion,

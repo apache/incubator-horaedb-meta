@@ -63,15 +63,19 @@ func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHear
 		shardInfos = append(shardInfos, cluster.ConvertShardsInfoPB(shardInfo))
 	}
 
-	err = s.h.GetClusterManager().RegisterNode(ctx, req.GetHeader().GetClusterName(), storage.Node{
-		Name: req.Info.Endpoint,
-		NodeStats: storage.NodeStats{
-			Lease:       req.GetInfo().Lease,
-			Zone:        req.GetInfo().Zone,
-			NodeVersion: req.GetInfo().BinaryVersion,
-		},
-		LastTouchTime: uint64(time.Now().UnixMilli()),
-	}, shardInfos)
+	registeredNode := cluster.RegisteredNode{
+		Node: storage.Node{
+			Name: req.Info.Endpoint,
+			NodeStats: storage.NodeStats{
+				Lease:       req.GetInfo().Lease,
+				Zone:        req.GetInfo().Zone,
+				NodeVersion: req.GetInfo().BinaryVersion,
+			},
+			LastTouchTime: uint64(time.Now().UnixMilli()),
+		}, ShardInfos: shardInfos,
+	}
+
+	err = s.h.GetClusterManager().RegisterNode(ctx, req.GetHeader().GetClusterName(), registeredNode)
 	if err != nil {
 		return &metaservicepb.NodeHeartbeatResponse{Header: responseHeader(err, "grpc heartbeat")}, nil
 	}
@@ -325,7 +329,7 @@ func convertRouteTableResult(routeTablesResult cluster.RouteTablesResult) *metas
 		nodeShards := make([]*metaservicepb.NodeShard, 0, len(entry.NodeShards))
 		for _, nodeShard := range entry.NodeShards {
 			nodeShards = append(nodeShards, &metaservicepb.NodeShard{
-				Endpoint: nodeShard.ShardNode.Node,
+				Endpoint: nodeShard.ShardNode.NodeName,
 				ShardInfo: &metaservicepb.ShardInfo{
 					Id:   uint32(nodeShard.ShardNode.ID),
 					Role: clusterpb.ShardRole(nodeShard.ShardNode.ShardRole),
@@ -350,7 +354,7 @@ func convertToGetNodesResponse(nodesResult cluster.GetNodeShardsResult) *metaser
 	nodeShards := make([]*metaservicepb.NodeShard, 0, len(nodesResult.NodeShards))
 	for _, shardNodeWithVersion := range nodesResult.NodeShards {
 		nodeShards = append(nodeShards, &metaservicepb.NodeShard{
-			Endpoint: shardNodeWithVersion.ShardNode.Node,
+			Endpoint: shardNodeWithVersion.ShardNode.NodeName,
 			ShardInfo: &metaservicepb.ShardInfo{
 				Id:   uint32(shardNodeWithVersion.ShardNode.ID),
 				Role: clusterpb.ShardRole(shardNodeWithVersion.ShardNode.ShardRole),

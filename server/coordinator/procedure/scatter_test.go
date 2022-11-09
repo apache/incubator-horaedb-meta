@@ -31,29 +31,33 @@ func newClusterAndRegisterNode(t *testing.T) *cluster.Cluster {
 	}()
 
 	// Cluster is empty, it should be return and do nothing
-	err := c.RegisterNode(ctx, storage.Node{
-		Name: nodeName0,
-	}, []cluster.ShardInfo{})
+	err := c.RegisterNode(ctx, cluster.RegisteredNode{
+		Node: storage.Node{
+			Name: nodeName0,
+		}, ShardInfos: []cluster.ShardInfo{},
+	})
 	re.NoError(err)
-	re.Equal(storage.Empty, c.GetClusterState())
+	re.Equal(storage.ClusterStateEmpty, c.GetClusterState())
 
 	// Register two node, defaultNodeCount is satisfied, Initialize shard topology
-	err = c.RegisterNode(ctx, storage.Node{
-		Name: nodeName1,
-	}, []cluster.ShardInfo{})
+	err = c.RegisterNode(ctx, cluster.RegisteredNode{
+		Node: storage.Node{
+			Name: nodeName1,
+		}, ShardInfos: []cluster.ShardInfo{},
+	})
 	re.NoError(err)
 	return c
 }
 
 func checkScatterWithCluster(t *testing.T, cluster *cluster.Cluster) {
 	re := require.New(t)
-	re.Equal(storage.Stable, cluster.GetClusterState())
+	re.Equal(storage.ClusterStateStable, cluster.GetClusterState())
 	shardNodes, err := cluster.GetShardNodes()
 	re.NoError(err)
 	re.Equal(len(shardNodes), defaultShardTotal)
 	shardNodeMapping := make(map[string][]storage.ShardID, 0)
 	for _, shardNode := range shardNodes {
-		nodeName := shardNode.Node
+		nodeName := shardNode.NodeName
 		shardID := shardNode.ID
 		_, exists := shardNodeMapping[nodeName]
 		if !exists {
@@ -95,8 +99,8 @@ func TestAllocNodeShard(t *testing.T) {
 	shardView, err := allocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList, shardIDs)
 	re.NoError(err)
 	re.Equal(shardTotal, len(shardView))
-	re.Equal("node0", shardView[0].Node)
-	re.Equal("node1", shardView[1].Node)
+	re.Equal("node0", shardView[0].NodeName)
+	re.Equal("node1", shardView[1].NodeName)
 
 	minNodeCount = 2
 	shardTotal = 3
@@ -117,7 +121,7 @@ func TestAllocNodeShard(t *testing.T) {
 	shardView, err = allocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList, shardIDs)
 	re.NoError(err)
 	re.Equal(shardTotal, len(shardView))
-	re.Equal("node0", shardView[0].Node)
-	re.Equal("node0", shardView[1].Node)
-	re.Equal("node1", shardView[2].Node)
+	re.Equal("node0", shardView[0].NodeName)
+	re.Equal("node0", shardView[1].NodeName)
+	re.Equal("node1", shardView[2].NodeName)
 }

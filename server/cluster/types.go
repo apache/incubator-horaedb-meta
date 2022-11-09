@@ -65,6 +65,26 @@ type GetNodeShardsResult struct {
 	NodeShards             []ShardNodeWithVersion
 }
 
+type RegisteredNode struct {
+	Node       storage.Node
+	ShardInfos []ShardInfo
+}
+
+func NewRegisteredNode(meta storage.Node, shardInfos []ShardInfo) RegisteredNode {
+	return RegisteredNode{
+		meta,
+		shardInfos,
+	}
+}
+
+func (n *RegisteredNode) IsOnline() bool {
+	return n.Node.State == storage.NodeStateOnline
+}
+
+func (n RegisteredNode) IsExpired(now uint64, aliveThreshold uint64) bool {
+	return now >= aliveThreshold+n.Node.LastTouchTime
+}
+
 func ConvertShardsInfoToPB(shard ShardInfo) *metaservicepb.ShardInfo {
 	return &metaservicepb.ShardInfo{
 		Id:      uint32(shard.ID),
