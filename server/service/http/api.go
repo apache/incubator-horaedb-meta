@@ -4,12 +4,19 @@ package http
 
 import (
 	"encoding/json"
+	"github.com/CeresDB/ceresmeta/pkg/coderr"
+	jsoniter "github.com/json-iterator/go"
 	"net/http"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"go.uber.org/zap"
+)
+
+const (
+	statusSuccess string = "success"
+	statusError   string = "error"
 )
 
 type API struct {
@@ -40,6 +47,52 @@ func printRequestInsmt(handlerName string, handler http.HandlerFunc) http.Handle
 	return func(writer http.ResponseWriter, request *http.Request) {
 		log.Info("receive http request", zap.String("handlerName", handlerName), zap.String("client host", request.RemoteAddr), zap.String("method", request.Method), zap.String("params", request.Form.Encode()))
 		handler.ServeHTTP(writer, request)
+	}
+}
+
+type response struct {
+	Status string      `json:"status"`
+	Data   interface{} `json:"data,omitempty"`
+	Error  string      `json:"error,omitempty"`
+}
+
+func (a *API) respond(w http.ResponseWriter, data interface{}) {
+	statusMessage := statusSuccess
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
+	b, err := json.Marshal(&response{
+		Status: statusMessage,
+		Data:   data,
+	})
+	if err != nil {
+		log.Error("error marshaling json response", zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if n, err := w.Write(b); err != nil {
+		log.Error("error writing response", zap.Int("msg", n), zap.Error(err))
+	}
+}
+
+func (a *API) respondError(w http.ResponseWriter, apiErr coderr.CodeError, data interface{}) {
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
+	b, err := json.Marshal(&response{
+		Status: statusError,
+		Error:  apiErr.Error(),
+		Data:   data,
+	})
+	if err != nil {
+		log.Error("error marshaling json response", zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(apiErr.Code().ToHTTPCode())
+	if n, err := w.Write(b); err != nil {
+		log.Error("error writing response", zap.Int("msg", n), zap.Error(err))
 	}
 }
 
