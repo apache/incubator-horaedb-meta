@@ -4,19 +4,21 @@ package http
 
 import (
 	"encoding/json"
-	"github.com/CeresDB/ceresmeta/pkg/coderr"
-	jsoniter "github.com/json-iterator/go"
 	"net/http"
 
+	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 )
 
 const (
 	statusSuccess string = "success"
 	statusError   string = "error"
+
+	apiPrefix string = "/api/v1"
 )
 
 type API struct {
@@ -35,7 +37,7 @@ func NewAPI(procedureManager procedure.Manager, procedureFactory *procedure.Fact
 }
 
 func (a *API) NewAPIRouter() *Router {
-	router := New().WithPrefix("/api/v1").WithInstrumentation(printRequestInsmt)
+	router := New().WithPrefix(apiPrefix).WithInstrumentation(printRequestInsmt)
 
 	router.Post("/transferLeader", a.transferLeader)
 
@@ -76,6 +78,7 @@ func (a *API) respond(w http.ResponseWriter, data interface{}) {
 	}
 }
 
+// nolint
 func (a *API) respondError(w http.ResponseWriter, apiErr coderr.CodeError, data interface{}) {
 	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	b, err := json.Marshal(&response{
@@ -102,11 +105,12 @@ type TransferLeaderRequest struct {
 }
 
 // TODO: impl this function
-func (a *API) transferLeader(_ http.ResponseWriter, req *http.Request) {
+func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 	var transferLeaderRequest TransferLeaderRequest
 	err := json.NewDecoder(req.Body).Decode(&transferLeaderRequest)
 	if err != nil {
-		log.Error("decode request body failed")
+		log.Error("decode request body failed", zap.Error(err))
 		return
 	}
+	a.respond(writer, "ok")
 }

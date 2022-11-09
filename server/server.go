@@ -182,7 +182,7 @@ func (srv *Server) startServer(_ context.Context) error {
 	srv.scheduler = coordinator.NewScheduler(manager, procedureManager, procedureFactory, dispatch)
 
 	api := http2.NewAPI(procedureManager, procedureFactory, manager)
-	httpService := http2.NewHTTPService(srv.cfg.DefaultHTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())
+	httpService := http2.NewHTTPService(srv.cfg.HTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())
 	err = httpService.Start()
 	if err != nil {
 		return errors.WithMessage(err, "start http service failed")
