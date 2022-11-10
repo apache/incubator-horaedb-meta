@@ -78,7 +78,6 @@ func (a *API) respond(w http.ResponseWriter, data interface{}) {
 	}
 }
 
-// nolint
 func (a *API) respondError(w http.ResponseWriter, apiErr coderr.CodeError, data interface{}) {
 	json := jsoniter.ConfigCompatibleWithStandardLibrary
 	b, err := json.Marshal(&response{
@@ -110,6 +109,7 @@ func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 	err := json.NewDecoder(req.Body).Decode(&transferLeaderRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
+		a.respondError(writer, ErrParseRequest, nil)
 		return
 	}
 	a.respond(writer, "ok")
