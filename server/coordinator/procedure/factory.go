@@ -16,6 +16,7 @@ import (
 type Factory struct {
 	idAllocator id.Allocator
 	dispatch    eventdispatch.Dispatch
+	storage     Storage
 }
 
 type ScatterRequest struct {
@@ -39,14 +40,23 @@ type DropTableRequest struct {
 	OnFailed    func(error) error
 }
 
-func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch) *Factory {
+type TransferLeaderRequest struct {
+	Cluster *cluster.Cluster
+
+	ShardID           storage.ShardID
+	OldLeaderNodeName string
+	NewLeaderNodeName string
+}
+
+func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage Storage) *Factory {
 	return &Factory{
 		idAllocator: allocator,
 		dispatch:    dispatch,
+		storage:     storage,
 	}
 }
 
-func (f *Factory) CreateScatterProcedure(ctx context.Context, request *ScatterRequest) (Procedure, error) {
+func (f *Factory) CreateScatterProcedure(ctx context.Context, request ScatterRequest) (Procedure, error) {
 	id, err := f.allocProcedureID(ctx)
 	if err != nil {
 		return nil, err
@@ -55,7 +65,7 @@ func (f *Factory) CreateScatterProcedure(ctx context.Context, request *ScatterRe
 	return procedure, nil
 }
 
-func (f *Factory) CreateCreateTableProcedure(ctx context.Context, request *CreateTableRequest) (Procedure, error) {
+func (f *Factory) CreateCreateTableProcedure(ctx context.Context, request CreateTableRequest) (Procedure, error) {
 	id, err := f.allocProcedureID(ctx)
 	if err != nil {
 		return nil, err
@@ -65,13 +75,23 @@ func (f *Factory) CreateCreateTableProcedure(ctx context.Context, request *Creat
 	return procedure, nil
 }
 
-func (f *Factory) CreateDropTableProcedure(ctx context.Context, request *DropTableRequest) (Procedure, error) {
+func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTableRequest) (Procedure, error) {
 	id, err := f.allocProcedureID(ctx)
 	if err != nil {
 		return nil, err
 	}
 	procedure := NewDropTableProcedure(f.dispatch, request.Cluster, id,
 		request.SourceReq, request.OnSucceeded, request.OnFailed)
+	return procedure, nil
+}
+
+func (f *Factory) CreateTransferLeaderProcedure(ctx context.Context, request TransferLeaderRequest) (Procedure, error) {
+	id, err := f.allocProcedureID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	procedure := NewTransferLeaderProcedure(f.dispatch, request.Cluster, f.storage,
+		request.ShardID, request.OldLeaderNodeName, request.NewLeaderNodeName, id)
 	return procedure, nil
 }
 

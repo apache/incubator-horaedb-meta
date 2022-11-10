@@ -3,13 +3,16 @@
 package http
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 )
@@ -47,7 +50,14 @@ func (a *API) NewAPIRouter() *Router {
 // printRequestInsmt used for printing every request information.
 func printRequestInsmt(handlerName string, handler http.HandlerFunc) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		log.Info("receive http request", zap.String("handlerName", handlerName), zap.String("client host", request.RemoteAddr), zap.String("method", request.Method), zap.String("params", request.Form.Encode()))
+		body := ""
+		bodyByte, err := io.ReadAll(request.Body)
+		if err == nil {
+			body = string(bodyByte)
+			newBody := io.NopCloser(bytes.NewReader(bodyByte))
+			request.Body = newBody
+		}
+		log.Info("receive http request", zap.String("handlerName", handlerName), zap.String("client host", request.RemoteAddr), zap.String("method", request.Method), zap.String("params", request.Form.Encode()), zap.String("body", body))
 		handler.ServeHTTP(writer, request)
 	}
 }
@@ -99,7 +109,9 @@ func (a *API) respondError(w http.ResponseWriter, apiErr coderr.CodeError, data 
 }
 
 type TransferLeaderRequest struct {
-	ShardID           uint64 `json:"shardID"`
+	ClusterName       string `json:"clusterName"`
+	ShardID           uint32 `json:"shardID"`
+	OldLeaderNodeName string `json:"OldLeaderNodeName"`
 	NewLeaderNodeName string `json:"newLeaderNodeName"`
 }
 
@@ -112,5 +124,51 @@ func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, nil)
 		return
 	}
+
+	c, err := a.clusterManager.GetCluster(req.Context(), transferLeaderRequest.ClusterName)
+	if err != nil {
+		log.Error("cluster not found", zap.String("clusterName", transferLeaderRequest.ClusterName))
+		a.respondError(writer, cluster.ErrClusterNotFound, nil)
+		return
+	}
+
+	shardNodes, err := c.GetShardNodesByShardID(storage.ShardID(transferLeaderRequest.ShardID))
+	if err != nil {
+		log.Error("get shard failed", zap.Error(err))
+		a.respondError(writer, cluster.ErrShardNotFound, nil)
+		return
+	}
+	if len(shardNodes) == 0 {
+		log.Error("shard not exist in any node", zap.Uint32("shardID", transferLeaderRequest.ShardID))
+		a.respondError(writer, cluster.ErrNodeNotFound, nil)
+		return
+	}
+	for _, shardNode := range shardNodes {
+		if shardNode.ShardRole == storage.ShardRoleLeader {
+			leaderNodeName := shardNode.NodeName
+			if leaderNodeName != transferLeaderRequest.OldLeaderNodeName {
+				log.Error("shard leader node not match", zap.String("requestNode", transferLeaderRequest.OldLeaderNodeName), zap.String("actualNode", leaderNodeName))
+				a.respondError(writer, cluster.ErrNodeNotFound, nil)
+				return
+			}
+		}
+	}
+
+	transferLeaderProcedure, err := a.procedureFactory.CreateTransferLeaderProcedure(req.Context(), procedure.TransferLeaderRequest{
+		Cluster: c, ShardID: storage.ShardID(transferLeaderRequest.ShardID),
+		OldLeaderNodeName: transferLeaderRequest.OldLeaderNodeName, NewLeaderNodeName: transferLeaderRequest.NewLeaderNodeName,
+	})
+	if err != nil {
+		log.Error("create transfer leader procedure", zap.Error(err))
+		a.respondError(writer, procedure.ErrCreateProcedure, nil)
+		return
+	}
+	err = a.procedureManager.Submit(req.Context(), transferLeaderProcedure)
+	if err != nil {
+		log.Error("submit transfer leader procedure", zap.Error(err))
+		a.respondError(writer, procedure.ErrSubmitProcedure, nil)
+		return
+	}
+
 	a.respond(writer, "ok")
 }
