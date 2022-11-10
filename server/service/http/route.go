@@ -1,5 +1,5 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
-// This file fork from [Prometheus](https://github.com/prometheus/common/blob/main/route/route.go)
+// This file fork from [Prometheus](https://github.com/prometheus/common/blob/8c9cb3fa6d01832ea16937b20ea561eed81abd2f/route/route.go)
 
 package http
 
