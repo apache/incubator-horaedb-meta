@@ -6,17 +6,20 @@ import (
 	"context"
 
 	"github.com/CeresDB/ceresdbproto/pkg/metaservicepb"
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 type Factory struct {
-	idAllocator id.Allocator
-	dispatch    eventdispatch.Dispatch
-	storage     Storage
+	idAllocator    id.Allocator
+	dispatch       eventdispatch.Dispatch
+	storage        Storage
+	clusterManager cluster.Manager
 }
 
 type ScatterRequest struct {
@@ -41,7 +44,7 @@ type DropTableRequest struct {
 }
 
 type TransferLeaderRequest struct {
-	Cluster *cluster.Cluster
+	ClusterName string
 
 	ShardID           storage.ShardID
 	OldLeaderNodeName string
@@ -90,7 +93,32 @@ func (f *Factory) CreateTransferLeaderProcedure(ctx context.Context, request Tra
 	if err != nil {
 		return nil, err
 	}
-	procedure := NewTransferLeaderProcedure(f.dispatch, request.Cluster, f.storage,
+
+	c, err := f.clusterManager.GetCluster(ctx, request.ClusterName)
+	if err != nil {
+		log.Error("cluster not found", zap.String("clusterName", request.ClusterName))
+		return nil, cluster.ErrClusterNotFound
+	}
+
+	shardNodes, err := c.GetShardNodesByShardID(request.ShardID)
+	if err != nil {
+		log.Error("get shard failed", zap.Error(err))
+		return nil, cluster.ErrShardNotFound
+	}
+	if len(shardNodes) == 0 {
+		log.Error("shard not exist in any node", zap.Uint32("shardID", uint32(request.ShardID)))
+		return nil, cluster.ErrNodeNotFound
+	}
+	for _, shardNode := range shardNodes {
+		if shardNode.ShardRole == storage.ShardRoleLeader {
+			leaderNodeName := shardNode.NodeName
+			if leaderNodeName != request.OldLeaderNodeName {
+				log.Error("shard leader node not match", zap.String("requestOldLeaderNodeName", request.OldLeaderNodeName), zap.String("actualOldLeaderNodeName", leaderNodeName))
+				return nil, cluster.ErrNodeNotFound
+			}
+		}
+	}
+	procedure := NewTransferLeaderProcedure(f.dispatch, c, f.storage,
 		request.ShardID, request.OldLeaderNodeName, request.NewLeaderNodeName, id)
 	return procedure, nil
 }

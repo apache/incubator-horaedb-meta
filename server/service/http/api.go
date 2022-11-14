@@ -124,37 +124,8 @@ func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c, err := a.clusterManager.GetCluster(req.Context(), transferLeaderRequest.ClusterName)
-	if err != nil {
-		log.Error("cluster not found", zap.String("clusterName", transferLeaderRequest.ClusterName))
-		a.respondError(writer, cluster.ErrClusterNotFound, nil)
-		return
-	}
-
-	shardNodes, err := c.GetShardNodesByShardID(storage.ShardID(transferLeaderRequest.ShardID))
-	if err != nil {
-		log.Error("get shard failed", zap.Error(err))
-		a.respondError(writer, cluster.ErrShardNotFound, nil)
-		return
-	}
-	if len(shardNodes) == 0 {
-		log.Error("shard not exist in any node", zap.Uint32("shardID", transferLeaderRequest.ShardID))
-		a.respondError(writer, cluster.ErrNodeNotFound, nil)
-		return
-	}
-	for _, shardNode := range shardNodes {
-		if shardNode.ShardRole == storage.ShardRoleLeader {
-			leaderNodeName := shardNode.NodeName
-			if leaderNodeName != transferLeaderRequest.OldLeaderNodeName {
-				log.Error("shard leader node not match", zap.String("requestOldLeaderNodeName", transferLeaderRequest.OldLeaderNodeName), zap.String("actualOldLeaderNodeName", leaderNodeName))
-				a.respondError(writer, cluster.ErrNodeNotFound, nil)
-				return
-			}
-		}
-	}
-
 	transferLeaderProcedure, err := a.procedureFactory.CreateTransferLeaderProcedure(req.Context(), procedure.TransferLeaderRequest{
-		Cluster: c, ShardID: storage.ShardID(transferLeaderRequest.ShardID),
+		ClusterName: transferLeaderRequest.ClusterName, ShardID: storage.ShardID(transferLeaderRequest.ShardID),
 		OldLeaderNodeName: transferLeaderRequest.OldLeaderNodeName, NewLeaderNodeName: transferLeaderRequest.NewLeaderNodeName,
 	})
 	if err != nil {

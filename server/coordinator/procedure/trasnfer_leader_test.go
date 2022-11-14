@@ -20,7 +20,7 @@ func TestTransferLeader(t *testing.T) {
 	getNodeShardsResult, err := c.GetNodeShards(ctx)
 	re.NoError(err)
 
-	// Randomly select a node and shard to transfer leader
+	// Randomly select a node and shard to transfer leader.
 	oldLeaderNodeName := getNodeShardsResult.NodeShards[0].ShardNode.NodeName
 	shardID := getNodeShardsResult.NodeShards[0].ShardNode.ID
 
