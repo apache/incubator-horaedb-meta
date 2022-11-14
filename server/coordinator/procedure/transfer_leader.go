@@ -262,11 +262,12 @@ func transferLeaderFinishCallback(event *fsm.Event) {
 
 func (p *TransferLeaderProcedure) updateStateWithLock(state State) {
 	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	p.state = state
-	p.lock.Unlock()
 }
 
-// TODO: Consider refactor meta procedure convertor function, encapsulate as a tool function or add
+// TODO: Consider refactor meta procedure convertor function, encapsulate as a tool function.
 func (p *TransferLeaderProcedure) convertToMeta() (Meta, error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -281,7 +282,7 @@ func (p *TransferLeaderProcedure) convertToMeta() (Meta, error) {
 	}
 	rawDataBytes, err := json.Marshal(rawData)
 	if err != nil {
-		return Meta{}, errors.WithMessage(err, "marshal raw data failed")
+		return Meta{}, ErrDecodeRawData.WithCausef("marshal raw data failed, procedureID:%v, err:%v", p.shardID, err)
 	}
 
 	meta := Meta{

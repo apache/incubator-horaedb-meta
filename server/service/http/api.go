@@ -147,7 +147,7 @@ func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 		if shardNode.ShardRole == storage.ShardRoleLeader {
 			leaderNodeName := shardNode.NodeName
 			if leaderNodeName != transferLeaderRequest.OldLeaderNodeName {
-				log.Error("shard leader node not match", zap.String("requestNode", transferLeaderRequest.OldLeaderNodeName), zap.String("actualNode", leaderNodeName))
+				log.Error("shard leader node not match", zap.String("requestOldLeaderNodeName", transferLeaderRequest.OldLeaderNodeName), zap.String("actualOldLeaderNodeName", leaderNodeName))
 				a.respondError(writer, cluster.ErrNodeNotFound, nil)
 				return
 			}
