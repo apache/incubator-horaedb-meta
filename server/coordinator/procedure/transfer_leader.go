@@ -105,14 +105,17 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 	p.updateStateWithLock(StateRunning)
 
 	transferLeaderRequest := &TransferLeaderCallbackRequest{
-		cluster:  p.cluster,
-		ctx:      ctx,
-		dispatch: p.dispatch,
+		cluster:           p.cluster,
+		ctx:               ctx,
+		dispatch:          p.dispatch,
+		shardID:           p.shardID,
+		oldLeaderNodeName: p.oldLeaderNodeName,
+		newLeaderNodeName: p.newLeaderNodeName,
 	}
 
 	for {
 		switch p.fsm.Current() {
-		case stateCreateTableBegin:
+		case stateTransferLeaderBegin:
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "transferLeader procedure persist failed")
 			}
@@ -230,16 +233,20 @@ func transferLeaderOpenNewShardCallback(event *fsm.Event) {
 	request := event.Args[0].(*TransferLeaderCallbackRequest)
 	ctx := request.ctx
 
-	// TODO: Shard version is only exists in ShardTables now, it is not sensible. Because shard version will be update when shard node mapping changed or shard table mapping changed, so ShardNodes also need shard version, consider refactor later.
-	shardTablesMapping := request.cluster.GetTables([]storage.ShardID{request.shardID}, request.oldLeaderNodeName)
-	shardTables, exists := shardTablesMapping[request.shardID]
-	if !exists {
-		cancelEventWithLog(event, cluster.ErrTableNotFound, "tables on shard not found")
+	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
+	if err != nil {
+		cancelEventWithLog(event, err, "get node shards failed")
 		return
+	}
+	var preVersion uint64
+	for _, shardNodeWithVersion := range getNodeShardResult.NodeShards {
+		if request.shardID == shardNodeWithVersion.ShardNode.ID {
+			preVersion = shardNodeWithVersion.Version
+		}
 	}
 
 	openShardRequest := eventdispatch.OpenShardRequest{
-		Shard: cluster.ShardInfo{ID: request.shardID, Role: storage.ShardRoleLeader, Version: shardTables.Shard.Version + 1},
+		Shard: cluster.ShardInfo{ID: request.shardID, Role: storage.ShardRoleLeader, Version: preVersion + 1},
 	}
 
 	if err := request.dispatch.OpenShard(ctx, request.newLeaderNodeName, openShardRequest); err != nil {
@@ -259,6 +266,7 @@ func (p *TransferLeaderProcedure) updateStateWithLock(state State) {
 	p.lock.Unlock()
 }
 
+// TODO: Consider refactor meta procedure convertor function, encapsulate as a tool function or add
 func (p *TransferLeaderProcedure) convertToMeta() (Meta, error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

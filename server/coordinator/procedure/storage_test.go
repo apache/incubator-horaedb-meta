@@ -18,7 +18,7 @@ const (
 	DefaultScanBatchSie = 100
 )
 
-func newTestStorage(t *testing.T) Storage {
+func NewTestStorage(t *testing.T) Storage {
 	_, client, _ := etcdutil.PrepareEtcdServerAndClient(t)
 	storage := NewEtcdStorageImpl(client, TestRootPath)
 	return storage
@@ -87,7 +87,7 @@ func testDelete(t *testing.T, storage Storage) {
 }
 
 func TestStorage(t *testing.T) {
-	storage := newTestStorage(t)
+	storage := NewTestStorage(t)
 	testWrite(t, storage)
 	testScan(t, storage)
 	testDelete(t, storage)

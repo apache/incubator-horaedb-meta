@@ -31,7 +31,7 @@ type ShardInfo struct {
 }
 
 type ShardNodeWithVersion struct {
-	version   uint64
+	Version   uint64
 	ShardNode storage.ShardNode
 }
 
