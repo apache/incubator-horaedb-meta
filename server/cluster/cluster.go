@@ -241,7 +241,11 @@ func (c *Cluster) RouteTables(_ context.Context, schemaName string, tableNames [
 		nodeShards := make([]ShardNodeWithVersion, 0, len(value))
 		for _, shardNode := range value {
 			nodeShards = append(nodeShards, ShardNodeWithVersion{
-				Version:   tableShardNodesWithShardViewVersion.Version[shardNode.ID],
+				ShardInfo: ShardInfo{
+					ID:      shardNode.ID,
+					Role:    shardNode.ShardRole,
+					Version: tableShardNodesWithShardViewVersion.Version[shardNode.ID],
+				},
 				ShardNode: shardNode,
 			})
 		}
@@ -269,7 +273,11 @@ func (c *Cluster) GetNodeShards(_ context.Context) (GetNodeShardsResult, error) 
 
 	for _, shardNode := range getNodeShardsResult.shardNodes {
 		shardNodesWithVersion = append(shardNodesWithVersion, ShardNodeWithVersion{
-			Version:   getNodeShardsResult.versions[shardNode.ID],
+			ShardInfo: ShardInfo{
+				ID:      shardNode.ID,
+				Role:    shardNode.ShardRole,
+				Version: getNodeShardsResult.versions[shardNode.ID],
+			},
 			ShardNode: shardNode,
 		})
 	}

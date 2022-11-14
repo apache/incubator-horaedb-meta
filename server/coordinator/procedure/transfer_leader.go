@@ -182,7 +182,11 @@ func (p *TransferLeaderProcedure) State() State {
 }
 
 func transferLeaderUpdateMetadataCallback(event *fsm.Event) {
-	request := event.Args[0].(*TransferLeaderCallbackRequest)
+	request, err := getRequestFromEvent(event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
 	ctx := request.ctx
 
 	if request.cluster.GetClusterState() != storage.ClusterStateStable {
@@ -218,7 +222,11 @@ func transferLeaderUpdateMetadataCallback(event *fsm.Event) {
 }
 
 func transferLeaderCloseOldLeaderCallback(event *fsm.Event) {
-	request := event.Args[0].(*TransferLeaderCallbackRequest)
+	request, err := getRequestFromEvent(event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
 	ctx := request.ctx
 
 	closeShardRequest := eventdispatch.CloseShardRequest{
@@ -231,7 +239,11 @@ func transferLeaderCloseOldLeaderCallback(event *fsm.Event) {
 }
 
 func transferLeaderOpenNewShardCallback(event *fsm.Event) {
-	request := event.Args[0].(*TransferLeaderCallbackRequest)
+	request, err := getRequestFromEvent(event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
 	ctx := request.ctx
 
 	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
@@ -242,7 +254,7 @@ func transferLeaderOpenNewShardCallback(event *fsm.Event) {
 	var preVersion uint64
 	for _, shardNodeWithVersion := range getNodeShardResult.NodeShards {
 		if request.shardID == shardNodeWithVersion.ShardNode.ID {
-			preVersion = shardNodeWithVersion.Version
+			preVersion = shardNodeWithVersion.ShardInfo.Version
 		}
 	}
 
@@ -257,7 +269,12 @@ func transferLeaderOpenNewShardCallback(event *fsm.Event) {
 }
 
 func transferLeaderFinishCallback(event *fsm.Event) {
-	request := event.Args[0].(*TransferLeaderCallbackRequest)
+	request, err := getRequestFromEvent(event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
+
 	log.Info("transfer leader finish", zap.Uint32("shardID", uint32(request.shardID)), zap.String("oldLeaderNode", request.oldLeaderNodeName), zap.String("newLeaderNode", request.newLeaderNodeName))
 }
 
@@ -296,32 +313,14 @@ func (p *TransferLeaderProcedure) convertToMeta() (Meta, error) {
 	return meta, nil
 }
 
-func ConvertToTransferLeaderProcedure(meta Meta, storage Storage, dispatch eventdispatch.Dispatch, cluster *cluster.Cluster) (*TransferLeaderProcedure, error) {
-	if meta.Typ != TransferLeader {
-		return nil, errors.WithMessagef(ErrProcedureTypeNotMatch, "expected type is:%d,real type is:%d", TransferLeader, meta.Typ)
+func getRequestFromEvent(event *fsm.Event) (*TransferLeaderCallbackRequest, error) {
+	if len(event.Args) != 1 {
+		return nil, ErrGetRequest.WithCausef("event args length must be 1, actual length:%d", len(event.Args))
 	}
-
-	var rawData TransferLeaderProcedurePersistRawData
-	err := json.Unmarshal(meta.RawData, &rawData)
-	if err != nil {
-		return nil, errors.WithMessage(err, "unmarshal raw data failed")
+	switch request := event.Args[0].(type) {
+	case *TransferLeaderCallbackRequest:
+		return request, nil
+	default:
+		return nil, ErrGetRequest.WithCausef("event arg type must be transferLeaderRequest")
 	}
-
-	transferLeaderOperationFsm := fsm.NewFSM(
-		rawData.FsmState,
-		transferLeaderEvents,
-		transferLeaderCallbacks,
-	)
-
-	return &TransferLeaderProcedure{
-		id:                rawData.ID,
-		fsm:               transferLeaderOperationFsm,
-		cluster:           cluster,
-		dispatch:          dispatch,
-		storage:           storage,
-		shardID:           rawData.ShardID,
-		oldLeaderNodeName: rawData.OldLeaderNodeName,
-		newLeaderNodeName: rawData.NewLeaderNodeName,
-		state:             rawData.State,
-	}, nil
 }

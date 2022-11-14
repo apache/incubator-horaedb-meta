@@ -115,7 +115,6 @@ type TransferLeaderRequest struct {
 	NewLeaderNodeName string `json:"newLeaderNodeName"`
 }
 
-// TODO: impl this function
 func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 	var transferLeaderRequest TransferLeaderRequest
 	err := json.NewDecoder(req.Body).Decode(&transferLeaderRequest)
