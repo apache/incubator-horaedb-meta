@@ -16,7 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// Begin -> UpdateMetadata -> CloseOldLeader -> OpenNewLeader -> Finish
+// fsm state change: Begin -> UpdateMetadata -> CloseOldLeader -> OpenNewLeader -> Finish
+// TODO: add more detailed comments.
 const (
 	eventTransferLeaderUpdateMetadata = "EventTransferLeaderUpdateMetadata"
 	eventTransferLeaderCloseOldLeader = "EventTransferLeaderCloseOldLeader"
