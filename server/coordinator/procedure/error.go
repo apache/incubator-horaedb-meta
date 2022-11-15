@@ -13,5 +13,6 @@ var (
 	ErrSubmitProcedure       = coderr.NewCodeError(coderr.Internal, "submit procedure")
 	ErrProcedureTypeNotMatch = coderr.NewCodeError(coderr.Internal, "procedure type not match")
 	ErrDecodeRawData         = coderr.NewCodeError(coderr.Internal, "decode raw data")
+	ErrEncodeRawData         = coderr.NewCodeError(coderr.Internal, "encode raw data")
 	ErrGetRequest            = coderr.NewCodeError(coderr.Internal, "get request from event")
 )

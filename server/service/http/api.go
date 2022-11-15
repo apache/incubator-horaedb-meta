@@ -125,8 +125,10 @@ func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	transferLeaderProcedure, err := a.procedureFactory.CreateTransferLeaderProcedure(req.Context(), procedure.TransferLeaderRequest{
-		ClusterName: transferLeaderRequest.ClusterName, ShardID: storage.ShardID(transferLeaderRequest.ShardID),
-		OldLeaderNodeName: transferLeaderRequest.OldLeaderNodeName, NewLeaderNodeName: transferLeaderRequest.NewLeaderNodeName,
+		ClusterName:       transferLeaderRequest.ClusterName,
+		ShardID:           storage.ShardID(transferLeaderRequest.ShardID),
+		OldLeaderNodeName: transferLeaderRequest.OldLeaderNodeName,
+		NewLeaderNodeName: transferLeaderRequest.NewLeaderNodeName,
 	})
 	if err != nil {
 		log.Error("create transfer leader procedure", zap.Error(err))

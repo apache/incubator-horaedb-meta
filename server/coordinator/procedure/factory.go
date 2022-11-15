@@ -44,8 +44,7 @@ type DropTableRequest struct {
 }
 
 type TransferLeaderRequest struct {
-	ClusterName string
-
+	ClusterName       string
 	ShardID           storage.ShardID
 	OldLeaderNodeName string
 	NewLeaderNodeName string
@@ -100,27 +99,8 @@ func (f *Factory) CreateTransferLeaderProcedure(ctx context.Context, request Tra
 		return nil, cluster.ErrClusterNotFound
 	}
 
-	shardNodes, err := c.GetShardNodesByShardID(request.ShardID)
-	if err != nil {
-		log.Error("get shard failed", zap.Error(err))
-		return nil, cluster.ErrShardNotFound
-	}
-	if len(shardNodes) == 0 {
-		log.Error("shard not exist in any node", zap.Uint32("shardID", uint32(request.ShardID)))
-		return nil, cluster.ErrNodeNotFound
-	}
-	for _, shardNode := range shardNodes {
-		if shardNode.ShardRole == storage.ShardRoleLeader {
-			leaderNodeName := shardNode.NodeName
-			if leaderNodeName != request.OldLeaderNodeName {
-				log.Error("shard leader node not match", zap.String("requestOldLeaderNodeName", request.OldLeaderNodeName), zap.String("actualOldLeaderNodeName", leaderNodeName))
-				return nil, cluster.ErrNodeNotFound
-			}
-		}
-	}
-	procedure := NewTransferLeaderProcedure(f.dispatch, c, f.storage,
+	return NewTransferLeaderProcedure(f.dispatch, c, f.storage,
 		request.ShardID, request.OldLeaderNodeName, request.NewLeaderNodeName, id)
-	return procedure, nil
 }
 
 func (f *Factory) allocProcedureID(ctx context.Context) (uint64, error) {

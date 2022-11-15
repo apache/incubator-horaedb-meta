@@ -73,7 +73,7 @@ type TransferLeaderProcedurePersistRawData struct {
 	State             State
 }
 
-// TransferLeaderCallbackRequest is fsm callbacks param
+// TransferLeaderCallbackRequest is fsm callbacks param.
 type TransferLeaderCallbackRequest struct {
 	cluster  *cluster.Cluster
 	ctx      context.Context
@@ -84,14 +84,32 @@ type TransferLeaderCallbackRequest struct {
 	newLeaderNodeName string
 }
 
-func NewTransferLeaderProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, storage Storage, shardID storage.ShardID, oldLeaderNodeName string, newLeaderNodeName string, id uint64) Procedure {
+func NewTransferLeaderProcedure(dispatch eventdispatch.Dispatch, c *cluster.Cluster, s Storage, shardID storage.ShardID, oldLeaderNodeName string, newLeaderNodeName string, id uint64) (Procedure, error) {
+	shardNodes, err := c.GetShardNodesByShardID(shardID)
+	if err != nil {
+		log.Error("get shard failed", zap.Error(err))
+		return nil, cluster.ErrShardNotFound
+	}
+	if len(shardNodes) == 0 {
+		log.Error("shard not exist in any node", zap.Uint32("shardID", uint32(shardID)))
+		return nil, cluster.ErrNodeNotFound
+	}
+	for _, shardNode := range shardNodes {
+		if shardNode.ShardRole == storage.ShardRoleLeader {
+			leaderNodeName := shardNode.NodeName
+			if leaderNodeName != oldLeaderNodeName {
+				log.Error("shard leader node not match", zap.String("requestOldLeaderNodeName", oldLeaderNodeName), zap.String("actualOldLeaderNodeName", leaderNodeName))
+				return nil, cluster.ErrNodeNotFound
+			}
+		}
+	}
 	transferLeaderOperationFsm := fsm.NewFSM(
 		stateTransferLeaderBegin,
 		transferLeaderEvents,
 		transferLeaderCallbacks,
 	)
 
-	return &TransferLeaderProcedure{id: id, fsm: transferLeaderOperationFsm, dispatch: dispatch, cluster: cluster, storage: storage, shardID: shardID, oldLeaderNodeName: oldLeaderNodeName, newLeaderNodeName: newLeaderNodeName, state: StateInit}
+	return &TransferLeaderProcedure{id: id, fsm: transferLeaderOperationFsm, dispatch: dispatch, cluster: c, storage: s, shardID: shardID, oldLeaderNodeName: oldLeaderNodeName, newLeaderNodeName: newLeaderNodeName, state: StateInit}, nil
 }
 
 func (p *TransferLeaderProcedure) ID() uint64 {
@@ -105,7 +123,7 @@ func (p *TransferLeaderProcedure) Typ() Typ {
 func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 	p.updateStateWithLock(StateRunning)
 
-	transferLeaderRequest := &TransferLeaderCallbackRequest{
+	transferLeaderRequest := TransferLeaderCallbackRequest{
 		cluster:           p.cluster,
 		ctx:               ctx,
 		dispatch:          p.dispatch,
@@ -118,39 +136,39 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 		switch p.fsm.Current() {
 		case stateTransferLeaderBegin:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "transferLeader procedure persist failed")
+				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
 			if err := p.fsm.Event(eventTransferLeaderUpdateMetadata, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "trasnferLeader procedure update metadata failed")
+				return errors.WithMessagef(err, "trasnferLeader procedure update metadata")
 			}
 		case stateTransferLeaderUpdateMetadata:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "transferLeader procedure persist failed")
+				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
 			if err := p.fsm.Event(eventTransferLeaderCloseOldLeader, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "trasnferLeader procedure close old leader failed")
+				return errors.WithMessagef(err, "trasnferLeader procedure close old leader")
 			}
 		case stateTransferLeaderCloseOldLeader:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "transferLeader procedure persist failed")
+				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
 			if err := p.fsm.Event(eventTransferLeaderOpenNewLeader, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "trasnferLeader procedure oepn new leader failed")
+				return errors.WithMessagef(err, "trasnferLeader procedure oepn new leader")
 			}
 		case stateTransferLeaderOpenNewLeader:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "transferLeader procedure persist failed")
+				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
 			if err := p.fsm.Event(eventTransferLeaderFinish, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "trasnferLeader procedure finish failed")
+				return errors.WithMessagef(err, "trasnferLeader procedure finish")
 			}
 		case stateTransferLeaderFinish:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "transferLeader procedure persist failed")
+				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
 			p.updateStateWithLock(StateFinished)
 			return nil
@@ -161,11 +179,11 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 func (p *TransferLeaderProcedure) persist(ctx context.Context) error {
 	meta, err := p.convertToMeta()
 	if err != nil {
-		return errors.WithMessagef(err, "convert")
+		return errors.WithMessage(err, "convert to meta")
 	}
 	err = p.storage.CreateOrUpdate(ctx, meta)
 	if err != nil {
-		return errors.WithMessagef(err, "createOrUpdate procedure storage failed")
+		return errors.WithMessage(err, "createOrUpdate procedure storage")
 	}
 	return nil
 }
@@ -182,7 +200,7 @@ func (p *TransferLeaderProcedure) State() State {
 }
 
 func transferLeaderUpdateMetadataCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent(event)
+	request, err := getRequestFromEvent[TransferLeaderCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
@@ -216,13 +234,13 @@ func transferLeaderUpdateMetadataCallback(event *fsm.Event) {
 
 	err = request.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, []storage.ShardNode{leaderShardNode})
 	if err != nil {
-		cancelEventWithLog(event, storage.ErrUpdateClusterViewConflict, "update cluster view failed")
+		cancelEventWithLog(event, storage.ErrUpdateClusterViewConflict, "update cluster view")
 		return
 	}
 }
 
 func transferLeaderCloseOldLeaderCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent(event)
+	request, err := getRequestFromEvent[TransferLeaderCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
@@ -233,13 +251,13 @@ func transferLeaderCloseOldLeaderCallback(event *fsm.Event) {
 		ShardID: uint32(request.shardID),
 	}
 	if err := request.dispatch.CloseShard(ctx, request.oldLeaderNodeName, closeShardRequest); err != nil {
-		cancelEventWithLog(event, err, "close shard failed", zap.Uint32("shardId", uint32(request.shardID)), zap.String("oldLeaderName", request.oldLeaderNodeName))
+		cancelEventWithLog(event, err, "close shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("oldLeaderName", request.oldLeaderNodeName))
 		return
 	}
 }
 
 func transferLeaderOpenNewShardCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent(event)
+	request, err := getRequestFromEvent[TransferLeaderCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
@@ -248,7 +266,7 @@ func transferLeaderOpenNewShardCallback(event *fsm.Event) {
 
 	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
 	if err != nil {
-		cancelEventWithLog(event, err, "get node shards failed")
+		cancelEventWithLog(event, err, "get node shards")
 		return
 	}
 	var preVersion uint64
@@ -263,13 +281,13 @@ func transferLeaderOpenNewShardCallback(event *fsm.Event) {
 	}
 
 	if err := request.dispatch.OpenShard(ctx, request.newLeaderNodeName, openShardRequest); err != nil {
-		cancelEventWithLog(event, err, "open shard failed", zap.Uint32("shardId", uint32(request.shardID)), zap.String("newLeaderNode", request.newLeaderNodeName))
+		cancelEventWithLog(event, err, "open shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("newLeaderNode", request.newLeaderNodeName))
 		return
 	}
 }
 
 func transferLeaderFinishCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent(event)
+	request, err := getRequestFromEvent[TransferLeaderCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
@@ -300,27 +318,16 @@ func (p *TransferLeaderProcedure) convertToMeta() (Meta, error) {
 	}
 	rawDataBytes, err := json.Marshal(rawData)
 	if err != nil {
-		return Meta{}, ErrDecodeRawData.WithCausef("marshal raw data failed, procedureID:%v, err:%v", p.shardID, err)
+		return Meta{}, ErrEncodeRawData.WithCausef("marshal raw data, procedureID:%v, err:%v", p.shardID, err)
 	}
 
 	meta := Meta{
-		ID:      p.id,
-		Typ:     TransferLeader,
-		State:   p.state,
+		ID:    p.id,
+		Typ:   TransferLeader,
+		State: p.state,
+
 		RawData: rawDataBytes,
 	}
 
 	return meta, nil
-}
-
-func getRequestFromEvent(event *fsm.Event) (*TransferLeaderCallbackRequest, error) {
-	if len(event.Args) != 1 {
-		return nil, ErrGetRequest.WithCausef("event args length must be 1, actual length:%d", len(event.Args))
-	}
-	switch request := event.Args[0].(type) {
-	case *TransferLeaderCallbackRequest:
-		return request, nil
-	default:
-		return nil, ErrGetRequest.WithCausef("event arg type must be transferLeaderRequest")
-	}
 }
