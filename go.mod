@@ -23,7 +23,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
-	github.com/CeresDB/ceresdbproto v0.0.0-20221115062517-8cd021e19e44 // indirect
+	github.com/CeresDB/ceresdbproto/golang v0.0.0-20221115062517-8cd021e19e44 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
