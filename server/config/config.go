@@ -9,7 +9,10 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/pelletier/go-toml/v2"
+	"github.com/pkg/errors"
 	"go.etcd.io/etcd/server/v3/embed"
+	"go.uber.org/zap"
 )
 
 const (
@@ -48,6 +51,8 @@ const (
 )
 
 type Config struct {
+	Config string `toml:"config" json:"config"`
+
 	Log     log.Config `toml:"log" json:"log"`
 	EtcdLog log.Config `toml:"etcd-log" json:"etcd-log"`
 
@@ -201,6 +206,8 @@ func MakeConfigParser() (*Parser, error) {
 		cfg:     cfg,
 	}
 
+	fs.StringVar(&cfg.Config, "config", "", "config file")
+
 	fs.StringVar(&cfg.Log.Level, "log-level", log.DefaultLogLevel, "log level")
 	fs.StringVar(&cfg.Log.File, "log-file", log.DefaultLogFile, "file for log output")
 	fs.StringVar(&cfg.EtcdLog.Level, "etcd-log-level", log.DefaultLogLevel, "log level of etcd")
@@ -249,4 +256,25 @@ func MakeConfigParser() (*Parser, error) {
 
 	fs.IntVar(&cfg.HTTPPort, "http-port", defaultHTTPPort, "port of http server")
 	return builder, nil
+}
+
+// MakeConfigParseFromToml read configuration from the toml file, if the config item already exists, it will be overwritten.
+func MakeConfigParseFromToml(conf *Config) error {
+	configFile := conf.Config
+	log.Info("get config from toml", zap.String("configFile", configFile))
+
+	file, err := os.ReadFile(configFile)
+	if err != nil {
+		log.Error("err", zap.Error(err))
+		return errors.WithMessage(err, fmt.Sprintf("read config file failed, configFile:%v", configFile))
+	}
+	log.Info("toml config value", zap.String("config", string(file)))
+
+	err = toml.Unmarshal(file, conf)
+	if err != nil {
+		log.Error("err", zap.Error(err))
+		return errors.WithMessagef(err, "unmarshal toml config failed, configFile:%v", configFile)
+	}
+
+	return nil
 }
