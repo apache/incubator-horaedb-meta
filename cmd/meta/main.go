@@ -45,7 +45,7 @@ func main() {
 		panicf("fail to init global logger, err:%v", err)
 	}
 
-	if err := config.MakeConfigParseFromToml(cfg); err != nil {
+	if err := config.ParseConfigFromToml(cfg); err != nil {
 		panicf("fail to parse config from toml file, err%v", err)
 	}
 

@@ -51,7 +51,7 @@ const (
 )
 
 type Config struct {
-	Config string `toml:"config" json:"config"`
+	Path string `toml:"path" json:"path"`
 
 	Log     log.Config `toml:"log" json:"log"`
 	EtcdLog log.Config `toml:"etcd-log" json:"etcd-log"`
@@ -206,7 +206,7 @@ func MakeConfigParser() (*Parser, error) {
 		cfg:     cfg,
 	}
 
-	fs.StringVar(&cfg.Config, "config", "", "config file")
+	fs.StringVar(&cfg.Path, "path", "", "config file path")
 
 	fs.StringVar(&cfg.Log.Level, "log-level", log.DefaultLogLevel, "log level")
 	fs.StringVar(&cfg.Log.File, "log-file", log.DefaultLogFile, "file for log output")
@@ -258,22 +258,26 @@ func MakeConfigParser() (*Parser, error) {
 	return builder, nil
 }
 
-// MakeConfigParseFromToml read configuration from the toml file, if the config item already exists, it will be overwritten.
-func MakeConfigParseFromToml(conf *Config) error {
-	configFile := conf.Config
-	log.Info("get config from toml", zap.String("configFile", configFile))
+// ParseConfigFromToml read configuration from the toml file, if the config item already exists, it will be overwritten.
+func ParseConfigFromToml(conf *Config) error {
+	configFilePath := conf.Path
+	if len(configFilePath) == 0 {
+		log.Info("no config file specified, skip parse config")
+		return nil
+	}
+	log.Info("get config from toml", zap.String("configFile", configFilePath))
 
-	file, err := os.ReadFile(configFile)
+	file, err := os.ReadFile(configFilePath)
 	if err != nil {
 		log.Error("err", zap.Error(err))
-		return errors.WithMessage(err, fmt.Sprintf("read config file failed, configFile:%v", configFile))
+		return errors.WithMessage(err, fmt.Sprintf("read config file failed, configFile:%v", configFilePath))
 	}
 	log.Info("toml config value", zap.String("config", string(file)))
 
 	err = toml.Unmarshal(file, conf)
 	if err != nil {
 		log.Error("err", zap.Error(err))
-		return errors.WithMessagef(err, "unmarshal toml config failed, configFile:%v", configFile)
+		return errors.WithMessagef(err, "unmarshal toml config failed, configFile:%v", configFilePath)
 	}
 
 	return nil
