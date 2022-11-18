@@ -184,10 +184,14 @@ func (srv *Server) startServer(_ context.Context) error {
 
 	api := http.NewAPI(procedureManager, procedureFactory, manager)
 	httpService := http.NewHTTPService(srv.cfg.HTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())
-	err = httpService.Start()
-	if err != nil {
-		return errors.WithMessage(err, "start http service failed")
-	}
+	go func() {
+		err := httpService.Start()
+		if err != nil {
+			if err != nil {
+				log.Error("start http service failed", zap.Error(err))
+			}
+		}
+	}()
 	srv.httpService = httpService
 
 	log.Info("server started")
