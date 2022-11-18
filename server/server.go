@@ -114,7 +114,10 @@ func (srv *Server) Close() {
 		}
 	}
 
-	// TODO: release other resources: httpclient, etcd server and so on.
+	err := srv.httpService.Stop()
+	if err != nil {
+		log.Error("fail to close http server", zap.Error(err))
+	}
 }
 
 func (srv *Server) IsClosed() bool {
