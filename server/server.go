@@ -187,9 +187,7 @@ func (srv *Server) startServer(_ context.Context) error {
 	go func() {
 		err := httpService.Start()
 		if err != nil {
-			if err != nil {
-				log.Error("start http service failed", zap.Error(err))
-			}
+			log.Error("start http service failed", zap.Error(err))
 		}
 	}()
 	srv.httpService = httpService
