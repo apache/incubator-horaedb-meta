@@ -57,8 +57,6 @@ const (
 // Their loading has priority, and low priority configurations will be overwritten by high priority configurations.
 // The priority from high to low is: env variables -> toml config file -> program params.
 type Config struct {
-	Path string `toml:"path" json:"path"`
-
 	Log     log.Config `toml:"log" json:"log"`
 	EtcdLog log.Config `toml:"etcd-log" json:"etcd-log"`
 
@@ -178,18 +176,29 @@ type Parser struct {
 	cfg     *Config
 }
 
-func (p *Parser) Parse(arguments []string) (*Config, error) {
+func (p *Parser) Parse(arguments []string) (*Config, string, error) {
+	var configFilePath string
+	for i, argument := range arguments {
+		if argument == "--config" || argument == "-config" {
+			if len(arguments) > i+1 {
+				configFilePath = arguments[i+1]
+				arguments = append(arguments[:i], arguments[i+2:]...)
+				break
+			}
+		}
+	}
+
 	if err := p.flagSet.Parse(arguments); err != nil {
 		if err == flag.ErrHelp {
-			return nil, ErrHelpRequested.WithCause(err)
+			return nil, configFilePath, ErrHelpRequested.WithCause(err)
 		}
 
-		return nil, ErrInvalidCommandArgs.WithCausef("fail to parse flag arguments:%v, err:%v", arguments, err)
+		return nil, configFilePath, ErrInvalidCommandArgs.WithCausef("fail to parse flag arguments:%v, err:%v", arguments, err)
 	}
 
 	// TODO: support loading config from file.
 
-	return p.cfg, nil
+	return p.cfg, configFilePath, nil
 }
 
 func makeDefaultNodeName() (string, error) {
@@ -211,8 +220,6 @@ func MakeConfigParser() (*Parser, error) {
 		flagSet: fs,
 		cfg:     cfg,
 	}
-
-	fs.StringVar(&cfg.Path, "path", "", "config file path")
 
 	fs.StringVar(&cfg.Log.Level, "log-level", log.DefaultLogLevel, "log level")
 	fs.StringVar(&cfg.Log.File, "log-file", log.DefaultLogFile, "file for log output")
@@ -266,8 +273,7 @@ func MakeConfigParser() (*Parser, error) {
 }
 
 // ParseConfigFromToml read configuration from the toml file, if the config item already exists, it will be overwritten.
-func (p *Parser) ParseConfigFromToml() error {
-	configFilePath := p.cfg.Path
+func (p *Parser) ParseConfigFromToml(configFilePath string) error {
 	if len(configFilePath) == 0 {
 		log.Info("no config file specified, skip parse config")
 		return nil
@@ -297,7 +303,7 @@ func (p *Parser) ParseConfigFromEnvVariables() error {
 		if exists {
 			err := f.Value.Set(envVar)
 			if err != nil {
-				log.Error("set env variable failed", zap.Error(err), zap.String("name", f.Name))
+				log.Error("set env variable failed", zap.Error(err), zap.String("name", f.Name), zap.String("value", envVar))
 				resultErr = err
 				return
 			}
