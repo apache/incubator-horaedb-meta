@@ -277,14 +277,14 @@ func (p *Parser) ParseConfigFromToml() error {
 	file, err := os.ReadFile(configFilePath)
 	if err != nil {
 		log.Error("err", zap.Error(err))
-		return errors.WithMessage(err, fmt.Sprintf("read config file failed, configFile:%v", configFilePath))
+		return errors.WithMessage(err, fmt.Sprintf("read config file failed, configFile:%s", configFilePath))
 	}
 	log.Info("toml config value", zap.String("config", string(file)))
 
 	err = toml.Unmarshal(file, p.cfg)
 	if err != nil {
 		log.Error("err", zap.Error(err))
-		return errors.WithMessagef(err, "unmarshal toml config failed, configFile:%v", configFilePath)
+		return errors.WithMessagef(err, "unmarshal toml config failed, configFile:%s", configFilePath)
 	}
 
 	return nil
