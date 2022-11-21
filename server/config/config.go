@@ -50,6 +50,12 @@ const (
 	defaultHTTPPort = 8080
 )
 
+// Config is server start config, it has three input modes:
+// 1. program params
+// 2. toml config file
+// 3. env variables
+// Their loading has priority, and low priority configurations will be overwritten by high priority configurations.
+// The priority from high to low is: env variables -> toml config file -> program params.
 type Config struct {
 	Path string `toml:"path" json:"path"`
 
@@ -255,12 +261,13 @@ func MakeConfigParser() (*Parser, error) {
 	fs.IntVar(&cfg.DefaultClusterShardTotal, "default-cluster-shard-total", defaultClusterShardTotal, "shard total of the default cluster")
 
 	fs.IntVar(&cfg.HTTPPort, "http-port", defaultHTTPPort, "port of http server")
+
 	return builder, nil
 }
 
 // ParseConfigFromToml read configuration from the toml file, if the config item already exists, it will be overwritten.
-func ParseConfigFromToml(conf *Config) error {
-	configFilePath := conf.Path
+func (p *Parser) ParseConfigFromToml() error {
+	configFilePath := p.cfg.Path
 	if len(configFilePath) == 0 {
 		log.Info("no config file specified, skip parse config")
 		return nil
@@ -274,11 +281,28 @@ func ParseConfigFromToml(conf *Config) error {
 	}
 	log.Info("toml config value", zap.String("config", string(file)))
 
-	err = toml.Unmarshal(file, conf)
+	err = toml.Unmarshal(file, p.cfg)
 	if err != nil {
 		log.Error("err", zap.Error(err))
 		return errors.WithMessagef(err, "unmarshal toml config failed, configFile:%v", configFilePath)
 	}
 
 	return nil
+}
+
+func (p *Parser) ParseConfigFromEnvVariables() error {
+	var resultErr error
+	p.flagSet.VisitAll(func(f *flag.Flag) {
+		envVar, exists := os.LookupEnv(f.Name)
+		if exists {
+			err := f.Value.Set(envVar)
+			if err != nil {
+				log.Error("set env variable failed", zap.Error(err), zap.String("name", f.Name))
+				resultErr = err
+				return
+			}
+			log.Info("set env variable", zap.String("name", f.Name), zap.String("value", envVar))
+		}
+	})
+	return resultErr
 }
