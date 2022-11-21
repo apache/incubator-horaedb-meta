@@ -24,8 +24,9 @@ type ShardTables struct {
 }
 
 type ShardInfo struct {
-	ID      storage.ShardID
-	Role    storage.ShardRole
+	ID   storage.ShardID
+	Role storage.ShardRole
+	// ShardViewVersion
 	Version uint64
 }
 
