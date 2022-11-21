@@ -27,7 +27,7 @@ func main() {
 		panicf("fail to generate config builder, err:%v", err)
 	}
 
-	cfg, configFilePath, err := cfgParser.Parse(os.Args[1:])
+	cfg, err := cfgParser.Parse(os.Args[1:])
 	if coderr.Is(err, coderr.PrintHelpUsage) {
 		return
 	}
@@ -45,7 +45,7 @@ func main() {
 		panicf("fail to init global logger, err:%v", err)
 	}
 
-	if err := cfgParser.ParseConfigFromToml(configFilePath); err != nil {
+	if err := cfgParser.ParseConfigFromToml(); err != nil {
 		panicf("fail to parse config from toml file, err%v", err)
 	}
 

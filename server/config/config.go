@@ -51,11 +51,10 @@ const (
 )
 
 // Config is server start config, it has three input modes:
-// 1. program params
-// 2. toml config file
-// 3. env variables
+// 1. toml config file
+// 2. env variables
 // Their loading has priority, and low priority configurations will be overwritten by high priority configurations.
-// The priority from high to low is: env variables -> toml config file -> program params.
+// The priority from high to low is: env variables -> toml config file.
 type Config struct {
 	Log     log.Config `toml:"log" json:"log"`
 	EtcdLog log.Config `toml:"etcd-log" json:"etcd-log"`
@@ -172,33 +171,19 @@ func (c *Config) GenEtcdConfig() (*embed.Config, error) {
 
 // Parser builds the config from the flags.
 type Parser struct {
-	flagSet *flag.FlagSet
-	cfg     *Config
+	flagSet        *flag.FlagSet
+	cfg            *Config
+	configFilePath string
 }
 
-func (p *Parser) Parse(arguments []string) (*Config, string, error) {
-	var configFilePath string
-	for i, argument := range arguments {
-		if argument == "--config" || argument == "-config" {
-			if len(arguments) > i+1 {
-				configFilePath = arguments[i+1]
-				arguments = append(arguments[:i], arguments[i+2:]...)
-				break
-			}
-		}
-	}
-
+func (p *Parser) Parse(arguments []string) (*Config, error) {
 	if err := p.flagSet.Parse(arguments); err != nil {
 		if err == flag.ErrHelp {
-			return nil, configFilePath, ErrHelpRequested.WithCause(err)
+			return nil, ErrHelpRequested.WithCause(err)
 		}
-
-		return nil, configFilePath, ErrInvalidCommandArgs.WithCausef("fail to parse flag arguments:%v, err:%v", arguments, err)
+		return nil, ErrInvalidCommandArgs.WithCausef("fail to parse flag arguments:%v, err:%v", arguments, err)
 	}
-
-	// TODO: support loading config from file.
-
-	return p.cfg, configFilePath, nil
+	return p.cfg, nil
 }
 
 func makeDefaultNodeName() (string, error) {
@@ -221,76 +206,30 @@ func MakeConfigParser() (*Parser, error) {
 		cfg:     cfg,
 	}
 
-	fs.StringVar(&cfg.Log.Level, "log-level", log.DefaultLogLevel, "log level")
-	fs.StringVar(&cfg.Log.File, "log-file", log.DefaultLogFile, "file for log output")
-	fs.StringVar(&cfg.EtcdLog.Level, "etcd-log-level", log.DefaultLogLevel, "log level of etcd")
-	fs.StringVar(&cfg.EtcdLog.File, "etcd-log-file", log.DefaultLogFile, "file for log output of etcd")
-
-	fs.Int64Var(&cfg.GrpcHandleTimeoutMs, "grpc-handle-timeout-ms", defaultGrpcHandleTimeoutMs, "timeout for handling grpc requests")
-	fs.Int64Var(&cfg.EtcdStartTimeoutMs, "etcd-start-timeout-ms", defaultEtcdStartTimeoutMs, "timeout for starting etcd server")
-	fs.Int64Var(&cfg.EtcdCallTimeoutMs, "etcd-dial-timeout-ms", defaultCallTimeoutMs, "timeout for dialing etcd server")
-	fs.Int64Var(&cfg.LeaseTTLSec, "lease-ttl-sec", defaultEtcdLeaseTTLSec, "ttl of etcd key lease (suggest 10s)")
-
-	defaultNodeName, err := makeDefaultNodeName()
-	if err != nil {
-		return nil, err
-	}
-	fs.StringVar(&cfg.NodeName, "node-name", defaultNodeName, "member name of this node in the cluster")
-
-	fs.StringVar(&cfg.DataDir, "data-dir", defaultDataDir, "data directory for the etcd server")
-	fs.StringVar(&cfg.WalDir, "wal-dir", defaultWalDir, "wal directory for the etcd server")
-	fs.StringVar(&cfg.StorageRootPath, "storage-root-path", defaultRootPath, "root path for the etcd server")
-
-	defaultInitialCluster := makeDefaultInitialCluster(defaultNodeName)
-	fs.StringVar(&cfg.InitialCluster, "initial-cluster", defaultInitialCluster, "members in the initial etcd cluster")
-	fs.StringVar(&cfg.InitialClusterState, "initial-cluster-state", defaultInitialClusterState, "state of the initial etcd cluster")
-	fs.StringVar(&cfg.InitialClusterToken, "initial-cluster-token", defaultInitialClusterToken, "token of the initial etcd cluster")
-
-	fs.StringVar(&cfg.ClientUrls, "client-urls", defaultClientUrls, "url for client traffic")
-	fs.StringVar(&cfg.AdvertiseClientUrls, "advertise-client-urls", defaultClientUrls, "advertise url for client traffic (default '${client-urls}')")
-	fs.StringVar(&cfg.PeerUrls, "peer-urls", defaultPeerUrls, "url for peer traffic")
-	fs.StringVar(&cfg.AdvertisePeerUrls, "advertise-peer-urls", defaultPeerUrls, "advertise url for peer traffic (default '${peer-urls}')")
-
-	fs.Int64Var(&cfg.TickIntervalMs, "tick-interval-ms", defaultTickIntervalMs, "tick interval of the etcd server")
-	fs.Int64Var(&cfg.ElectionTimeoutMs, "election-timeout-ms", defaultElectionTimeoutMs, "election timeout of the etcd server")
-
-	fs.Int64Var(&cfg.QuotaBackendBytes, "quota-backend-bytes", defaultQuotaBackendBytes, "alarming threshold for too much memory consumption")
-	fs.StringVar(&cfg.AutoCompactionMode, "auto-compaction-mode", defaultCompactionMode, "mode of auto compaction of etcd server")
-	fs.StringVar(&cfg.AutoCompactionRetention, "auto-compaction-retention", defaultAutoCompactionRetention, "retention for auto compaction(works only if auto-compaction-mode is periodic)")
-	fs.UintVar(&cfg.MaxRequestBytes, "max-request-bytes", defaultMaxRequestBytes, "max bytes of requests received by etcd server")
-	fs.IntVar(&cfg.MaxScanLimit, "max-scan-limit", defaultMaxScanLimit, "max kv storage scan limit")
-	fs.IntVar(&cfg.MinScanLimit, "min-scan-limit", defaultMinScanLimit, "min kv storage scan limit")
-	fs.UintVar(&cfg.IDAllocatorStep, "id-allocator-step", defaultIDAllocatorStep, "id allocator step")
-
-	fs.StringVar(&cfg.DefaultClusterName, "default-cluster", defaultClusterName, "name of the default cluster")
-	fs.IntVar(&cfg.DefaultClusterNodeCount, "default-cluster-node-count", defaultClusterNodeCount, "node count of the default cluster")
-	fs.IntVar(&cfg.DefaultClusterReplicationFactor, "default-cluster-replication-factor", defaultClusterReplicationFactor, "replication factor of the default cluster")
-	fs.IntVar(&cfg.DefaultClusterShardTotal, "default-cluster-shard-total", defaultClusterShardTotal, "shard total of the default cluster")
-
-	fs.IntVar(&cfg.HTTPPort, "http-port", defaultHTTPPort, "port of http server")
+	fs.StringVar(&builder.configFilePath, "config", "", "config file path")
 
 	return builder, nil
 }
 
 // ParseConfigFromToml read configuration from the toml file, if the config item already exists, it will be overwritten.
-func (p *Parser) ParseConfigFromToml(configFilePath string) error {
-	if len(configFilePath) == 0 {
+func (p *Parser) ParseConfigFromToml() error {
+	if len(p.configFilePath) == 0 {
 		log.Info("no config file specified, skip parse config")
 		return nil
 	}
-	log.Info("get config from toml", zap.String("configFile", configFilePath))
+	log.Info("get config from toml", zap.String("configFile", p.configFilePath))
 
-	file, err := os.ReadFile(configFilePath)
+	file, err := os.ReadFile(p.configFilePath)
 	if err != nil {
 		log.Error("err", zap.Error(err))
-		return errors.WithMessage(err, fmt.Sprintf("read config file failed, configFile:%s", configFilePath))
+		return errors.WithMessage(err, fmt.Sprintf("read config file, configFile:%s", p.configFilePath))
 	}
 	log.Info("toml config value", zap.String("config", string(file)))
 
 	err = toml.Unmarshal(file, p.cfg)
 	if err != nil {
 		log.Error("err", zap.Error(err))
-		return errors.WithMessagef(err, "unmarshal toml config failed, configFile:%s", configFilePath)
+		return errors.WithMessagef(err, "unmarshal toml config, configFile:%s", p.configFilePath)
 	}
 
 	return nil
