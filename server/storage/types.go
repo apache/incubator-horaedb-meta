@@ -15,18 +15,18 @@ type (
 )
 
 const (
-	ClusterStateEmpty ClusterState = iota + 1
-	ClusterStateStable
+	ClusterStateEmpty  ClusterState = 0
+	ClusterStateStable ClusterState = 4
 )
 
 const (
-	ShardRoleLeader ShardRole = iota + 1
-	ShardRoleFollower
+	ShardRoleLeader   ShardRole = 0
+	ShardRoleFollower ShardRole = 1
 )
 
 const (
-	NodeStateOnline NodeState = iota + 1
-	NodeStateOffline
+	NodeStateOnline  NodeState = 0
+	NodeStateOffline NodeState = 1
 )
 
 type ListClustersResult struct {
