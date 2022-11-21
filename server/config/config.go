@@ -59,17 +59,17 @@ type Config struct {
 	Log     log.Config `toml:"log" json:"log"`
 	EtcdLog log.Config `toml:"etcd-log" json:"etcd-log"`
 
-	GrpcHandleTimeoutMs int64 `toml:"grpc-handle-timeout-ms" json:"grpc-handle-timeout-ms"`
-	EtcdStartTimeoutMs  int64 `toml:"etcd-start-timeout-ms" json:"etcd-start-timeout-ms"`
-	EtcdCallTimeoutMs   int64 `toml:"etcd-call-timeout-ms" json:"etcd-call-timeout-ms"`
+	GrpcHandleTimeoutMs int64 `toml:"grpc-handle-timeout-ms"`
+	EtcdStartTimeoutMs  int64 `toml:"etcd-start-timeout-ms"`
+	EtcdCallTimeoutMs   int64 `toml:"etcd-call-timeout-ms"`
 
-	LeaseTTLSec int64 `toml:"lease-sec" json:"lease-sec"`
+	LeaseTTLSec int64 `toml:"lease-sec"`
 
-	NodeName            string `toml:"node-name" json:"node-name"`
-	DataDir             string `toml:"data-dir" json:"data-dir"`
-	WalDir              string `toml:"wal-dir" json:"wal-dir"`
-	StorageRootPath     string `toml:"storage-root-path" json:"storage-root-path"`
-	InitialCluster      string `toml:"initial-cluster" json:"initial-cluster"`
+	NodeName            string `toml:"node-name"`
+	DataDir             string `toml:"data-dir"`
+	WalDir              string `toml:"wal-dir"`
+	StorageRootPath     string `toml:"storage-root-path"`
+	InitialCluster      string `toml:"initial-cluster"`
 	InitialClusterState string `toml:"initial-cluster-state" json:"initial-cluster-state"`
 	InitialClusterToken string `toml:"initial-cluster-token" json:"initial-cluster-token"`
 	// TickInterval is the interval for etcd Raft tick.
