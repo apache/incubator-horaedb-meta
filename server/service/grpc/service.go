@@ -75,6 +75,8 @@ func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHear
 		}, ShardInfos: shardInfos,
 	}
 
+	log.Info("registerNode", zap.String("name", req.Info.Endpoint), zap.String("info", req.Info.String()))
+
 	err = s.h.GetClusterManager().RegisterNode(ctx, req.GetHeader().GetClusterName(), registeredNode)
 	if err != nil {
 		return &metaservicepb.NodeHeartbeatResponse{Header: responseHeader(err, "grpc heartbeat")}, nil

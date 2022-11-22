@@ -50,7 +50,7 @@ func (s *metaStorageImpl) ListClusters(ctx context.Context) (ListClustersResult,
 			return ErrDecode.WithCausef("decode cluster, key:%s, value:%v, err:%v", key, value, err)
 		}
 
-		clusters = append(clusters, ConvertClusterPB(cluster))
+		clusters = append(clusters, convertClusterPB(cluster))
 		return nil
 	}
 
@@ -66,7 +66,7 @@ func (s *metaStorageImpl) ListClusters(ctx context.Context) (ListClustersResult,
 
 // CreateCluster return error if the cluster already exists.
 func (s *metaStorageImpl) CreateCluster(ctx context.Context, req CreateClusterRequest) error {
-	c := ConvertClusterToPB(req.Cluster)
+	c := convertClusterToPB(req.Cluster)
 	value, err := proto.Marshal(&c)
 	if err != nil {
 		return ErrEncode.WithCausef("encode cluster，clusterID:%d, err:%v", req.Cluster.ID, err)
@@ -93,7 +93,7 @@ func (s *metaStorageImpl) CreateCluster(ctx context.Context, req CreateClusterRe
 
 // CreateClusterView return error if the cluster view already exists.
 func (s *metaStorageImpl) CreateClusterView(ctx context.Context, req CreateClusterViewRequest) error {
-	clusterViewPB := ConvertClusterViewToPB(req.ClusterView)
+	clusterViewPB := convertClusterViewToPB(req.ClusterView)
 	value, err := proto.Marshal(&clusterViewPB)
 	if err != nil {
 		return ErrEncode.WithCausef("encode cluster view, clusterID:%d, err:%v", clusterViewPB.ClusterId, err)
@@ -139,12 +139,12 @@ func (s *metaStorageImpl) GetClusterView(ctx context.Context, req GetClusterView
 		return GetClusterViewResult{}, ErrDecode.WithCausef("decode cluster view, clusterID:%d, err:%v", req.ClusterID, err)
 	}
 	return GetClusterViewResult{
-		ClusterView: ConvertClusterViewPB(clusterView),
+		ClusterView: convertClusterViewPB(clusterView),
 	}, nil
 }
 
 func (s *metaStorageImpl) UpdateClusterView(ctx context.Context, req UpdateClusterViewRequest) error {
-	clusterViewPB := ConvertClusterViewToPB(req.ClusterView)
+	clusterViewPB := convertClusterViewToPB(req.ClusterView)
 
 	value, err := proto.Marshal(&clusterViewPB)
 	if err != nil {
@@ -185,7 +185,7 @@ func (s *metaStorageImpl) ListSchemas(ctx context.Context, req ListSchemasReques
 			return ErrDecode.WithCausef("decode schema, key:%s, value:%v, clusterID:%d, err:%v", key, value, req.ClusterID, err)
 		}
 
-		schemas = append(schemas, ConvertSchemaPB(schema))
+		schemas = append(schemas, convertSchemaPB(schema))
 		return nil
 	}
 
@@ -199,7 +199,7 @@ func (s *metaStorageImpl) ListSchemas(ctx context.Context, req ListSchemasReques
 
 // CreateSchema return error if the schema already exists.
 func (s *metaStorageImpl) CreateSchema(ctx context.Context, req CreateSchemaRequest) error {
-	schema := ConvertSchemaToPB(req.Schema)
+	schema := convertSchemaToPB(req.Schema)
 	value, err := proto.Marshal(&schema)
 	if err != nil {
 		return ErrDecode.WithCausef("encode schema, clusterID:%d, schemaID:%d, err:%v", req.ClusterID, schema.Id, err)
@@ -226,7 +226,7 @@ func (s *metaStorageImpl) CreateSchema(ctx context.Context, req CreateSchemaRequ
 
 // CreateTable return error if the table already exists.
 func (s *metaStorageImpl) CreateTable(ctx context.Context, req CreateTableRequest) error {
-	table := ConvertTableToPB(req.Table)
+	table := convertTableToPB(req.Table)
 	value, err := proto.Marshal(&table)
 	if err != nil {
 		return ErrEncode.WithCausef("encode table, clusterID:%d, schemaID:%d, tableID:%d, err:%v", req.ClusterID, req.Table.ID, table.Id, err)
@@ -282,7 +282,7 @@ func (s *metaStorageImpl) GetTable(ctx context.Context, req GetTableRequest) (Ge
 	}
 
 	return GetTableResult{
-		Table:  ConvertTablePB(table),
+		Table:  convertTablePB(table),
 		Exists: true,
 	}, nil
 }
@@ -298,7 +298,7 @@ func (s *metaStorageImpl) ListTables(ctx context.Context, req ListTableRequest) 
 		if err := proto.Unmarshal(value, tablePB); err != nil {
 			return ErrDecode.WithCausef("decode table, key:%s, value:%v, clusterID:%d, schemaID:%d, err:%v", key, value, req.ClusterID, req.SchemaID, err)
 		}
-		table := ConvertTablePB(tablePB)
+		table := convertTablePB(tablePB)
 		tables = append(tables, table)
 		return nil
 	}
@@ -352,7 +352,7 @@ func (s *metaStorageImpl) CreateShardViews(ctx context.Context, req CreateShardV
 	opCreateShardTopologiesAndLatestVersion := make([]clientv3.Op, 0)
 
 	for _, shardView := range req.ShardViews {
-		shardViewPB := ConvertShardViewToPB(shardView)
+		shardViewPB := convertShardViewToPB(shardView)
 		value, err := proto.Marshal(&shardViewPB)
 		if err != nil {
 			return ErrEncode.WithCausef("encode shard clusterView, clusterID:%d, shardID:%d, err:%v", req.ClusterID, shardView.ShardID, err)
@@ -398,7 +398,7 @@ func (s *metaStorageImpl) ListShardViews(ctx context.Context, req ListShardViews
 		if err = proto.Unmarshal([]byte(value), shardViewPB); err != nil {
 			return ListShardViewsResult{}, ErrDecode.WithCausef("decode shard view, clusterID:%d, shardID:%d, err:%v", req.ClusterID, shardID, err)
 		}
-		shardView := ConvertShardViewPB(shardViewPB)
+		shardView := convertShardViewPB(shardViewPB)
 		shardViews = append(shardViews, shardView)
 	}
 	return ListShardViewsResult{
@@ -407,7 +407,7 @@ func (s *metaStorageImpl) ListShardViews(ctx context.Context, req ListShardViews
 }
 
 func (s *metaStorageImpl) UpdateShardView(ctx context.Context, req UpdateShardViewRequest) error {
-	shardViewPB := ConvertShardViewToPB(req.ShardView)
+	shardViewPB := convertShardViewToPB(req.ShardView)
 	value, err := proto.Marshal(&shardViewPB)
 	if err != nil {
 		return ErrEncode.WithCausef("encode shard view, clusterID:%d, shardID:%d, err:%v", req.ClusterID, req.ShardView.ShardID, err)
@@ -462,7 +462,7 @@ func (s *metaStorageImpl) ListNodes(ctx context.Context, req ListNodesRequest) (
 }
 
 func (s *metaStorageImpl) CreateOrUpdateNode(ctx context.Context, req CreateOrUpdateNodeRequest) error {
-	nodePB := ConvertNodeToPB(req.Node)
+	nodePB := convertNodeToPB(req.Node)
 
 	key := makeNodeKey(s.rootPath, uint32(req.ClusterID), req.Node.Name)
 

@@ -201,18 +201,18 @@ func ConvertShardRolePB(role clusterpb.ShardRole) ShardRole {
 	return ShardRoleFollower
 }
 
-func ConvertNodeToPB(node Node) clusterpb.Node {
-	nodeStats := ConvertNodeStatsToPB(node.NodeStats)
+func convertNodeToPB(node Node) clusterpb.Node {
+	nodeStats := convertNodeStatsToPB(node.NodeStats)
 	return clusterpb.Node{
 		Name:          node.Name,
 		NodeStats:     &nodeStats,
 		CreateTime:    node.CreatedAt,
 		LastTouchTime: node.LastTouchTime,
-		State:         ConvertNodeStateToPB(node.State),
+		State:         convertNodeStateToPB(node.State),
 	}
 }
 
-func ConvertClusterPB(cluster *clusterpb.Cluster) Cluster {
+func convertClusterPB(cluster *clusterpb.Cluster) Cluster {
 	return Cluster{
 		ID:                ClusterID(cluster.Id),
 		Name:              cluster.Name,
@@ -223,7 +223,7 @@ func ConvertClusterPB(cluster *clusterpb.Cluster) Cluster {
 	}
 }
 
-func ConvertClusterToPB(cluster Cluster) clusterpb.Cluster {
+func convertClusterToPB(cluster Cluster) clusterpb.Cluster {
 	return clusterpb.Cluster{
 		Id:                uint32(cluster.ID),
 		Name:              cluster.Name,
@@ -234,7 +234,7 @@ func ConvertClusterToPB(cluster Cluster) clusterpb.Cluster {
 	}
 }
 
-func ConvertClusterStateToPB(state ClusterState) clusterpb.ClusterTopology_ClusterState {
+func convertClusterStateToPB(state ClusterState) clusterpb.ClusterTopology_ClusterState {
 	switch state {
 	case ClusterStateEmpty:
 		return clusterpb.ClusterTopology_EMPTY
@@ -244,7 +244,7 @@ func ConvertClusterStateToPB(state ClusterState) clusterpb.ClusterTopology_Clust
 	return clusterpb.ClusterTopology_EMPTY
 }
 
-func ConvertClusterStatePB(state clusterpb.ClusterTopology_ClusterState) ClusterState {
+func convertClusterStatePB(state clusterpb.ClusterTopology_ClusterState) ClusterState {
 	switch state {
 	case clusterpb.ClusterTopology_EMPTY:
 		return ClusterStateEmpty
@@ -264,7 +264,7 @@ func ConvertShardRoleToPB(role ShardRole) clusterpb.ShardRole {
 	return clusterpb.ShardRole_FOLLOWER
 }
 
-func ConvertShardNodeToPB(shardNode ShardNode) clusterpb.Shard {
+func convertShardNodeToPB(shardNode ShardNode) clusterpb.Shard {
 	return clusterpb.Shard{
 		Id:        uint32(shardNode.ID),
 		ShardRole: ConvertShardRoleToPB(shardNode.ShardRole),
@@ -272,7 +272,7 @@ func ConvertShardNodeToPB(shardNode ShardNode) clusterpb.Shard {
 	}
 }
 
-func ConvertShardNodePB(shardNode *clusterpb.Shard) ShardNode {
+func convertShardNodePB(shardNode *clusterpb.Shard) ShardNode {
 	return ShardNode{
 		ID:        ShardID(shardNode.Id),
 		ShardRole: ConvertShardRolePB(shardNode.ShardRole),
@@ -280,17 +280,17 @@ func ConvertShardNodePB(shardNode *clusterpb.Shard) ShardNode {
 	}
 }
 
-func ConvertClusterViewToPB(view ClusterView) clusterpb.ClusterTopology {
+func convertClusterViewToPB(view ClusterView) clusterpb.ClusterTopology {
 	shardViews := make([]*clusterpb.Shard, 0, len(view.ShardNodes))
 	for _, shardNode := range view.ShardNodes {
-		shardNodePB := ConvertShardNodeToPB(shardNode)
+		shardNodePB := convertShardNodeToPB(shardNode)
 		shardViews = append(shardViews, &shardNodePB)
 	}
 
 	return clusterpb.ClusterTopology{
 		ClusterId:        uint32(view.ClusterID),
 		Version:          view.Version,
-		State:            ConvertClusterStateToPB(view.State),
+		State:            convertClusterStateToPB(view.State),
 		ShardView:        shardViews,
 		Cause:            "",
 		CreatedAt:        view.CreatedAt,
@@ -298,23 +298,23 @@ func ConvertClusterViewToPB(view ClusterView) clusterpb.ClusterTopology {
 	}
 }
 
-func ConvertClusterViewPB(view *clusterpb.ClusterTopology) ClusterView {
+func convertClusterViewPB(view *clusterpb.ClusterTopology) ClusterView {
 	shardNodes := make([]ShardNode, 0, len(view.ShardView))
 	for _, shardNodePB := range view.ShardView {
-		shardNode := ConvertShardNodePB(shardNodePB)
+		shardNode := convertShardNodePB(shardNodePB)
 		shardNodes = append(shardNodes, shardNode)
 	}
 
 	return ClusterView{
 		ClusterID:  ClusterID(view.ClusterId),
 		Version:    view.Version,
-		State:      ConvertClusterStatePB(view.State),
+		State:      convertClusterStatePB(view.State),
 		ShardNodes: shardNodes,
 		CreatedAt:  view.CreatedAt,
 	}
 }
 
-func ConvertSchemaToPB(schema Schema) clusterpb.Schema {
+func convertSchemaToPB(schema Schema) clusterpb.Schema {
 	return clusterpb.Schema{
 		Id:        uint32(schema.ID),
 		ClusterId: uint32(schema.ClusterID),
@@ -323,7 +323,7 @@ func ConvertSchemaToPB(schema Schema) clusterpb.Schema {
 	}
 }
 
-func ConvertSchemaPB(schema *clusterpb.Schema) Schema {
+func convertSchemaPB(schema *clusterpb.Schema) Schema {
 	return Schema{
 		ID:        SchemaID(schema.Id),
 		ClusterID: ClusterID(schema.ClusterId),
@@ -332,7 +332,7 @@ func ConvertSchemaPB(schema *clusterpb.Schema) Schema {
 	}
 }
 
-func ConvertTableToPB(table Table) clusterpb.Table {
+func convertTableToPB(table Table) clusterpb.Table {
 	return clusterpb.Table{
 		Id:        uint64(table.ID),
 		Name:      table.Name,
@@ -343,7 +343,7 @@ func ConvertTableToPB(table Table) clusterpb.Table {
 	}
 }
 
-func ConvertTablePB(table *clusterpb.Table) Table {
+func convertTablePB(table *clusterpb.Table) Table {
 	return Table{
 		ID:        TableID(table.Id),
 		Name:      table.Name,
@@ -352,7 +352,7 @@ func ConvertTablePB(table *clusterpb.Table) Table {
 	}
 }
 
-func ConvertShardViewToPB(view ShardView) clusterpb.ShardTopology {
+func convertShardViewToPB(view ShardView) clusterpb.ShardTopology {
 	tableIDs := make([]uint64, 0, len(view.TableIDs))
 	for _, id := range view.TableIDs {
 		tableIDs = append(tableIDs, uint64(id))
@@ -366,7 +366,7 @@ func ConvertShardViewToPB(view ShardView) clusterpb.ShardTopology {
 	}
 }
 
-func ConvertShardViewPB(shardTopology *clusterpb.ShardTopology) ShardView {
+func convertShardViewPB(shardTopology *clusterpb.ShardTopology) ShardView {
 	tableIDs := make([]TableID, 0, len(shardTopology.TableIds))
 	for _, id := range shardTopology.TableIds {
 		tableIDs = append(tableIDs, TableID(id))
@@ -380,7 +380,7 @@ func ConvertShardViewPB(shardTopology *clusterpb.ShardTopology) ShardView {
 	}
 }
 
-func ConvertNodeStatsToPB(stats NodeStats) clusterpb.NodeStats {
+func convertNodeStatsToPB(stats NodeStats) clusterpb.NodeStats {
 	return clusterpb.NodeStats{
 		Lease:       stats.Lease,
 		Zone:        stats.Zone,
@@ -388,7 +388,7 @@ func ConvertNodeStatsToPB(stats NodeStats) clusterpb.NodeStats {
 	}
 }
 
-func ConvertNodeStatsPB(stats *clusterpb.NodeStats) NodeStats {
+func convertNodeStatsPB(stats *clusterpb.NodeStats) NodeStats {
 	return NodeStats{
 		Lease:       stats.Lease,
 		Zone:        stats.Zone,
@@ -396,7 +396,7 @@ func ConvertNodeStatsPB(stats *clusterpb.NodeStats) NodeStats {
 	}
 }
 
-func ConvertNodeStateToPB(state NodeState) clusterpb.NodeState {
+func convertNodeStateToPB(state NodeState) clusterpb.NodeState {
 	switch state {
 	case NodeStateOnline:
 		return clusterpb.NodeState_ONLINE
@@ -406,7 +406,7 @@ func ConvertNodeStateToPB(state NodeState) clusterpb.NodeState {
 	return clusterpb.NodeState_OFFLINE
 }
 
-func ConvertNodeStatePB(state clusterpb.NodeState) NodeState {
+func convertNodeStatePB(state clusterpb.NodeState) NodeState {
 	switch state {
 	case clusterpb.NodeState_ONLINE:
 		return NodeStateOnline
@@ -417,12 +417,12 @@ func ConvertNodeStatePB(state clusterpb.NodeState) NodeState {
 }
 
 func convertNodePB(node *clusterpb.Node) Node {
-	nodeStats := ConvertNodeStatsPB(node.NodeStats)
+	nodeStats := convertNodeStatsPB(node.NodeStats)
 	return Node{
 		Name:          node.Name,
 		NodeStats:     nodeStats,
 		CreatedAt:     node.CreateTime,
 		LastTouchTime: node.LastTouchTime,
-		State:         ConvertNodeStatePB(node.State),
+		State:         convertNodeStatePB(node.State),
 	}
 }
