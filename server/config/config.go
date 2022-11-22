@@ -54,10 +54,10 @@ const (
 // 1. toml config file
 // 2. env variables
 // Their loading has priority, and low priority configurations will be overwritten by high priority configurations.
-// The priority from high to low is: env variables -> toml config file.
+// The priority from high to low is: env variables > toml config file.
 type Config struct {
-	Log     log.Config `toml:"log" json:"log"`
-	EtcdLog log.Config `toml:"etcd-log" json:"etcd-log"`
+	Log     log.Config `toml:"log"`
+	EtcdLog log.Config `toml:"etcd-log"`
 
 	GrpcHandleTimeoutMs int64 `toml:"grpc-handle-timeout-ms"`
 	EtcdStartTimeoutMs  int64 `toml:"etcd-start-timeout-ms"`
@@ -70,40 +70,40 @@ type Config struct {
 	WalDir              string `toml:"wal-dir"`
 	StorageRootPath     string `toml:"storage-root-path"`
 	InitialCluster      string `toml:"initial-cluster"`
-	InitialClusterState string `toml:"initial-cluster-state" json:"initial-cluster-state"`
-	InitialClusterToken string `toml:"initial-cluster-token" json:"initial-cluster-token"`
+	InitialClusterState string `toml:"initial-cluster-state"`
+	InitialClusterToken string `toml:"initial-cluster-token"`
 	// TickInterval is the interval for etcd Raft tick.
-	TickIntervalMs    int64 `toml:"tick-interval-ms" json:"tick-interval-ms"`
-	ElectionTimeoutMs int64 `toml:"election-timeout-ms" json:"election-timeout-ms"`
+	TickIntervalMs    int64 `toml:"tick-interval-ms"`
+	ElectionTimeoutMs int64 `toml:"election-timeout-ms"`
 	// QuotaBackendBytes Raise alarms when backend size exceeds the given quota. 0 means use the default quota.
 	// the default size is 2GB, the maximum is 8GB.
-	QuotaBackendBytes int64 `toml:"quota-backend-bytes" json:"quota-backend-bytes"`
+	QuotaBackendBytes int64 `toml:"quota-backend-bytes"`
 	// AutoCompactionMode is either 'periodic' or 'revision'. The default value is 'periodic'.
-	AutoCompactionMode string `toml:"auto-compaction-mode" json:"auto-compaction-mode"`
+	AutoCompactionMode string `toml:"auto-compaction-mode"`
 	// AutoCompactionRetention is either duration string with time unit
 	// (e.g. '5m' for 5-minute), or revision unit (e.g. '5000').
 	// If no time unit is provided and compaction mode is 'periodic',
 	// the unit defaults to hour. For example, '5' translates into 5-hour.
 	// The default retention is 1 hour.
 	// Before etcd v3.3.x, the type of retention is int. We add 'v2' suffix to make it backward compatible.
-	AutoCompactionRetention string `toml:"auto-compaction-retention" json:"auto-compaction-retention-v2"`
-	MaxRequestBytes         uint   `toml:"max-request-bytes" json:"max-request-bytes"`
-	MaxScanLimit            int    `toml:"max-scan-limit" json:"max-scan-limit"`
-	MinScanLimit            int    `toml:"min-scan-limit" json:"min-scan-limit"`
-	IDAllocatorStep         uint   `toml:"id-allocator-step" json:"id-allocator-step"`
+	AutoCompactionRetention string `toml:"auto-compaction-retention"`
+	MaxRequestBytes         uint   `toml:"max-request-bytes"`
+	MaxScanLimit            int    `toml:"max-scan-limit"`
+	MinScanLimit            int    `toml:"min-scan-limit"`
+	IDAllocatorStep         uint   `toml:"id-allocator-step"`
 
 	// Following fields are the settings for the default cluster.
-	DefaultClusterName              string `toml:"default-cluster-name" json:"default-cluster-name"`
-	DefaultClusterNodeCount         int    `toml:"default-cluster-node-count" json:"default-cluster-node-count"`
-	DefaultClusterReplicationFactor int    `toml:"default-cluster-replication-factor" json:"default-cluster-replication-factor"`
-	DefaultClusterShardTotal        int    `toml:"default-cluster-shard-total" json:"default-cluster-shard-total"`
+	DefaultClusterName              string `toml:"default-cluster-name"`
+	DefaultClusterNodeCount         int    `toml:"default-cluster-node-count"`
+	DefaultClusterReplicationFactor int    `toml:"default-cluster-replication-factor"`
+	DefaultClusterShardTotal        int    `toml:"default-cluster-shard-total"`
 
-	ClientUrls          string `toml:"client-urls" json:"client-urls"`
-	PeerUrls            string `toml:"peer-urls" json:"peer-urls"`
-	AdvertiseClientUrls string `toml:"advertise-client-urls" json:"advertise-client-urls"`
-	AdvertisePeerUrls   string `toml:"advertise-peer-urls" json:"advertise-peer-urls"`
+	ClientUrls          string `toml:"client-urls"`
+	PeerUrls            string `toml:"peer-urls"`
+	AdvertiseClientUrls string `toml:"advertise-client-urls"`
+	AdvertisePeerUrls   string `toml:"advertise-peer-urls"`
 
-	HTTPPort int `toml:"default-http-port" json:"default-http-port"`
+	HTTPPort int `toml:"default-http-port"`
 }
 
 func (c *Config) GrpcHandleTimeout() time.Duration {
@@ -200,7 +200,60 @@ func makeDefaultInitialCluster(nodeName string) string {
 }
 
 func MakeConfigParser() (*Parser, error) {
-	fs, cfg := flag.NewFlagSet("meta", flag.ContinueOnError), &Config{}
+	defaultNodeName, err := makeDefaultNodeName()
+	if err != nil {
+		return nil, err
+	}
+	defaultInitialCluster := makeDefaultInitialCluster(defaultNodeName)
+
+	fs, cfg := flag.NewFlagSet("meta", flag.ContinueOnError), &Config{
+		Log: log.Config{
+			Level: log.DefaultLogLevel,
+			File:  log.DefaultLogFile,
+		},
+		EtcdLog: log.Config{
+			Level: log.DefaultLogLevel,
+			File:  log.DefaultLogFile,
+		},
+
+		GrpcHandleTimeoutMs: defaultGrpcHandleTimeoutMs,
+		EtcdStartTimeoutMs:  defaultEtcdStartTimeoutMs,
+		EtcdCallTimeoutMs:   defaultCallTimeoutMs,
+
+		LeaseTTLSec: defaultEtcdLeaseTTLSec,
+
+		NodeName:        defaultNodeName,
+		DataDir:         defaultDataDir,
+		WalDir:          defaultWalDir,
+		StorageRootPath: defaultRootPath,
+
+		InitialCluster:      defaultInitialCluster,
+		InitialClusterState: defaultInitialClusterState,
+		InitialClusterToken: defaultInitialClusterToken,
+
+		ClientUrls:          defaultClientUrls,
+		AdvertiseClientUrls: defaultClientUrls,
+		PeerUrls:            defaultPeerUrls,
+		AdvertisePeerUrls:   defaultPeerUrls,
+
+		TickIntervalMs:    defaultTickIntervalMs,
+		ElectionTimeoutMs: defaultElectionTimeoutMs,
+
+		QuotaBackendBytes:       defaultQuotaBackendBytes,
+		AutoCompactionMode:      defaultCompactionMode,
+		AutoCompactionRetention: defaultAutoCompactionRetention,
+		MaxRequestBytes:         defaultMaxRequestBytes,
+		MaxScanLimit:            defaultMaxScanLimit,
+		MinScanLimit:            defaultMinScanLimit,
+		IDAllocatorStep:         defaultIDAllocatorStep,
+
+		DefaultClusterName:              defaultClusterName,
+		DefaultClusterNodeCount:         defaultClusterNodeCount,
+		DefaultClusterReplicationFactor: defaultClusterReplicationFactor,
+		DefaultClusterShardTotal:        defaultClusterShardTotal,
+
+		HTTPPort: defaultHTTPPort,
+	}
 	builder := &Parser{
 		flagSet: fs,
 		cfg:     cfg,
