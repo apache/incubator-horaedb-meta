@@ -332,7 +332,7 @@ func convertRouteTableResult(routeTablesResult cluster.RouteTablesResult) *metas
 				Endpoint: nodeShard.ShardNode.NodeName,
 				ShardInfo: &metaservicepb.ShardInfo{
 					Id:   uint32(nodeShard.ShardNode.ID),
-					Role: clusterpb.ShardRole(nodeShard.ShardNode.ShardRole),
+					Role: storage.ConvertShardRoleToPB(nodeShard.ShardNode.ShardRole),
 				},
 			})
 		}
@@ -357,7 +357,7 @@ func convertToGetNodesResponse(nodesResult cluster.GetNodeShardsResult) *metaser
 			Endpoint: shardNodeWithVersion.ShardNode.NodeName,
 			ShardInfo: &metaservicepb.ShardInfo{
 				Id:   uint32(shardNodeWithVersion.ShardNode.ID),
-				Role: clusterpb.ShardRole(shardNodeWithVersion.ShardNode.ShardRole),
+				Role: storage.ConvertShardRoleToPB(shardNodeWithVersion.ShardNode.ShardRole),
 			},
 		})
 	}
