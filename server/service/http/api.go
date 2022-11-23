@@ -45,6 +45,7 @@ func (a *API) NewAPIRouter() *Router {
 
 	router.Post("/transferLeader", a.transferLeader)
 	router.Post("/route", a.route)
+	router.Post("/dropTable", a.dropTable)
 
 	return router
 }
@@ -177,4 +178,28 @@ func (a *API) route(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	a.respond(writer, string(resultByte))
+}
+
+type DropTableRequest struct {
+	ClusterName string `json:"clusterName"`
+	SchemaName  string `json:"schemaName"`
+	Table       string `json:"table"`
+}
+
+func (a *API) dropTable(writer http.ResponseWriter, req *http.Request) {
+	var dropTableRequest DropTableRequest
+	err := json.NewDecoder(req.Body).Decode(&dropTableRequest)
+	if err != nil {
+		log.Error("decode request body failed", zap.Error(err))
+		a.respondError(writer, ErrParseRequest, "decode request body failed")
+		return
+	}
+
+	if err := a.clusterManager.DropTable(context.Background(), dropTableRequest.ClusterName, dropTableRequest.SchemaName, dropTableRequest.Table); err != nil {
+		log.Error("cluster drop table failed", zap.Error(err))
+		a.respondError(writer, ErrParseResponse, "cluster drop table failed")
+		return
+	}
+
+	a.respond(writer, "ok")
 }
