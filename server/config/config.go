@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/caarlos0/env/v6"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/server/v3/embed"
@@ -56,54 +57,54 @@ const (
 // Their loading has priority, and low priority configurations will be overwritten by high priority configurations.
 // The priority from high to low is: env variables > toml config file.
 type Config struct {
-	Log     log.Config `toml:"log"`
-	EtcdLog log.Config `toml:"etcd-log"`
+	Log     log.Config `toml:"log" env:"log"`
+	EtcdLog log.Config `toml:"etcd-log" env:"etcd_log"`
 
-	GrpcHandleTimeoutMs int64 `toml:"grpc-handle-timeout-ms"`
-	EtcdStartTimeoutMs  int64 `toml:"etcd-start-timeout-ms"`
-	EtcdCallTimeoutMs   int64 `toml:"etcd-call-timeout-ms"`
+	GrpcHandleTimeoutMs int64 `toml:"grpc-handle-timeout-ms" env:"grpc_handle_timeout_ms"`
+	EtcdStartTimeoutMs  int64 `toml:"etcd-start-timeout-ms" env:"etcd_start_timeout_ms"`
+	EtcdCallTimeoutMs   int64 `toml:"etcd-call-timeout-ms" env:"etcd_call_timeout_ms"`
 
-	LeaseTTLSec int64 `toml:"lease-sec"`
+	LeaseTTLSec int64 `toml:"lease-sec" env:"lease_sec"`
 
-	NodeName            string `toml:"node-name"`
-	DataDir             string `toml:"data-dir"`
-	WalDir              string `toml:"wal-dir"`
-	StorageRootPath     string `toml:"storage-root-path"`
-	InitialCluster      string `toml:"initial-cluster"`
-	InitialClusterState string `toml:"initial-cluster-state"`
-	InitialClusterToken string `toml:"initial-cluster-token"`
+	NodeName            string `toml:"node-name" env:"node_name"`
+	DataDir             string `toml:"data-dir" env:"data_dir"`
+	WalDir              string `toml:"wal-dir" env:"wal_dir"`
+	StorageRootPath     string `toml:"storage-root-path" env:"storage_root_path"`
+	InitialCluster      string `toml:"initial-cluster" env:"initial_cluster"`
+	InitialClusterState string `toml:"initial-cluster-state" env:"initial_cluster_state"`
+	InitialClusterToken string `toml:"initial-cluster-token" env:"initial_cluster_token"`
 	// TickInterval is the interval for etcd Raft tick.
-	TickIntervalMs    int64 `toml:"tick-interval-ms"`
-	ElectionTimeoutMs int64 `toml:"election-timeout-ms"`
+	TickIntervalMs    int64 `toml:"tick-interval-ms" env:"tick_interval_ms"`
+	ElectionTimeoutMs int64 `toml:"election-timeout-ms" env:"election_timeout_ms"`
 	// QuotaBackendBytes Raise alarms when backend size exceeds the given quota. 0 means use the default quota.
 	// the default size is 2GB, the maximum is 8GB.
-	QuotaBackendBytes int64 `toml:"quota-backend-bytes"`
+	QuotaBackendBytes int64 `toml:"quota-backend-bytes" env:"quota_backend_bytes"`
 	// AutoCompactionMode is either 'periodic' or 'revision'. The default value is 'periodic'.
-	AutoCompactionMode string `toml:"auto-compaction-mode"`
+	AutoCompactionMode string `toml:"auto-compaction-mode" env:"auto-compaction-mode"`
 	// AutoCompactionRetention is either duration string with time unit
 	// (e.g. '5m' for 5-minute), or revision unit (e.g. '5000').
 	// If no time unit is provided and compaction mode is 'periodic',
 	// the unit defaults to hour. For example, '5' translates into 5-hour.
 	// The default retention is 1 hour.
 	// Before etcd v3.3.x, the type of retention is int. We add 'v2' suffix to make it backward compatible.
-	AutoCompactionRetention string `toml:"auto-compaction-retention"`
-	MaxRequestBytes         uint   `toml:"max-request-bytes"`
-	MaxScanLimit            int    `toml:"max-scan-limit"`
-	MinScanLimit            int    `toml:"min-scan-limit"`
-	IDAllocatorStep         uint   `toml:"id-allocator-step"`
+	AutoCompactionRetention string `toml:"auto-compaction-retention" env:"auto_compaction_retention"`
+	MaxRequestBytes         uint   `toml:"max-request-bytes" env:"max_request_bytes"`
+	MaxScanLimit            int    `toml:"max-scan-limit" env:"max_scan_limit"`
+	MinScanLimit            int    `toml:"min-scan-limit" env:"min_scan_limit"`
+	IDAllocatorStep         uint   `toml:"id-allocator-step" env:"id_allocator_step"`
 
 	// Following fields are the settings for the default cluster.
-	DefaultClusterName              string `toml:"default-cluster-name"`
-	DefaultClusterNodeCount         int    `toml:"default-cluster-node-count"`
-	DefaultClusterReplicationFactor int    `toml:"default-cluster-replication-factor"`
-	DefaultClusterShardTotal        int    `toml:"default-cluster-shard-total"`
+	DefaultClusterName              string `toml:"default-cluster-name" env:"default_cluster_name"`
+	DefaultClusterNodeCount         int    `toml:"default-cluster-node-count" env:"default_cluster_node_count"`
+	DefaultClusterReplicationFactor int    `toml:"default-cluster-replication-factor" env:"default_cluster_replication_factor"`
+	DefaultClusterShardTotal        int    `toml:"default-cluster-shard-total" env:"default_cluster_shard_total"`
 
-	ClientUrls          string `toml:"client-urls"`
-	PeerUrls            string `toml:"peer-urls"`
-	AdvertiseClientUrls string `toml:"advertise-client-urls"`
-	AdvertisePeerUrls   string `toml:"advertise-peer-urls"`
+	ClientUrls          string `toml:"client-urls" env:"client_urls"`
+	PeerUrls            string `toml:"peer-urls" env:"peer_urls"`
+	AdvertiseClientUrls string `toml:"advertise-client-urls" env:"advertise_client_urls"`
+	AdvertisePeerUrls   string `toml:"advertise-peer-urls" env:"advertise_peer_urls"`
 
-	HTTPPort int `toml:"default-http-port"`
+	HTTPPort int `toml:"default-http-port" env:"default_http_port"`
 }
 
 func (c *Config) GrpcHandleTimeout() time.Duration {
@@ -289,18 +290,9 @@ func (p *Parser) ParseConfigFromToml() error {
 }
 
 func (p *Parser) ParseConfigFromEnvVariables() error {
-	var resultErr error
-	p.flagSet.VisitAll(func(f *flag.Flag) {
-		envVar, exists := os.LookupEnv(f.Name)
-		if exists {
-			err := f.Value.Set(envVar)
-			if err != nil {
-				log.Error("set env variable failed", zap.Error(err), zap.String("name", f.Name), zap.String("value", envVar))
-				resultErr = err
-				return
-			}
-			log.Info("set env variable", zap.String("name", f.Name), zap.String("value", envVar))
-		}
-	})
-	return resultErr
+	err := env.Parse(p.cfg)
+	if err != nil {
+		return errors.WithMessagef(err, "parse config from env variables")
+	}
+	return nil
 }
