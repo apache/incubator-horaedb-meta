@@ -44,6 +44,8 @@ func NewAPI(procedureManager procedure.Manager, procedureFactory *procedure.Fact
 func (a *API) NewAPIRouter() *Router {
 	router := New().WithPrefix(apiPrefix).WithInstrumentation(printRequestInsmt)
 
+	router.Get("/getShardTables", a.getShardTables)
+
 	router.Post("/transferLeader", a.transferLeader)
 	router.Post("/route", a.route)
 	router.Post("/dropTable", a.dropTable)
@@ -127,7 +129,7 @@ func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, "decode request body failed")
 		return
 	}
-	log.Info("transfer leader request", zap.String("request", fmt.Sprintf("%v", transferLeaderRequest)))
+	log.Info("transfer leader request", zap.String("request", fmt.Sprintf("%+v", transferLeaderRequest)))
 
 	transferLeaderProcedure, err := a.procedureFactory.CreateTransferLeaderProcedure(req.Context(), procedure.TransferLeaderRequest{
 		ClusterName:       transferLeaderRequest.ClusterName,
@@ -164,7 +166,7 @@ func (a *API) route(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, "decode request body failed")
 		return
 	}
-	log.Info("route request", zap.String("request", fmt.Sprintf("%v", routeRequest)))
+	log.Info("route request", zap.String("request", fmt.Sprintf("%+v", routeRequest)))
 
 	result, err := a.clusterManager.RouteTables(context.Background(), routeRequest.ClusterName, routeRequest.SchemaName, routeRequest.Tables)
 	if err != nil {
@@ -173,14 +175,7 @@ func (a *API) route(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	resultByte, err := json.Marshal(result)
-	if err != nil {
-		log.Error("route tables result marshal failed", zap.Error(err))
-		a.respondError(writer, ErrParseResponse, "route tables result marshal failed")
-		return
-	}
-
-	a.respond(writer, string(resultByte))
+	a.respond(writer, fmt.Sprintf("%+v", result))
 }
 
 type DropTableRequest struct {
@@ -197,7 +192,7 @@ func (a *API) dropTable(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, "decode request body failed")
 		return
 	}
-	log.Info("drop table reqeust", zap.String("request", fmt.Sprintf("%v", dropTableRequest)))
+	log.Info("drop table reqeust", zap.String("request", fmt.Sprintf("%+v", dropTableRequest)))
 
 	if err := a.clusterManager.DropTable(context.Background(), dropTableRequest.ClusterName, dropTableRequest.SchemaName, dropTableRequest.Table); err != nil {
 		log.Error("cluster drop table failed", zap.Error(err))
@@ -206,4 +201,42 @@ func (a *API) dropTable(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	a.respond(writer, nil)
+}
+
+func (a *API) getShardTables(writer http.ResponseWriter, req *http.Request) {
+	clusterName := req.URL.Query().Get("clusterName")
+	nodeName := req.URL.Query().Get("nodeName")
+	if len(clusterName) == 0 {
+		log.Error("clusterName cannot be empty")
+		a.respondError(writer, ErrParseRequest, "clusterName cannot be empty")
+		return
+	}
+	if len(nodeName) == 0 {
+		log.Error("nodeName cannot be empty")
+		a.respondError(writer, ErrParseRequest, "nodeName cannot be empty")
+		return
+	}
+
+	c, err := a.clusterManager.GetCluster(req.Context(), clusterName)
+	if err != nil {
+		log.Error("get cluster failed", zap.Error(err), zap.String("clusterName", clusterName))
+		a.respondError(writer, ErrParseRequest, fmt.Sprintf("get cluster failed, clusterName:%+v", clusterName))
+		return
+	}
+
+	getNodeShardsResult, err := c.GetNodeShards(req.Context())
+	if err != nil {
+		log.Error("get node shards result failed", zap.Error(err))
+		a.respondError(writer, cluster.ErrShardNotFound, "get node shards result failed")
+		return
+	}
+	var shardIDs []storage.ShardID
+	for _, nodeShard := range getNodeShardsResult.NodeShards {
+		if nodeShard.ShardNode.NodeName == nodeName {
+			shardIDs = append(shardIDs, nodeShard.ShardInfo.ID)
+		}
+	}
+
+	shardTables := c.GetShardTables(shardIDs, nodeName)
+	a.respond(writer, fmt.Sprintf("%+v", shardTables))
 }
