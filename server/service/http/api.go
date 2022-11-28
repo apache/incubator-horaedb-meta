@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -126,6 +127,7 @@ func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, "decode request body failed")
 		return
 	}
+	log.Info("transfer leader request", zap.String("request", fmt.Sprintf("%v", transferLeaderRequest)))
 
 	transferLeaderProcedure, err := a.procedureFactory.CreateTransferLeaderProcedure(req.Context(), procedure.TransferLeaderRequest{
 		ClusterName:       transferLeaderRequest.ClusterName,
@@ -162,6 +164,7 @@ func (a *API) route(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, "decode request body failed")
 		return
 	}
+	log.Info("route request", zap.String("request", fmt.Sprintf("%v", routeRequest)))
 
 	result, err := a.clusterManager.RouteTables(context.Background(), routeRequest.ClusterName, routeRequest.SchemaName, routeRequest.Tables)
 	if err != nil {
@@ -194,6 +197,7 @@ func (a *API) dropTable(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, "decode request body failed")
 		return
 	}
+	log.Info("drop table reqeust", zap.String("request", fmt.Sprintf("%v", dropTableRequest)))
 
 	if err := a.clusterManager.DropTable(context.Background(), dropTableRequest.ClusterName, dropTableRequest.SchemaName, dropTableRequest.Table); err != nil {
 		log.Error("cluster drop table failed", zap.Error(err))
@@ -201,5 +205,5 @@ func (a *API) dropTable(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	a.respond(writer, "ok")
+	a.respond(writer, nil)
 }
