@@ -13,8 +13,8 @@ const (
 )
 
 type Config struct {
-	Level string `toml:"level" env:"level"`
-	File  string `toml:"file" env:"file"`
+	Level string `toml:"level" env:"LEVEL"`
+	File  string `toml:"file" env:"FILE"`
 }
 
 // DefaultZapLoggerConfig defines default zap logger configuration.
