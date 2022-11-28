@@ -128,7 +128,7 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 	ret := DropTableResult{
 		ShardVersionUpdate: updateVersion,
 	}
-	log.Info(fmt.Sprintf("create table success, result:%v", ret), zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
+	log.Info("drop table success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("result", fmt.Sprintf("%+v", ret)))
 	return ret, nil
 }
 
@@ -170,7 +170,7 @@ func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName s
 		Table:              table,
 		ShardVersionUpdate: result,
 	}
-	log.Info(fmt.Sprintf("create table succeed, result:%v", ret), zap.String("cluster", c.Name()))
+	log.Info("create table succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", ret)))
 	return ret, nil
 }
 
