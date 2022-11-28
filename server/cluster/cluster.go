@@ -98,6 +98,13 @@ func (c *Cluster) GetShardTables(shardIDs []storage.ShardID, nodeName string) ma
 			Tables: tableInfos,
 		}
 	}
+
+	for _, shardID := range shardIDs {
+		_, exists := result[shardID]
+		if !exists {
+			result[shardID] = ShardTables{}
+		}
+	}
 	return result
 }
 
@@ -130,6 +137,15 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 	}
 	log.Info("drop table success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("result", fmt.Sprintf("%+v", ret)))
 	return ret, nil
+}
+
+func (c *Cluster) UpdateShardTables(ctx context.Context, shardTables ShardTables) (UpdateShardTablesResult, error) {
+	updateVersion, err := c.topologyManager.UpdateShardTables(ctx, shardTables)
+	if err != nil {
+		return UpdateShardTablesResult{}, errors.WithMessagef(err, "update shard tables")
+	}
+
+	return UpdateShardTablesResult{updateVersion}, nil
 }
 
 // GetOrCreateSchema the second output parameter bool: returns true if the schema was newly created.
@@ -295,6 +311,13 @@ func (c *Cluster) GetNodeShards(_ context.Context) (GetNodeShardsResult, error) 
 		ClusterTopologyVersion: c.topologyManager.GetVersion(),
 		NodeShards:             shardNodesWithVersion,
 	}, nil
+}
+
+func (c *Cluster) GetClusterViewVersion() uint64 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.topologyManager.GetVersion()
 }
 
 func (c *Cluster) GetClusterMinNodeCount() uint32 {

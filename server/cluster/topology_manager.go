@@ -30,6 +30,8 @@ type TopologyManager interface {
 	AddTable(ctx context.Context, nodeName string, table storage.Table) (ShardVersionUpdate, error)
 	// RemoveTable remove table from cluster topology.
 	RemoveTable(ctx context.Context, tableID storage.TableID) (ShardVersionUpdate, error)
+	// UpdateShardTables update table mapping with ShardTables
+	UpdateShardTables(ctx context.Context, shardTables ShardTables) (ShardVersionUpdate, error)
 	// GetShardNodesByID get shardNodes with shardID.
 	GetShardNodesByID(shardID storage.ShardID) ([]storage.ShardNode, error)
 	// GetShardNodesByTableIDs get shardNodes with tableIDs.
@@ -238,9 +240,54 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, tableID storage.T
 	// Update shardView in memory.
 	shardView.Version = prevVersion + 1
 	shardView.TableIDs = tableIDs
+	delete(m.tableShardMapping, tableID)
 
 	return ShardVersionUpdate{
 		ShardID:     shardID,
+		CurrVersion: prevVersion + 1,
+		PrevVersion: prevVersion,
+	}, nil
+}
+
+func (m *TopologyManagerImpl) UpdateShardTables(ctx context.Context, shardTables ShardTables) (ShardVersionUpdate, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if _, ok := m.shardNodesMapping[shardTables.Shard.ID]; !ok {
+		return ShardVersionUpdate{}, ErrShardNotFound.WithCausef("shard id:%d", shardTables.Shard.ID)
+	}
+
+	prevVersion := uint64(0)
+	shardView, ok := m.shardTablesMapping[shardTables.Shard.ID]
+	if ok {
+		prevVersion = shardView.Version
+	}
+
+	tableIDs := make([]storage.TableID, 0, len(shardTables.Tables))
+	for _, table := range shardTables.Tables {
+		tableIDs = append(tableIDs, table.ID)
+	}
+
+	if err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
+		ClusterID: m.clusterID,
+		ShardView: storage.ShardView{
+			ShardID:   shardTables.Shard.ID,
+			Version:   prevVersion + 1,
+			TableIDs:  tableIDs,
+			CreatedAt: uint64(time.Now().UnixMilli()),
+		},
+		LatestVersion: prevVersion,
+	}); err != nil {
+		return ShardVersionUpdate{}, errors.WithMessage(err, "storage update shard view")
+	}
+
+	// Update shardView in memory.
+	if err := m.loadShardViews(ctx); err != nil {
+		return ShardVersionUpdate{}, errors.WithMessage(err, "load shard views")
+	}
+
+	return ShardVersionUpdate{
+		ShardID:     shardTables.Shard.ID,
 		CurrVersion: prevVersion + 1,
 		PrevVersion: prevVersion,
 	}, nil
