@@ -253,12 +253,10 @@ func (m *TopologyManagerImpl) UpdateShardView(ctx context.Context, shardView sto
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	preVersion := shardView.Version
-	shardView.Version++
 	if err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
 		ClusterID:     m.clusterID,
 		ShardView:     shardView,
-		LatestVersion: preVersion,
+		LatestVersion: shardView.Version - 1,
 	}); err != nil {
 		return ShardVersionUpdate{}, errors.WithMessage(err, "storage update shard view")
 	}
@@ -271,8 +269,8 @@ func (m *TopologyManagerImpl) UpdateShardView(ctx context.Context, shardView sto
 
 	return ShardVersionUpdate{
 		ShardID:     shardView.ShardID,
-		CurrVersion: preVersion + 1,
-		PrevVersion: preVersion,
+		CurrVersion: shardView.Version,
+		PrevVersion: shardView.Version - 1,
 	}, nil
 }
 

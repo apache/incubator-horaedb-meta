@@ -20,16 +20,14 @@ import (
 const (
 	eventSplitCreateNewShardMetadata = "EventSplitCreateNewShardMetadata"
 	eventSplitCreateNewShardView     = "EventCreateNewShardView"
-	eventSplitDeleteShardTables      = "EventSplitDeleteShardTables"
-	eventSplitCreateShardTables      = "EventSplitCreateShardTables"
+	eventSplitUpdateShardTables      = "EventSplitUpdateShardTables"
 	eventSplitOpenNewShard           = "EventSplitOpenNewShard"
 	eventSplitFinish                 = "EventSplitFinish"
 
 	stateSplitBegin                  = "StateBegin"
 	stateSplitCreateNewShardMetadata = "StateSplitCreateNewShardMetadata"
 	stateSplitCreateNewShardView     = "StateSplitCreateNewShardView"
-	stateSplitDeleteShardTables      = "StateDeleteShardTables"
-	stateSplitCreateShardTables      = "StateSplitCreateShardTables"
+	stateSplitUpdateShardTables      = "StateSplitUpdateShardTables"
 	stateSplitOpenNewShard           = "StateOpenNewShard"
 	stateSplitFinish                 = "StateFinish"
 )
@@ -38,16 +36,14 @@ var (
 	splitEvents = fsm.Events{
 		{Name: eventSplitCreateNewShardMetadata, Src: []string{stateSplitBegin}, Dst: stateSplitCreateNewShardMetadata},
 		{Name: eventSplitCreateNewShardView, Src: []string{stateSplitCreateNewShardMetadata}, Dst: stateSplitCreateNewShardView},
-		{Name: eventSplitDeleteShardTables, Src: []string{stateSplitCreateNewShardView}, Dst: stateSplitDeleteShardTables},
-		{Name: eventSplitCreateShardTables, Src: []string{stateSplitDeleteShardTables}, Dst: stateSplitCreateShardTables},
-		{Name: eventSplitOpenNewShard, Src: []string{stateSplitCreateShardTables}, Dst: stateSplitOpenNewShard},
+		{Name: eventSplitUpdateShardTables, Src: []string{stateSplitCreateNewShardView}, Dst: stateSplitUpdateShardTables},
+		{Name: eventSplitOpenNewShard, Src: []string{stateSplitUpdateShardTables}, Dst: stateSplitOpenNewShard},
 		{Name: eventSplitFinish, Src: []string{stateSplitOpenNewShard}, Dst: stateSplitFinish},
 	}
 	splitCallbacks = fsm.Callbacks{
 		eventSplitCreateNewShardMetadata: splitOpenNewShardMetadataCallback,
 		eventSplitCreateNewShardView:     splitCreateShardViewCallback,
-		eventSplitDeleteShardTables:      splitDeleteShardTablesCallback,
-		eventSplitCreateShardTables:      splitCreateShardTablesCallback,
+		eventSplitUpdateShardTables:      splitUpdateShardTablesCallback,
 		eventSplitOpenNewShard:           splitOpenShardCallback,
 		eventSplitFinish:                 splitFinishCallback,
 	}
@@ -152,19 +148,11 @@ func (p *SplitProcedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "split procedure persist")
 			}
-			if err := p.fsm.Event(eventSplitDeleteShardTables, splitCallbackRequest); err != nil {
+			if err := p.fsm.Event(eventSplitUpdateShardTables, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "split procedure open new shard")
+				return errors.WithMessagef(err, "split procedure create new shard")
 			}
-		case stateSplitDeleteShardTables:
-			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "split procedure persist")
-			}
-			if err := p.fsm.Event(eventSplitCreateShardTables, splitCallbackRequest); err != nil {
-				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "split procedure create shard tables")
-			}
-		case stateSplitCreateShardTables:
+		case stateSplitUpdateShardTables:
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "split procedure persist")
 			}
@@ -319,7 +307,7 @@ func splitOpenShardCallback(event *fsm.Event) {
 	}
 }
 
-func splitDeleteShardTablesCallback(event *fsm.Event) {
+func splitUpdateShardTablesCallback(event *fsm.Event) {
 	request, err := getRequestFromEvent[splitCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
@@ -327,12 +315,12 @@ func splitDeleteShardTablesCallback(event *fsm.Event) {
 	}
 	ctx := request.ctx
 
-	shardTables := request.cluster.GetShardTables([]storage.ShardID{request.shardID}, request.targetNodeName)[request.shardID]
+	originShardTables := request.cluster.GetShardTables([]storage.ShardID{request.shardID}, request.targetNodeName)[request.shardID]
 
 	// Find remaining tables in old shard.
 	var remainingTables []cluster.TableInfo
 
-	for _, tableInfo := range shardTables.Tables {
+	for _, tableInfo := range originShardTables.Tables {
 		found := false
 		for _, tableName := range request.tableNames {
 			if tableInfo.Name == tableName && tableInfo.SchemaName == request.schemaName {
@@ -346,21 +334,8 @@ func splitDeleteShardTablesCallback(event *fsm.Event) {
 	}
 
 	// Update shard tables.
-	shardTables.Tables = remainingTables
-	shardTables.Shard.Version++
-	if _, err := request.cluster.UpdateShardTables(ctx, shardTables); err != nil {
-		cancelEventWithLog(event, err, "update shard tables")
-		return
-	}
-}
-
-func splitCreateShardTablesCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[splitCallbackRequest](event)
-	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
-		return
-	}
-	ctx := request.ctx
+	originShardTables.Tables = remainingTables
+	originShardTables.Shard.Version++
 
 	getNodeShardsResult, err := request.cluster.GetNodeShards(ctx)
 	if err != nil {
@@ -403,11 +378,12 @@ func splitCreateShardTablesCallback(event *fsm.Event) {
 			SchemaName: request.schemaName,
 		})
 	}
-
-	if _, err := request.cluster.UpdateShardTables(ctx, cluster.ShardTables{
+	newShardTables := cluster.ShardTables{
 		Shard:  newShardInfo,
 		Tables: tables,
-	}); err != nil {
+	}
+
+	if err := request.cluster.UpdateShardTables(ctx, []cluster.ShardTables{originShardTables, newShardTables}); err != nil {
 		cancelEventWithLog(event, err, "update shard tables")
 		return
 	}

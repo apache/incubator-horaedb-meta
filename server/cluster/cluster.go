@@ -140,24 +140,25 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 	return ret, nil
 }
 
-func (c *Cluster) UpdateShardTables(ctx context.Context, shardTables ShardTables) (UpdateShardTablesResult, error) {
+func (c *Cluster) UpdateShardTables(ctx context.Context, shardTablesArr []ShardTables) error {
+	for _, shardTables := range shardTablesArr {
+		tableIDs := make([]storage.TableID, 0, len(shardTables.Tables))
+		for _, table := range shardTables.Tables {
+			tableIDs = append(tableIDs, table.ID)
+		}
 
-	tableIDs := make([]storage.TableID, len(shardTables.Tables))
-	for _, table := range shardTables.Tables {
-		tableIDs = append(tableIDs, table.ID)
+		_, err := c.topologyManager.UpdateShardView(ctx, storage.ShardView{
+			ShardID:   shardTables.Shard.ID,
+			Version:   shardTables.Shard.Version,
+			TableIDs:  tableIDs,
+			CreatedAt: uint64(time.Now().UnixMilli()),
+		})
+		if err != nil {
+			return errors.WithMessagef(err, "update shard tables")
+		}
 	}
 
-	updateVersion, err := c.topologyManager.UpdateShardView(ctx, storage.ShardView{
-		ShardID:   shardTables.Shard.ID,
-		Version:   shardTables.Shard.Version,
-		TableIDs:  tableIDs,
-		CreatedAt: uint64(time.Now().UnixMilli()),
-	})
-	if err != nil {
-		return UpdateShardTablesResult{}, errors.WithMessagef(err, "update shard tables")
-	}
-
-	return UpdateShardTablesResult{updateVersion}, nil
+	return nil
 }
 
 // GetOrCreateSchema the second output parameter bool: returns true if the schema was newly created.
