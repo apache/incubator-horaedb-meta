@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -140,7 +141,18 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 }
 
 func (c *Cluster) UpdateShardTables(ctx context.Context, shardTables ShardTables) (UpdateShardTablesResult, error) {
-	updateVersion, err := c.topologyManager.UpdateShardTables(ctx, shardTables)
+
+	tableIDs := make([]storage.TableID, len(shardTables.Tables))
+	for _, table := range shardTables.Tables {
+		tableIDs = append(tableIDs, table.ID)
+	}
+
+	updateVersion, err := c.topologyManager.UpdateShardView(ctx, storage.ShardView{
+		ShardID:   shardTables.Shard.ID,
+		Version:   shardTables.Shard.Version,
+		TableIDs:  tableIDs,
+		CreatedAt: uint64(time.Now().UnixMilli()),
+	})
 	if err != nil {
 		return UpdateShardTablesResult{}, errors.WithMessagef(err, "update shard tables")
 	}
