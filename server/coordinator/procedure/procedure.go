@@ -28,6 +28,7 @@ const (
 	Scatter
 	CreateTable
 	DropTable
+	Apply
 	CreatePartitionTable
 	DropPartitionTable
 )

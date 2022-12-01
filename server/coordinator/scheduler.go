@@ -117,8 +117,7 @@ func (s *Scheduler) processNodes(ctx context.Context, nodes []cluster.Registered
 }
 
 // applyMetadataShardInfo verify shardInfo in heartbeats and metadata, they are forcibly synchronized to the latest version if they are inconsistent.
-// TODO: Encapsulate the following logic as a standalone ApplyProcedure.
-func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, realShards []cluster.ShardInfo, expectShards []cluster.ShardInfo) error {
+func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, nodeName string, realShards []cluster.ShardInfo, expectShards []cluster.ShardInfo) error {
 	realShardInfoMapping := make(map[storage.ShardID]cluster.ShardInfo, len(realShards))
 	expectShardInfoMapping := make(map[storage.ShardID]cluster.ShardInfo, len(expectShards))
 	for _, realShard := range realShards {
@@ -128,16 +127,18 @@ func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, rea
 		expectShardInfoMapping[expectShard.ID] = expectShard
 	}
 
+	var shardsNeedToReopen []cluster.ShardInfo
+	var shardsNeedToCloseAndReopen []cluster.ShardInfo
+	var shardNeedToClose []cluster.ShardInfo
+
 	// This includes the following cases:
 	for _, expectShard := range expectShards {
 		realShard, exists := realShardInfoMapping[expectShard.ID]
 
 		// 1. Shard exists in metadata and not exists in node, reopen lack shards on node.
 		if !exists {
-			log.Info("Shard exists in metadata and not exists in node, reopen lack shards on node.", zap.String("node", node), zap.Uint32("shardID", uint32(expectShard.ID)))
-			if err := s.dispatch.OpenShard(ctx, node, eventdispatch.OpenShardRequest{Shard: expectShard}); err != nil {
-				return errors.WithMessagef(err, "reopen shard failed, shardInfo:%d", expectShard.ID)
-			}
+			log.Info("Shard exists in metadata and not exists in node, reopen lack shards on node", zap.String("nodeName", nodeName), zap.Uint32("shardID", uint32(expectShard.ID)))
+			shardsNeedToReopen = append(shardsNeedToReopen, expectShard)
 			continue
 		}
 
@@ -147,13 +148,8 @@ func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, rea
 		}
 
 		// 3. Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.
-		log.Info("Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.", zap.String("node", node), zap.Uint32("shardID", uint32(expectShard.ID)))
-		if err := s.dispatch.CloseShard(ctx, node, eventdispatch.CloseShardRequest{ShardID: uint32(expectShard.ID)}); err != nil {
-			return errors.WithMessagef(err, "close shard failed, shardInfo:%d", expectShard.ID)
-		}
-		if err := s.dispatch.OpenShard(ctx, node, eventdispatch.OpenShardRequest{Shard: expectShard}); err != nil {
-			return errors.WithMessagef(err, "reopen shard failed, shardInfo:%d", expectShard.ID)
-		}
+		log.Info("Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node", zap.String("nodeName", nodeName), zap.Uint32("shardID", uint32(expectShard.ID)))
+		shardsNeedToCloseAndReopen = append(shardsNeedToCloseAndReopen, expectShard)
 	}
 
 	// 4. Shard exists in node and not exists in metadata, close extra shard on node.
@@ -162,11 +158,18 @@ func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, rea
 		if ok {
 			continue
 		}
-		log.Info("Shard exists in node and not exists in metadata, close extra shard on node.", zap.String("node", node), zap.Uint32("shardID", uint32(realShard.ID)))
-		if err := s.dispatch.CloseShard(ctx, node, eventdispatch.CloseShardRequest{ShardID: uint32(realShard.ID)}); err != nil {
-			return errors.WithMessagef(err, "close shard failed, shardInfo:%d", realShard.ID)
-		}
+		log.Info("Shard exists in node and not exists in metadata, close extra shard on node", zap.String("nodeName", nodeName), zap.Uint32("shardID", uint32(realShard.ID)))
+		shardNeedToClose = append(shardNeedToClose, realShard)
 	}
 
+	if len(shardsNeedToReopen) > 0 || len(shardNeedToClose) > 0 || len(shardsNeedToCloseAndReopen) > 0 {
+		applyProcedure, err := s.procedureFactory.CreateApplyProcedure(ctx, procedure.ApplyRequest{NodeName: nodeName, ShardsNeedReopen: shardsNeedToReopen, ShardsNeedClose: shardNeedToClose, ShardsNeedCloseAndReopen: shardsNeedToCloseAndReopen})
+		if err != nil {
+			return errors.WithMessagef(err, "create apply procedure failed, target nodeName:%s", nodeName)
+		}
+		if err := s.procedureManager.Submit(ctx, applyProcedure); err != nil {
+			return errors.WithMessagef(err, "submit apply procedure failed, procedureID:%d, target nodeName:%s", applyProcedure.ID(), nodeName)
+		}
+	}
 	return nil
 }

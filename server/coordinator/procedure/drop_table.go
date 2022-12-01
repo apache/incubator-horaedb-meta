@@ -180,6 +180,7 @@ type DropTableProcedure struct {
 	onSucceeded func(cluster.TableInfo) error
 	onFailed    func(error) error
 
+	// Protect the state.
 	lock  sync.RWMutex
 	state State
 }

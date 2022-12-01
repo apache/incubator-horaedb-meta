@@ -67,6 +67,7 @@ type CreatePartitionTableProcedure struct {
 	onSucceeded func(cluster.CreateTableResult) error
 	onFailed    func(error) error
 
+	// Protect the state.
 	lock  sync.RWMutex
 	state State
 }
