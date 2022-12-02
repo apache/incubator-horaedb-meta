@@ -5,6 +5,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -100,6 +101,8 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 		return ceresmetaClient.AllocSchemaID(ctx, req)
 	}
 
+	req.Name = strings.ToLower(req.Name)
+
 	schemaID, _, err := s.h.GetClusterManager().AllocSchemaID(ctx, req.GetHeader().GetClusterName(), req.GetName())
 	if err != nil {
 		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "grpc alloc schema id")}, nil
@@ -148,6 +151,9 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 	if ceresmetaClient != nil {
 		return ceresmetaClient.CreateTable(ctx, req)
 	}
+
+	req.SchemaName = strings.ToLower(req.SchemaName)
+	req.Name = strings.ToLower(req.Name)
 
 	clusterManager := s.h.GetClusterManager()
 	factory := s.h.GetProcedureFactory()
@@ -219,6 +225,9 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 		return ceresmetaClient.DropTable(ctx, req)
 	}
 
+	req.SchemaName = strings.ToLower(req.SchemaName)
+	req.Name = strings.ToLower(req.Name)
+
 	clusterManager := s.h.GetClusterManager()
 	factory := s.h.GetProcedureFactory()
 	manager := s.h.GetProcedureManager()
@@ -278,6 +287,13 @@ func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTable
 	if ceresmetaClient != nil {
 		return ceresmetaClient.RouteTables(ctx, req)
 	}
+
+	req.SchemaName = strings.ToLower(req.SchemaName)
+	tableNames := make([]string, len(req.TableNames))
+	for _, tableName := range req.TableNames {
+		tableNames = append(tableNames, strings.ToLower(tableName))
+	}
+	req.TableNames = tableNames
 
 	routeTableResult, err := s.h.GetClusterManager().RouteTables(ctx, req.GetHeader().GetClusterName(), req.GetSchemaName(), req.GetTableNames())
 	if err != nil {
