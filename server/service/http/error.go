@@ -12,4 +12,5 @@ var (
 	ErrSubmitProcedure = coderr.NewCodeError(coderr.Internal, "submit procedure")
 	ErrGetCluster      = coderr.NewCodeError(coderr.Internal, "get cluster")
 	ErrAllocShardID    = coderr.NewCodeError(coderr.Internal, "alloc shard id")
+	ErrForwardToLeader = coderr.NewCodeError(coderr.Internal, "forward to leader")
 )
