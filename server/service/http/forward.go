@@ -51,19 +51,21 @@ func (s *ForwardClient) getForwardedAddr(ctx context.Context) (string, bool, err
 	if member.IsLocal {
 		return "", true, nil
 	}
-	leaderAddr := strings.Split(member.Leader.GetEndpoint(), ":")
-	leaderAddr[2] = strconv.Itoa(s.port)
-	return strings.Join(leaderAddr, ":"), false, nil
+	httpAddr, err := formatHTTPAddr(member.Leader.Endpoint, s.port)
+	if err != nil {
+		return "", false, errors.WithMessage(err, "format http addr")
+	}
+	return httpAddr, false, nil
 }
 
 func (s *ForwardClient) forwardToLeader(req *http.Request) (*http.Response, bool, error) {
 	addr, isLeader, err := s.getForwardedAddr(req.Context())
 	if err != nil {
 		log.Error("get forward addr failed", zap.Error(err))
-		return &http.Response{}, false, err
+		return nil, false, err
 	}
 	if isLeader {
-		return &http.Response{}, true, nil
+		return nil, true, nil
 	}
 
 	// Update remote host
@@ -78,8 +80,20 @@ func (s *ForwardClient) forwardToLeader(req *http.Request) (*http.Response, bool
 	resp, err := s.client.Do(req)
 	if err != nil {
 		log.Error("forward client send request failed", zap.Error(err))
-		return &http.Response{}, false, err
+		return nil, false, err
 	}
 
 	return resp, false, nil
+}
+
+// formatHttpAddr convert grpcAddr(http://127.0.0.1:8831) httpPort(5000) to httpAddr(127.0.0.1:5000).
+func formatHTTPAddr(grpcAddr string, httpPort int) (string, error) {
+	leaderAddr := strings.Split(grpcAddr, ":")
+	if len(leaderAddr) != 3 {
+		return "", errors.WithMessagef(ErrParseLeaderAddr, "gprc addr:%s", grpcAddr)
+	}
+	leaderAddr[2] = strconv.Itoa(httpPort)
+	leaderAddr = append(leaderAddr[:0], leaderAddr[0:]...)
+	httpAddr := strings.Join(leaderAddr, ":")
+	return httpAddr, nil
 }
