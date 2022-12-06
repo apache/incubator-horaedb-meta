@@ -1,0 +1,14 @@
+etcd-start-timeout-ms = 30000
+peer-urls = "http://127.0.0.1:22380"
+advertise-client-urls = "http://127.0.0.1:22379"
+advertise-peer-urls = "http://127.0.0.1:22380"
+client-urls = "http://127.0.0.1:22379"
+wal-dir = "/tmp/ceresmeta2/wal"
+data-dir = "/tmp/ceresmeta2/data"
+node-name = "meta2"
+initial-cluster = "meta0=http://127.0.0.1:2380,meta1=http://127.0.0.1:12380,meta2=http://127.0.0.1:22380"
+default-cluster-node-count = 2
+default-http-port = 28080
+
+[etcd-log]
+file = "/tmp/ceresmeta2/etcd.log"
