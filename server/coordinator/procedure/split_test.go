@@ -15,7 +15,7 @@ func TestSplit(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
 	dispatch := MockDispatch{}
-	c := prepare(t)
+	_, c := prepare(t)
 	s := NewTestStorage(t)
 
 	getNodeShardsResult, err := c.GetNodeShards(ctx)

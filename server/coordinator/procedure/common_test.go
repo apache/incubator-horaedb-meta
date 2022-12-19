@@ -26,6 +26,7 @@ const (
 	clusterName              = "ceresdbCluster1"
 	defaultNodeCount         = 2
 	defaultReplicationFactor = 1
+	defaultPartitionNum      = 2
 	defaultShardTotal        = 2
 )
 
@@ -55,25 +56,25 @@ func newTestEtcdStorage(t *testing.T) (storage.Storage, clientv3.KV, etcdutil.Cl
 	return storage, client, closeSrv
 }
 
-func newTestCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
+func newTestCluster(ctx context.Context, t *testing.T) (cluster.Manager, *cluster.Cluster) {
 	re := require.New(t)
 	storage, kv, _ := newTestEtcdStorage(t)
 	manager, err := cluster.NewManagerImpl(storage, kv, testRootPath, defaultIDAllocatorStep)
 	re.NoError(err)
 
-	cluster, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
+	cluster, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal, defaultPartitionNum)
 	re.NoError(err)
-	return cluster
+	return manager, cluster
 }
 
 // Prepare a test cluster which has scattered shards and created test schema.
 // Notice: sleep(5s) will be called in this function.
-func prepare(t *testing.T) *cluster.Cluster {
+func prepare(t *testing.T) (cluster.Manager, *cluster.Cluster) {
 	re := require.New(t)
-	cluster := newClusterAndRegisterNode(t)
+	manager, cluster := newClusterAndRegisterNode(t)
 	// Wait for the cluster to be ready.
 	time.Sleep(time.Second * 5)
 	_, _, err := cluster.GetOrCreateSchema(context.Background(), testSchemaName)
 	re.NoError(err)
-	return cluster
+	return manager, cluster
 }

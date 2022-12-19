@@ -243,7 +243,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) error {
 
 	// Create default cluster by the leader.
 	if leaderResp.IsLocal {
-		defaultCluster, err := srv.clusterManager.CreateCluster(ctx, srv.cfg.DefaultClusterName, uint32(srv.cfg.DefaultClusterNodeCount), uint32(srv.cfg.DefaultClusterReplicationFactor), uint32(srv.cfg.DefaultClusterShardTotal))
+		defaultCluster, err := srv.clusterManager.CreateCluster(ctx, srv.cfg.DefaultClusterName, uint32(srv.cfg.DefaultClusterNodeCount), uint32(srv.cfg.DefaultClusterReplicationFactor), uint32(srv.cfg.DefaultClusterShardTotal), uint32(srv.cfg.DefaultClusterPartitionTableNum))
 		if err != nil {
 			log.Warn("create default cluster failed", zap.Error(err))
 			if coderr.Is(err, cluster.ErrClusterAlreadyExists.Code()) {

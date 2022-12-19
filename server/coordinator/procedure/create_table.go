@@ -4,14 +4,12 @@ package procedure
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
-	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
 )
@@ -42,64 +40,14 @@ var (
 
 func createTablePrepareCallback(event *fsm.Event) {
 	req := event.Args[0].(*createTableCallbackRequest)
-	_, exists, err := req.cluster.GetTable(req.sourceReq.GetSchemaName(), req.sourceReq.GetName())
+
+	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), req.sourceReq.GetHeader().GetNode())
 	if err != nil {
-		cancelEventWithLog(event, err, "cluster get table")
-		return
-	}
-	if exists {
-		cancelEventWithLog(event, ErrTableAlreadyExists, fmt.Sprintf("create an existing table, schemaName:%s, tableName:%s", req.sourceReq.GetSchemaName(), req.sourceReq.GetName()))
+		cancelEventWithLog(event, err, "create table metadata")
 		return
 	}
 
-	createTableResult, err := req.cluster.CreateTable(req.ctx, req.sourceReq.GetHeader().GetNode(), req.sourceReq.GetSchemaName(), req.sourceReq.GetName())
-	if err != nil {
-		cancelEventWithLog(event, err, "cluster create table")
-		return
-	}
-
-	shardNodes, err := req.cluster.GetShardNodesByShardID(createTableResult.ShardVersionUpdate.ShardID)
-	if err != nil {
-		cancelEventWithLog(event, err, "cluster get shardNode by id")
-		return
-	}
-	// TODO: consider followers
-	leader := storage.ShardNode{}
-	found := false
-	for _, shardNode := range shardNodes {
-		if shardNode.ShardRole == storage.ShardRoleLeader {
-			found = true
-			leader = shardNode
-			break
-		}
-	}
-	if !found {
-		cancelEventWithLog(event, ErrShardLeaderNotFound, fmt.Sprintf("shard node can't find leader, shardID:%d", createTableResult.ShardVersionUpdate.ShardID))
-		return
-	}
-
-	err = req.dispatch.CreateTableOnShard(req.ctx, leader.NodeName, eventdispatch.CreateTableOnShardRequest{
-		UpdateShardInfo: eventdispatch.UpdateShardInfo{
-			CurrShardInfo: cluster.ShardInfo{
-				ID: createTableResult.ShardVersionUpdate.ShardID,
-				// TODO: dispatch CreateTableOnShard to followers?
-				Role:    storage.ShardRoleLeader,
-				Version: createTableResult.ShardVersionUpdate.CurrVersion,
-			},
-			PrevVersion: createTableResult.ShardVersionUpdate.PrevVersion,
-		},
-		TableInfo: cluster.TableInfo{
-			ID:         createTableResult.Table.ID,
-			Name:       createTableResult.Table.Name,
-			SchemaID:   createTableResult.Table.SchemaID,
-			SchemaName: req.sourceReq.GetSchemaName(),
-		},
-		EncodedSchema:    req.sourceReq.EncodedSchema,
-		Engine:           req.sourceReq.Engine,
-		CreateIfNotExist: req.sourceReq.CreateIfNotExist,
-		Options:          req.sourceReq.Options,
-	})
-	if err != nil {
+	if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, createTableResult.ShardVersionUpdate.ShardID, buildCreateTableRequest(createTableResult, req.sourceReq)); err != nil {
 		cancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}

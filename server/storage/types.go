@@ -139,6 +139,7 @@ type Cluster struct {
 	MinNodeCount      uint32
 	ReplicationFactor uint32
 	ShardTotal        uint32
+	PartitionTableNum uint32
 	CreatedAt         uint64
 }
 

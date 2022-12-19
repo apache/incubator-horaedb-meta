@@ -20,6 +20,7 @@ type Factory struct {
 	dispatch       eventdispatch.Dispatch
 	storage        Storage
 	clusterManager cluster.Manager
+	shardPicker    ShardPicker
 }
 
 type ScatterRequest struct {
@@ -61,12 +62,23 @@ type SplitRequest struct {
 	ClusterVersion uint64
 }
 
+type CreatePartitionTableRequest struct {
+	ClusterName string
+	SourceReq   *metaservicepb.CreateTableRequest
+
+	PartitionTableNum uint
+
+	OnSucceeded func(cluster.CreateTableResult) error
+	OnFailed    func(error) error
+}
+
 func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage Storage, manager cluster.Manager) *Factory {
 	return &Factory{
 		idAllocator:    allocator,
 		dispatch:       dispatch,
 		storage:        storage,
 		clusterManager: manager,
+		shardPicker:    NewRandomShardPicker(manager),
 	}
 }
 
@@ -128,6 +140,32 @@ func (f *Factory) CreateSplitProcedure(ctx context.Context, request SplitRequest
 	}
 
 	procedure := NewSplitProcedure(id, f.dispatch, f.storage, c, request.SchemaName, request.ShardID, request.NewShardID, request.TableNames, request.TargetNodeName)
+	return procedure, nil
+}
+
+func (f *Factory) CreateCreatePartitionTableProcedure(ctx context.Context, request CreatePartitionTableRequest) (Procedure, error) {
+	id, err := f.allocProcedureID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := f.clusterManager.GetCluster(ctx, request.ClusterName)
+	if err != nil {
+		log.Error("cluster not found", zap.String("clusterName", request.ClusterName))
+		return nil, cluster.ErrClusterNotFound
+	}
+
+	partitionTableShards, err := f.shardPicker.PickShards(ctx, request.ClusterName, int(request.PartitionTableNum))
+	if err != nil {
+		return nil, errors.WithMessage(err, "pick partition table shards")
+	}
+
+	dataTableShards, err := f.shardPicker.PickShards(ctx, request.ClusterName, len(request.SourceReq.PartitionInfo.Names))
+	if err != nil {
+		return nil, errors.WithMessage(err, "pick data table shards")
+	}
+
+	procedure := NewCreatePartitionTableProcedure(id, c, f.dispatch, f.storage, request.SourceReq, partitionTableShards, dataTableShards, request.OnSucceeded, request.OnFailed)
 	return procedure, nil
 }
 

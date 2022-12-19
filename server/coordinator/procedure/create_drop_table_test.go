@@ -17,7 +17,7 @@ import (
 func TestCreateAndDropTable(t *testing.T) {
 	re := require.New(t)
 	dispatch := MockDispatch{}
-	c := prepare(t)
+	_, c := prepare(t)
 	testTableNum := 20
 	// Create table.
 	for i := 0; i < testTableNum; i++ {

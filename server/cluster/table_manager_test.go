@@ -39,6 +39,7 @@ const (
 	testRootPath                    = "/rootPath"
 	defaultIDAllocatorStep          = 20
 	defaultThreadNum                = 20
+	defaultPartitionTableNum        = 2
 )
 
 func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, etcdutil.CloseFn) {
@@ -158,7 +159,7 @@ func testCluster(ctx context.Context, re *require.Assertions, manager Manager, c
 }
 
 func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
-	_, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal)
+	_, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal, defaultPartitionTableNum)
 	re.NoError(err)
 }
 
