@@ -32,15 +32,17 @@ func TestCreatePartitionTable(t *testing.T) {
 		Name:       testTableName0,
 	}
 
-	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), defaultPartitionNum)
+	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), defaultTablePartitionNum)
 	re.NoError(err)
 	dataTableShards, err := shardPicker.PickShards(ctx, c.Name(), len(request.PartitionInfo.Names))
 	re.NoError(err)
 
-	procedure := NewCreatePartitionTableProcedure(1, c, dispatch, s, request, partitionTableShards, dataTableShards, func(_ cluster.CreateTableResult) error {
-		return nil
-	}, func(_ error) error {
-		return nil
+	procedure := NewCreatePartitionTableProcedure(CreatePartitionTableProcedureRequest{
+		1, c, dispatch, s, request, partitionTableShards, dataTableShards, func(_ cluster.CreateTableResult) error {
+			return nil
+		}, func(_ error) error {
+			return nil
+		},
 	})
 
 	err = procedure.Start(ctx)

@@ -35,6 +35,13 @@ type ShardNodeWithVersion struct {
 	ShardNode storage.ShardNode
 }
 
+type CreateClusterOpts struct {
+	NodeCount         uint32
+	ReplicationFactor uint32
+	ShardTotal        uint32
+	TablePartitionNum uint32
+}
+
 type CreateTableResult struct {
 	Table              storage.Table
 	ShardVersionUpdate ShardVersionUpdate

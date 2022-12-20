@@ -29,7 +29,7 @@ type Manager interface {
 	Stop(ctx context.Context) error
 
 	ListClusters(ctx context.Context) ([]*Cluster, error)
-	CreateCluster(ctx context.Context, clusterName string, nodeCount, replicationFactor, shardTotal, partitionTableNum uint32) (*Cluster, error)
+	CreateCluster(ctx context.Context, clusterName string, opts CreateClusterOpts) (*Cluster, error)
 	GetCluster(ctx context.Context, clusterName string) (*Cluster, error)
 	// AllocSchemaID means get or create schema.
 	// The second output parameter bool: Returns true if the table was newly created.
@@ -82,10 +82,8 @@ func (m *managerImpl) ListClusters(_ context.Context) ([]*Cluster, error) {
 	return clusters, nil
 }
 
-func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, initialNodeCount,
-	replicationFactor, shardTotal, partitionTableNum uint32,
-) (*Cluster, error) {
-	if initialNodeCount < 1 {
+func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opts CreateClusterOpts) (*Cluster, error) {
+	if opts.NodeCount < 1 {
 		log.Error("cluster's nodeCount must > 0", zap.String("clusterName", clusterName))
 		return nil, ErrCreateCluster.WithCausef("nodeCount must > 0")
 	}
@@ -107,10 +105,10 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, ini
 	clusterMetadata := storage.Cluster{
 		ID:                clusterID,
 		Name:              clusterName,
-		MinNodeCount:      initialNodeCount,
-		ReplicationFactor: replicationFactor,
-		ShardTotal:        shardTotal,
-		PartitionTableNum: partitionTableNum,
+		MinNodeCount:      opts.NodeCount,
+		ReplicationFactor: opts.ReplicationFactor,
+		ShardTotal:        opts.ShardTotal,
+		TablePartitionNum: opts.TablePartitionNum,
 		CreatedAt:         uint64(time.Now().UnixMilli()),
 	}
 	err = m.storage.CreateCluster(ctx, storage.CreateClusterRequest{

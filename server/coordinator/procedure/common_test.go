@@ -26,7 +26,7 @@ const (
 	clusterName              = "ceresdbCluster1"
 	defaultNodeCount         = 2
 	defaultReplicationFactor = 1
-	defaultPartitionNum      = 2
+	defaultTablePartitionNum = 2
 	defaultShardTotal        = 2
 )
 
@@ -62,7 +62,12 @@ func newTestCluster(ctx context.Context, t *testing.T) (cluster.Manager, *cluste
 	manager, err := cluster.NewManagerImpl(storage, kv, testRootPath, defaultIDAllocatorStep)
 	re.NoError(err)
 
-	cluster, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal, defaultPartitionNum)
+	cluster, err := manager.CreateCluster(ctx, clusterName, cluster.CreateClusterOpts{
+		NodeCount:         defaultNodeCount,
+		ReplicationFactor: defaultReplicationFactor,
+		ShardTotal:        defaultShardTotal,
+		TablePartitionNum: defaultTablePartitionNum,
+	})
 	re.NoError(err)
 	return manager, cluster
 }

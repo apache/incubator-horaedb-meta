@@ -47,7 +47,7 @@ const (
 	defaultClusterNodeCount         = 2
 	defaultClusterReplicationFactor = 1
 	defaultClusterShardTotal        = 8
-	defaultClusterPartitionTableNum = 2
+	defaultClusterTablePartitionNum = 2
 
 	defaultHTTPPort = 8080
 )
@@ -99,7 +99,7 @@ type Config struct {
 	DefaultClusterNodeCount         int    `toml:"default-cluster-node-count" env:"DEFAULT_CLUSTER_NODE_COUNT"`
 	DefaultClusterReplicationFactor int    `toml:"default-cluster-replication-factor" env:"DEFAULT_CLUSTER_REPLICATION_FACTOR"`
 	DefaultClusterShardTotal        int    `toml:"default-cluster-shard-total" env:"DEFAULT_CLUSTER_SHARD_TOTAL"`
-	DefaultClusterPartitionTableNum uint   `toml:"default-cluster-partition-table-num" env:"DEFAULT_CLUSTER_PARTITION_TABLE_NUM"`
+	DefaultClusterTablePartitionNum uint   `toml:"default-cluster-table-partition-num" env:"DEFAULT_CLUSTER_TABLE_PARTITION_NUM"`
 
 	ClientUrls          string `toml:"client-urls" env:"CLIENT_URLS"`
 	PeerUrls            string `toml:"peer-urls" env:"PEER_URLS"`
@@ -254,7 +254,7 @@ func MakeConfigParser() (*Parser, error) {
 		DefaultClusterNodeCount:         defaultClusterNodeCount,
 		DefaultClusterReplicationFactor: defaultClusterReplicationFactor,
 		DefaultClusterShardTotal:        defaultClusterShardTotal,
-		DefaultClusterPartitionTableNum: defaultClusterPartitionTableNum,
+		DefaultClusterTablePartitionNum: defaultClusterTablePartitionNum,
 
 		HTTPPort: defaultHTTPPort,
 	}

@@ -24,6 +24,7 @@ const (
 	defaultNodeCount                = 2
 	defaultReplicationFactor        = 1
 	defaultShardTotal               = 8
+	defaultTablePartitionNum        = 2
 	defaultLease                    = 100
 	node1                           = "127.0.0.1:8081"
 	node2                           = "127.0.0.2:8081"
@@ -39,7 +40,6 @@ const (
 	testRootPath                    = "/rootPath"
 	defaultIDAllocatorStep          = 20
 	defaultThreadNum                = 20
-	defaultPartitionTableNum        = 2
 )
 
 func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, etcdutil.CloseFn) {
@@ -159,7 +159,12 @@ func testCluster(ctx context.Context, re *require.Assertions, manager Manager, c
 }
 
 func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
-	_, err := manager.CreateCluster(ctx, clusterName, defaultNodeCount, defaultReplicationFactor, defaultShardTotal, defaultPartitionTableNum)
+	_, err := manager.CreateCluster(ctx, clusterName, CreateClusterOpts{
+		NodeCount:         defaultNodeCount,
+		ReplicationFactor: defaultReplicationFactor,
+		ShardTotal:        defaultShardTotal,
+		TablePartitionNum: defaultTablePartitionNum,
+	})
 	re.NoError(err)
 }
 

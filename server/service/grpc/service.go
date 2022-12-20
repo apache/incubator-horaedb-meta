@@ -170,30 +170,15 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 		return nil
 	}
 
-	var p procedure.Procedure
-	if req.PartitionInfo != nil && len(req.PartitionInfo.GetNames()) != 0 {
-		p, err = factory.CreateCreatePartitionTableProcedure(ctx, procedure.CreatePartitionTableRequest{
-			ClusterName:       c.Name(),
-			SourceReq:         req,
-			PartitionTableNum: uint(c.GetPartitionTableNum()),
-			OnSucceeded:       onSucceeded,
-			OnFailed:          onFailed,
-		})
-		if err != nil {
-			log.Error("fail to create partition table", zap.Error(err))
-			return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
-		}
-	} else {
-		p, err = factory.CreateCreateTableProcedure(ctx, procedure.CreateTableRequest{
-			Cluster:     c,
-			SourceReq:   req,
-			OnSucceeded: onSucceeded,
-			OnFailed:    onFailed,
-		})
-		if err != nil {
-			log.Error("fail to create table", zap.Error(err))
-			return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
-		}
+	p, err := factory.MakeCreateTableProcedure(ctx, procedure.CreateTableRequest{
+		Cluster:     c,
+		SourceReq:   req,
+		OnSucceeded: onSucceeded,
+		OnFailed:    onFailed,
+	})
+	if err != nil {
+		log.Error("fail to create table, factory create procedure", zap.Error(err))
+		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
 	}
 
 	err = manager.Submit(ctx, p)
