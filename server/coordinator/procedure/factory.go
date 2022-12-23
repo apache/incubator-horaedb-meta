@@ -66,7 +66,7 @@ type CreatePartitionTableRequest struct {
 	ClusterName string
 	SourceReq   *metaservicepb.CreateTableRequest
 
-	TablePartitionNum uint
+	PartitionTableRatioOfNodes uint
 
 	OnSucceeded func(cluster.CreateTableResult) error
 	OnFailed    func(error) error
@@ -122,7 +122,20 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 		return nil, cluster.ErrClusterNotFound
 	}
 
-	partitionTableShards, err := f.shardPicker.PickShards(ctx, request.ClusterName, int(request.TablePartitionNum))
+	getNodeShardResult, err := c.GetNodeShards(ctx)
+	if err != nil {
+		log.Error("cluster get node shard result")
+		return nil, err
+	}
+
+	nodeNames := make(map[string]int)
+	for _, nodeShard := range getNodeShardResult.NodeShards {
+		nodeNames[nodeShard.ShardNode.NodeName] = 1
+	}
+
+	partitionTableNum := Max(1, len(nodeNames)/int(request.PartitionTableRatioOfNodes))
+
+	partitionTableShards, err := f.shardPicker.PickShards(ctx, request.ClusterName, partitionTableNum)
 	if err != nil {
 		return nil, errors.WithMessage(err, "pick partition table shards")
 	}

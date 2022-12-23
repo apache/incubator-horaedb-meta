@@ -36,10 +36,10 @@ type ShardNodeWithVersion struct {
 }
 
 type CreateClusterOpts struct {
-	NodeCount         uint32
-	ReplicationFactor uint32
-	ShardTotal        uint32
-	TablePartitionNum uint32
+	NodeCount                  uint32
+	ReplicationFactor          uint32
+	ShardTotal                 uint32
+	PartitionTableRatioOfNodes uint32
 }
 
 type CreateTableResult struct {

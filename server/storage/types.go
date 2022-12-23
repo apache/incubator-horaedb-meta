@@ -134,13 +134,13 @@ type CreateOrUpdateNodeRequest struct {
 }
 
 type Cluster struct {
-	ID                ClusterID
-	Name              string
-	MinNodeCount      uint32
-	ReplicationFactor uint32
-	ShardTotal        uint32
-	TablePartitionNum uint32
-	CreatedAt         uint64
+	ID                         ClusterID
+	Name                       string
+	MinNodeCount               uint32
+	ReplicationFactor          uint32
+	ShardTotal                 uint32
+	PartitionTableRatioOfNodes uint32
+	CreatedAt                  uint64
 }
 
 type ShardNode struct {

@@ -32,7 +32,7 @@ func TestCreatePartitionTable(t *testing.T) {
 		Name:       testTableName0,
 	}
 
-	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), defaultTablePartitionNum)
+	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), defaultPartitionTableRatioOfNodes)
 	re.NoError(err)
 	dataTableShards, err := shardPicker.PickShards(ctx, c.Name(), len(request.PartitionInfo.Names))
 	re.NoError(err)

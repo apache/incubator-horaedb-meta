@@ -43,11 +43,11 @@ const (
 	defaultMinScanLimit    int  = 20
 	defaultIDAllocatorStep uint = 20
 
-	defaultClusterName              = "defaultCluster"
-	defaultClusterNodeCount         = 2
-	defaultClusterReplicationFactor = 1
-	defaultClusterShardTotal        = 8
-	defaultClusterTablePartitionNum = 2
+	defaultClusterName                       = "defaultCluster"
+	defaultClusterNodeCount                  = 2
+	defaultClusterReplicationFactor          = 1
+	defaultClusterShardTotal                 = 8
+	defaultClusterPartitionTableRatioOfNodes = 2
 
 	defaultHTTPPort = 8080
 )
@@ -95,11 +95,11 @@ type Config struct {
 	IDAllocatorStep         uint   `toml:"id-allocator-step" env:"ID_ALLOCATOR_STEP"`
 
 	// Following fields are the settings for the default cluster.
-	DefaultClusterName              string `toml:"default-cluster-name" env:"DEFAULT_CLUSTER_NAME"`
-	DefaultClusterNodeCount         int    `toml:"default-cluster-node-count" env:"DEFAULT_CLUSTER_NODE_COUNT"`
-	DefaultClusterReplicationFactor int    `toml:"default-cluster-replication-factor" env:"DEFAULT_CLUSTER_REPLICATION_FACTOR"`
-	DefaultClusterShardTotal        int    `toml:"default-cluster-shard-total" env:"DEFAULT_CLUSTER_SHARD_TOTAL"`
-	DefaultClusterTablePartitionNum uint   `toml:"default-cluster-table-partition-num" env:"DEFAULT_CLUSTER_TABLE_PARTITION_NUM"`
+	DefaultClusterName                       string `toml:"default-cluster-name" env:"DEFAULT_CLUSTER_NAME"`
+	DefaultClusterNodeCount                  int    `toml:"default-cluster-node-count" env:"DEFAULT_CLUSTER_NODE_COUNT"`
+	DefaultClusterReplicationFactor          int    `toml:"default-cluster-replication-factor" env:"DEFAULT_CLUSTER_REPLICATION_FACTOR"`
+	DefaultClusterShardTotal                 int    `toml:"default-cluster-shard-total" env:"DEFAULT_CLUSTER_SHARD_TOTAL"`
+	DefaultClusterPartitionTableRatioOfNodes uint   `toml:"default-cluster-partition_table_radio_of_nodes" env:"DEFAULT_CLUSTER_CLUSTER_PARTITION_TABLE_RADIO_OF_NODES"`
 
 	ClientUrls          string `toml:"client-urls" env:"CLIENT_URLS"`
 	PeerUrls            string `toml:"peer-urls" env:"PEER_URLS"`
@@ -250,11 +250,11 @@ func MakeConfigParser() (*Parser, error) {
 		MinScanLimit:            defaultMinScanLimit,
 		IDAllocatorStep:         defaultIDAllocatorStep,
 
-		DefaultClusterName:              defaultClusterName,
-		DefaultClusterNodeCount:         defaultClusterNodeCount,
-		DefaultClusterReplicationFactor: defaultClusterReplicationFactor,
-		DefaultClusterShardTotal:        defaultClusterShardTotal,
-		DefaultClusterTablePartitionNum: defaultClusterTablePartitionNum,
+		DefaultClusterName:                       defaultClusterName,
+		DefaultClusterNodeCount:                  defaultClusterNodeCount,
+		DefaultClusterReplicationFactor:          defaultClusterReplicationFactor,
+		DefaultClusterShardTotal:                 defaultClusterShardTotal,
+		DefaultClusterPartitionTableRatioOfNodes: defaultClusterPartitionTableRatioOfNodes,
 
 		HTTPPort: defaultHTTPPort,
 	}

@@ -16,18 +16,18 @@ import (
 )
 
 const (
-	testTableName0           = "table0"
-	testTableName1           = "table1"
-	testSchemaName           = "testSchemaName"
-	nodeName0                = "node0"
-	nodeName1                = "node1"
-	testRootPath             = "/rootPath"
-	defaultIDAllocatorStep   = 20
-	clusterName              = "ceresdbCluster1"
-	defaultNodeCount         = 2
-	defaultReplicationFactor = 1
-	defaultTablePartitionNum = 2
-	defaultShardTotal        = 2
+	testTableName0                    = "table0"
+	testTableName1                    = "table1"
+	testSchemaName                    = "testSchemaName"
+	nodeName0                         = "node0"
+	nodeName1                         = "node1"
+	testRootPath                      = "/rootPath"
+	defaultIDAllocatorStep            = 20
+	clusterName                       = "ceresdbCluster1"
+	defaultNodeCount                  = 2
+	defaultReplicationFactor          = 1
+	defaultPartitionTableRatioOfNodes = 1
+	defaultShardTotal                 = 2
 )
 
 type MockDispatch struct{}
@@ -63,10 +63,10 @@ func newTestCluster(ctx context.Context, t *testing.T) (cluster.Manager, *cluste
 	re.NoError(err)
 
 	cluster, err := manager.CreateCluster(ctx, clusterName, cluster.CreateClusterOpts{
-		NodeCount:         defaultNodeCount,
-		ReplicationFactor: defaultReplicationFactor,
-		ShardTotal:        defaultShardTotal,
-		TablePartitionNum: defaultTablePartitionNum,
+		NodeCount:                  defaultNodeCount,
+		ReplicationFactor:          defaultReplicationFactor,
+		ShardTotal:                 defaultShardTotal,
+		PartitionTableRatioOfNodes: defaultPartitionTableRatioOfNodes,
 	})
 	re.NoError(err)
 	return manager, cluster

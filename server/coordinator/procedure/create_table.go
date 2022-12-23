@@ -21,14 +21,15 @@ func NewCreateTableProcedure(ctx context.Context, factory *Factory, c *cluster.C
 		log.Error("fail to create table", zap.Error(ErrEmptyPartitionNames))
 		return CreateTableProcedure{}, ErrEmptyPartitionNames
 	}
+
 	var realProcedure Procedure
 	if sourceReq.PartitionInfo != nil && len(sourceReq.PartitionInfo.GetNames()) != 0 {
 		p, err := factory.makeCreatePartitionTableProcedure(ctx, CreatePartitionTableRequest{
-			ClusterName:       c.Name(),
-			SourceReq:         sourceReq,
-			TablePartitionNum: uint(c.GetTablePartitionNum()),
-			OnSucceeded:       onSucceeded,
-			OnFailed:          onFailed,
+			ClusterName:                c.Name(),
+			SourceReq:                  sourceReq,
+			PartitionTableRatioOfNodes: uint(c.GetPartitionTableRatioOfNodes()),
+			OnSucceeded:                onSucceeded,
+			OnFailed:                   onFailed,
 		})
 		if err != nil {
 			log.Error("fail to create partition table", zap.Error(err))
@@ -48,6 +49,7 @@ func NewCreateTableProcedure(ctx context.Context, factory *Factory, c *cluster.C
 		}
 		realProcedure = p
 	}
+
 	return CreateTableProcedure{
 		realProcedure: realProcedure,
 	}, nil
