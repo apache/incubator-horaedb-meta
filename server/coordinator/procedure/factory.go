@@ -21,6 +21,9 @@ type Factory struct {
 	storage        Storage
 	clusterManager cluster.Manager
 	shardPicker    ShardPicker
+
+	// TODO: This is a temporary implementation version, which needs to be refined to the table level later.
+	PartitionTableProportionOfNodes float32
 }
 
 type ScatterRequest struct {
@@ -66,19 +69,20 @@ type CreatePartitionTableRequest struct {
 	ClusterName string
 	SourceReq   *metaservicepb.CreateTableRequest
 
-	PartitionTableRatioOfNodes uint
+	PartitionTableRatioOfNodes float32
 
 	OnSucceeded func(cluster.CreateTableResult) error
 	OnFailed    func(error) error
 }
 
-func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage Storage, manager cluster.Manager) *Factory {
+func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage Storage, manager cluster.Manager, partitionTableProportionOfNodes float32) *Factory {
 	return &Factory{
-		idAllocator:    allocator,
-		dispatch:       dispatch,
-		storage:        storage,
-		clusterManager: manager,
-		shardPicker:    NewRandomShardPicker(manager),
+		idAllocator:                     allocator,
+		dispatch:                        dispatch,
+		storage:                         storage,
+		clusterManager:                  manager,
+		shardPicker:                     NewRandomShardPicker(manager),
+		PartitionTableProportionOfNodes: partitionTableProportionOfNodes,
 	}
 }
 
@@ -133,7 +137,7 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 		nodeNames[nodeShard.ShardNode.NodeName] = 1
 	}
 
-	partitionTableNum := Max(1, len(nodeNames)/int(request.PartitionTableRatioOfNodes))
+	partitionTableNum := Max(1, int(float32(len(nodeNames))*request.PartitionTableRatioOfNodes))
 
 	partitionTableShards, err := f.shardPicker.PickShards(ctx, request.ClusterName, partitionTableNum)
 	if err != nil {

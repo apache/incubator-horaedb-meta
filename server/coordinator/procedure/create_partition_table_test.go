@@ -32,7 +32,17 @@ func TestCreatePartitionTable(t *testing.T) {
 		Name:       testTableName0,
 	}
 
-	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), defaultPartitionTableRatioOfNodes)
+	getNodeShardResult, err := c.GetNodeShards(ctx)
+	re.NoError(err)
+
+	nodeNames := make(map[string]int)
+	for _, nodeShard := range getNodeShardResult.NodeShards {
+		nodeNames[nodeShard.ShardNode.NodeName] = 1
+	}
+
+	partitionTableNum := Max(1, int(float32(len(nodeNames))*defaultPartitionTableProportionOfNodes))
+
+	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), partitionTableNum)
 	re.NoError(err)
 	dataTableShards, err := shardPicker.PickShards(ctx, c.Name(), len(request.PartitionInfo.Names))
 	re.NoError(err)

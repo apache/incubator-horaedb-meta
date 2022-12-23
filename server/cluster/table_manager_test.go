@@ -160,10 +160,9 @@ func testCluster(ctx context.Context, re *require.Assertions, manager Manager, c
 
 func testCreateCluster(ctx context.Context, re *require.Assertions, manager Manager, clusterName string) {
 	_, err := manager.CreateCluster(ctx, clusterName, CreateClusterOpts{
-		NodeCount:                  defaultNodeCount,
-		ReplicationFactor:          defaultReplicationFactor,
-		ShardTotal:                 defaultShardTotal,
-		PartitionTableRatioOfNodes: defaultPartitionTableRatioOfNodes,
+		NodeCount:         defaultNodeCount,
+		ReplicationFactor: defaultReplicationFactor,
+		ShardTotal:        defaultShardTotal,
 	})
 	re.NoError(err)
 }
@@ -194,7 +193,7 @@ func testCreateTable(ctx context.Context, re *require.Assertions, manager Manage
 ) {
 	c, err := manager.GetCluster(ctx, clusterName)
 	re.NoError(err)
-	table, err := c.CreateTable(ctx, node, schema, tableName)
+	table, err := c.CreateTable(ctx, node, schema, tableName, false)
 	re.NoError(err)
 	re.Equal(tableID, table.Table.ID)
 }

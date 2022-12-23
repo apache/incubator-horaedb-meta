@@ -181,7 +181,7 @@ func (srv *Server) startServer(_ context.Context) error {
 	}
 	srv.procedureManager = procedureManager
 	dispatch := eventdispatch.NewDispatchImpl()
-	procedureFactory := procedure.NewFactory(id.NewAllocatorImpl(srv.etcdCli, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage, manager)
+	procedureFactory := procedure.NewFactory(id.NewAllocatorImpl(srv.etcdCli, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage, manager, srv.cfg.DefaultPartitionTableProportionOfNodes)
 	srv.procedureFactory = procedureFactory
 	srv.scheduler = coordinator.NewScheduler(manager, procedureManager, procedureFactory, dispatch)
 
@@ -245,10 +245,9 @@ func (srv *Server) createDefaultCluster(ctx context.Context) error {
 	if leaderResp.IsLocal {
 		defaultCluster, err := srv.clusterManager.CreateCluster(ctx, srv.cfg.DefaultClusterName,
 			cluster.CreateClusterOpts{
-				NodeCount:                  uint32(srv.cfg.DefaultClusterNodeCount),
-				ReplicationFactor:          uint32(srv.cfg.DefaultClusterReplicationFactor),
-				ShardTotal:                 uint32(srv.cfg.DefaultClusterShardTotal),
-				PartitionTableRatioOfNodes: uint32(srv.cfg.DefaultClusterPartitionTableRatioOfNodes),
+				NodeCount:         uint32(srv.cfg.DefaultClusterNodeCount),
+				ReplicationFactor: uint32(srv.cfg.DefaultClusterReplicationFactor),
+				ShardTotal:        uint32(srv.cfg.DefaultClusterShardTotal),
 			})
 		if err != nil {
 			log.Warn("create default cluster failed", zap.Error(err))

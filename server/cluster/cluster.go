@@ -347,13 +347,6 @@ func (c *Cluster) GetTotalShardNum() uint32 {
 	return c.metaData.ShardTotal
 }
 
-func (c *Cluster) GetPartitionTableRatioOfNodes() uint32 {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	return c.metaData.PartitionTableRatioOfNodes
-}
-
 func (c *Cluster) GetClusterState() storage.ClusterState {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

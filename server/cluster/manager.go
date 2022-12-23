@@ -103,13 +103,12 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 	}
 
 	clusterMetadata := storage.Cluster{
-		ID:                         clusterID,
-		Name:                       clusterName,
-		MinNodeCount:               opts.NodeCount,
-		ReplicationFactor:          opts.ReplicationFactor,
-		ShardTotal:                 opts.ShardTotal,
-		PartitionTableRatioOfNodes: opts.PartitionTableRatioOfNodes,
-		CreatedAt:                  uint64(time.Now().UnixMilli()),
+		ID:                clusterID,
+		Name:              clusterName,
+		MinNodeCount:      opts.NodeCount,
+		ReplicationFactor: opts.ReplicationFactor,
+		ShardTotal:        opts.ShardTotal,
+		CreatedAt:         uint64(time.Now().UnixMilli()),
 	}
 	err = m.storage.CreateCluster(ctx, storage.CreateClusterRequest{
 		Cluster: clusterMetadata,
