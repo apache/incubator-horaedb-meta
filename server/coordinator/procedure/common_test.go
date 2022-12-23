@@ -26,7 +26,7 @@ const (
 	clusterName                            = "ceresdbCluster1"
 	defaultNodeCount                       = 2
 	defaultReplicationFactor               = 1
-	defaultPartitionTableProportionOfNodes = float32(0.5)
+	defaultPartitionTableProportionOfNodes = 0.5
 	defaultShardTotal                      = 2
 )
 

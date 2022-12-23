@@ -23,7 +23,7 @@ type Factory struct {
 	shardPicker    ShardPicker
 
 	// TODO: This is a temporary implementation version, which needs to be refined to the table level later.
-	PartitionTableProportionOfNodes float32
+	partitionTableProportionOfNodes float32
 }
 
 type ScatterRequest struct {
@@ -82,7 +82,7 @@ func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage
 		storage:                         storage,
 		clusterManager:                  manager,
 		shardPicker:                     NewRandomShardPicker(manager),
-		PartitionTableProportionOfNodes: partitionTableProportionOfNodes,
+		partitionTableProportionOfNodes: partitionTableProportionOfNodes,
 	}
 }
 

@@ -47,7 +47,7 @@ const (
 	defaultClusterNodeCount                = 2
 	defaultClusterReplicationFactor        = 1
 	defaultClusterShardTotal               = 8
-	defaultPartitionTableProportionOfNodes = float32(0.5)
+	defaultPartitionTableProportionOfNodes = 0.5
 
 	defaultHTTPPort = 8080
 )
