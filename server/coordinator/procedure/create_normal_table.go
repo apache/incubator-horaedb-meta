@@ -41,13 +41,13 @@ var (
 func createTablePrepareCallback(event *fsm.Event) {
 	req := event.Args[0].(*createTableCallbackRequest)
 
-	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), req.sourceReq.GetHeader().GetNode())
+	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), req.sourceReq.GetHeader().GetNode(), false)
 	if err != nil {
 		cancelEventWithLog(event, err, "create table metadata")
 		return
 	}
 
-	if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, createTableResult.ShardVersionUpdate.ShardID, buildCreateTableRequest(createTableResult, req.sourceReq)); err != nil {
+	if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, createTableResult.ShardVersionUpdate.ShardID, buildCreateTableRequest(createTableResult, req.sourceReq, false)); err != nil {
 		cancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}

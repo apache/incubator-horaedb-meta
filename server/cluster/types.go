@@ -12,10 +12,11 @@ const (
 )
 
 type TableInfo struct {
-	ID         storage.TableID
-	Name       string
-	SchemaID   storage.SchemaID
-	SchemaName string
+	ID          storage.TableID
+	Name        string
+	SchemaID    storage.SchemaID
+	SchemaName  string
+	Partitioned bool
 }
 
 type ShardTables struct {

@@ -25,9 +25,9 @@ func TestSplit(t *testing.T) {
 	targetShardNode := getNodeShardsResult.NodeShards[0].ShardNode
 
 	// Create some tables in this shard.
-	_, err = c.CreateTable(ctx, targetShardNode.NodeName, testSchemaName, testTableName0)
+	_, err = c.CreateTable(ctx, targetShardNode.NodeName, testSchemaName, testTableName0, false)
 	re.NoError(err)
-	_, err = c.CreateTable(ctx, targetShardNode.NodeName, testSchemaName, testTableName1)
+	_, err = c.CreateTable(ctx, targetShardNode.NodeName, testSchemaName, testTableName1, false)
 	re.NoError(err)
 
 	// Split one table from this shard.

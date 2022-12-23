@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func createTableMetadata(ctx context.Context, c *cluster.Cluster, schemaName string, tableName string, nodeName string) (cluster.CreateTableResult, error) {
+func createTableMetadata(ctx context.Context, c *cluster.Cluster, schemaName string, tableName string, nodeName string, partitioned bool) (cluster.CreateTableResult, error) {
 	_, exists, err := c.GetTable(schemaName, tableName)
 	if err != nil {
 		return cluster.CreateTableResult{}, errors.WithMessage(err, "cluster get table")
@@ -22,7 +22,7 @@ func createTableMetadata(ctx context.Context, c *cluster.Cluster, schemaName str
 		return cluster.CreateTableResult{}, errors.WithMessage(ErrTableAlreadyExists, fmt.Sprintf("create an existing table, schemaName:%s, tableName:%s", schemaName, tableName))
 	}
 
-	createTableResult, err := c.CreateTable(ctx, nodeName, schemaName, tableName)
+	createTableResult, err := c.CreateTable(ctx, nodeName, schemaName, tableName, partitioned)
 	if err != nil {
 		return cluster.CreateTableResult{}, errors.WithMessage(err, "create table")
 	}
@@ -55,7 +55,7 @@ func createTableOnShard(ctx context.Context, c *cluster.Cluster, dispatch eventd
 	return nil
 }
 
-func buildCreateTableRequest(createTableResult cluster.CreateTableResult, req *metaservicepb.CreateTableRequest) eventdispatch.CreateTableOnShardRequest {
+func buildCreateTableRequest(createTableResult cluster.CreateTableResult, req *metaservicepb.CreateTableRequest, partitioned bool) eventdispatch.CreateTableOnShardRequest {
 	return eventdispatch.CreateTableOnShardRequest{
 		UpdateShardInfo: eventdispatch.UpdateShardInfo{
 			CurrShardInfo: cluster.ShardInfo{
@@ -67,10 +67,11 @@ func buildCreateTableRequest(createTableResult cluster.CreateTableResult, req *m
 			PrevVersion: createTableResult.ShardVersionUpdate.PrevVersion,
 		},
 		TableInfo: cluster.TableInfo{
-			ID:         createTableResult.Table.ID,
-			Name:       createTableResult.Table.Name,
-			SchemaID:   createTableResult.Table.SchemaID,
-			SchemaName: req.GetSchemaName(),
+			ID:          createTableResult.Table.ID,
+			Name:        createTableResult.Table.Name,
+			SchemaID:    createTableResult.Table.SchemaID,
+			SchemaName:  req.GetSchemaName(),
+			Partitioned: partitioned,
 		},
 		EncodedSchema:    req.EncodedSchema,
 		Engine:           req.Engine,

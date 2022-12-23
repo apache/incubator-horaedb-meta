@@ -204,14 +204,14 @@ func createPartitionTableCallback(event *fsm.Event) {
 	// Select first shard to create partition table.
 	partitionTableShardNode := req.partitionTableShards[0]
 
-	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), partitionTableShardNode.ShardNode.NodeName)
+	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), partitionTableShardNode.ShardNode.NodeName, true)
 	if err != nil {
 		cancelEventWithLog(event, err, "create table metadata")
 		return
 	}
 	req.createTableResult = createTableResult
 
-	if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, partitionTableShardNode.ShardInfo.ID, buildCreateTableRequest(createTableResult, req.sourceReq)); err != nil {
+	if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, partitionTableShardNode.ShardInfo.ID, buildCreateTableRequest(createTableResult, req.sourceReq, true)); err != nil {
 		cancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}
@@ -226,13 +226,13 @@ func createDataTablesCallback(event *fsm.Event) {
 	}
 
 	for i, dataTableShard := range req.dataTablesShards {
-		createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetPartitionInfo().Names[i], dataTableShard.ShardNode.NodeName)
+		createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetPartitionInfo().Names[i], dataTableShard.ShardNode.NodeName, false)
 		if err != nil {
 			cancelEventWithLog(event, err, "create table metadata")
 			return
 		}
 
-		if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, dataTableShard.ShardInfo.ID, buildCreateTableRequest(createTableResult, req.sourceReq)); err != nil {
+		if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, dataTableShard.ShardInfo.ID, buildCreateTableRequest(createTableResult, req.sourceReq, false)); err != nil {
 			cancelEventWithLog(event, err, "dispatch create table on shard")
 			return
 		}
