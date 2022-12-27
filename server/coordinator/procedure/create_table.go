@@ -17,13 +17,13 @@ type CreateTableProcedure struct {
 }
 
 func NewCreateTableProcedure(ctx context.Context, factory *Factory, c *cluster.Cluster, sourceReq *metaservicepb.CreateTableRequest, onSucceeded func(cluster.CreateTableResult) error, onFailed func(error) error) (Procedure, error) {
-	if sourceReq.PartitionInfo != nil && len(sourceReq.PartitionInfo.GetNames()) == 0 {
+	if sourceReq.PartitionTableInfo != nil && len(sourceReq.PartitionTableInfo.SubTableNames) == 0 {
 		log.Error("fail to create table", zap.Error(ErrEmptyPartitionNames))
 		return CreateTableProcedure{}, ErrEmptyPartitionNames
 	}
 
 	var realProcedure Procedure
-	if sourceReq.PartitionInfo != nil && len(sourceReq.PartitionInfo.GetNames()) != 0 {
+	if sourceReq.PartitionTableInfo != nil && len(sourceReq.PartitionTableInfo.SubTableNames) != 0 {
 		p, err := factory.makeCreatePartitionTableProcedure(ctx, CreatePartitionTableRequest{
 			ClusterName: c.Name(),
 			SourceReq:   sourceReq,
