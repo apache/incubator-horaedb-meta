@@ -156,11 +156,11 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 				p.updateStateWithLock(StateFailed)
 				return errors.WithMessagef(err, "create partition table procedure open partition tables")
 			}
+			p.updateStateWithLock(StateFinished)
 		case stateFinish:
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "create partition table procedure persist")
 			}
-			p.updateStateWithLock(StateFinished)
 			return nil
 		}
 	}

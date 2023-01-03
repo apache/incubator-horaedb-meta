@@ -47,6 +47,10 @@ type DropTableRequest struct {
 	OnFailed    func(error) error
 }
 
+func (d DropTableRequest) IsPartitionTable() bool {
+	return d.SourceReq.PartitionTableInfo != nil
+}
+
 type TransferLeaderRequest struct {
 	ClusterName       string
 	ShardID           storage.ShardID
@@ -162,6 +166,21 @@ func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTabl
 	if err != nil {
 		return nil, err
 	}
+
+	if request.IsPartitionTable() {
+		req := DropPartitionTableProcedureRequest{
+			ID:          id,
+			Cluster:     request.Cluster,
+			Dispatch:    f.dispatch,
+			Storage:     f.storage,
+			Req:         request.SourceReq,
+			OnSucceeded: request.OnSucceeded,
+			OnFailed:    request.OnFailed,
+		}
+		procedure := NewDropPartitionTableProcedure(req)
+		return procedure, nil
+	}
+
 	procedure := NewDropTableProcedure(f.dispatch, request.Cluster, id,
 		request.SourceReq, request.OnSucceeded, request.OnFailed)
 	return procedure, nil
