@@ -118,7 +118,7 @@ func (p *DropPartitionTableProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventDropDataTable, dropPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "drop partition table procedure create new shard view")
+				return errors.WithMessagef(err, "drop partition table procedure")
 			}
 		case stateDropDataTable:
 			if err := p.persist(ctx); err != nil {
@@ -126,7 +126,7 @@ func (p *DropPartitionTableProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventDropPartitionTable, dropPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "drop partition table procedure drop partition table")
+				return errors.WithMessagef(err, "drop partition table procedure drop data table")
 			}
 		case stateDropPartitionTable:
 			if err := p.persist(ctx); err != nil {
@@ -134,7 +134,7 @@ func (p *DropPartitionTableProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventDropPartitionTableFinish, dropPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "drop partition table procedure open partition tables")
+				return errors.WithMessagef(err, "drop partition table procedure drop partition table")
 			}
 			p.updateStateWithLock(StateFinished)
 		case stateDropPartitionTableFinish:
@@ -156,6 +156,58 @@ func (p *DropPartitionTableProcedure) State() State {
 	defer p.lock.RUnlock()
 
 	return p.state
+}
+
+func (p *DropPartitionTableProcedure) updateStateWithLock(state State) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.state = state
+}
+
+func (p *DropPartitionTableProcedure) persist(ctx context.Context) error {
+	meta, err := p.convertToMeta()
+	if err != nil {
+		return errors.WithMessage(err, "convert to meta")
+	}
+	err = p.storage.CreateOrUpdate(ctx, meta)
+	if err != nil {
+		return errors.WithMessage(err, "createOrUpdate procedure storage")
+	}
+	return nil
+}
+
+func (p *DropPartitionTableProcedure) convertToMeta() (Meta, error) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	rawData := dropPartitionTableRawData{
+		ID:       p.id,
+		FsmState: p.fsm.Current(),
+		State:    p.state,
+	}
+	rawDataBytes, err := json.Marshal(rawData)
+	if err != nil {
+		return Meta{}, ErrEncodeRawData.WithCausef("marshal raw data, procedureID:%v, err:%v", p.id, err)
+	}
+
+	meta := Meta{
+		ID:    p.id,
+		Typ:   DropPartitionTable,
+		State: p.state,
+
+		RawData: rawDataBytes,
+	}
+
+	return meta, nil
+}
+
+type dropPartitionTableRawData struct {
+	ID       uint64
+	FsmState string
+	State    State
+
+	DropTableResult cluster.DropTableResult
 }
 
 type dropPartitionTableCallbackRequest struct {
@@ -280,56 +332,4 @@ func dropTable(event *fsm.Event, tableName string) error {
 		return errors.WithMessage(err, "dispatch drop table on shard")
 	}
 	return nil
-}
-
-func (p *DropPartitionTableProcedure) updateStateWithLock(state State) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.state = state
-}
-
-func (p *DropPartitionTableProcedure) persist(ctx context.Context) error {
-	meta, err := p.convertToMeta()
-	if err != nil {
-		return errors.WithMessage(err, "convert to meta")
-	}
-	err = p.storage.CreateOrUpdate(ctx, meta)
-	if err != nil {
-		return errors.WithMessage(err, "createOrUpdate procedure Storage")
-	}
-	return nil
-}
-
-type dropPartitionTableRawData struct {
-	ID       uint64
-	FsmState string
-	State    State
-
-	DropTableResult cluster.DropTableResult
-}
-
-func (p *DropPartitionTableProcedure) convertToMeta() (Meta, error) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	rawData := dropPartitionTableRawData{
-		ID:       p.id,
-		FsmState: p.fsm.Current(),
-		State:    p.state,
-	}
-	rawDataBytes, err := json.Marshal(rawData)
-	if err != nil {
-		return Meta{}, ErrEncodeRawData.WithCausef("marshal raw data, procedureID:%v, err:%v", p.id, err)
-	}
-
-	meta := Meta{
-		ID:    p.id,
-		Typ:   DropPartitionTable,
-		State: p.state,
-
-		RawData: rawDataBytes,
-	}
-
-	return meta, nil
 }
