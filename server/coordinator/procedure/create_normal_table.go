@@ -39,7 +39,11 @@ var (
 )
 
 func createTablePrepareCallback(event *fsm.Event) {
-	req := event.Args[0].(*createTableCallbackRequest)
+	req, err := getRequestFromEvent[*createTableCallbackRequest](event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
 
 	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), req.sourceReq.GetHeader().GetNode(), false)
 	if err != nil {
@@ -56,7 +60,11 @@ func createTablePrepareCallback(event *fsm.Event) {
 }
 
 func createTableSuccessCallback(event *fsm.Event) {
-	req := event.Args[0].(*createTableCallbackRequest)
+	req, err := getRequestFromEvent[*createTableCallbackRequest](event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
 
 	if err := req.onSucceeded(req.createTableResult); err != nil {
 		log.Error("exec success callback failed")
@@ -64,7 +72,11 @@ func createTableSuccessCallback(event *fsm.Event) {
 }
 
 func createTableFailedCallback(event *fsm.Event) {
-	req := event.Args[0].(*createTableCallbackRequest)
+	req, err := getRequestFromEvent[*createTableCallbackRequest](event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
 
 	if err := req.onFailed(event.Err); err != nil {
 		log.Error("exec failed callback failed")

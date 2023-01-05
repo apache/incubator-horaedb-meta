@@ -169,10 +169,10 @@ func (p *SplitProcedure) Start(ctx context.Context) error {
 				return errors.WithMessagef(err, "split procedure delete shard tables")
 			}
 		case stateSplitFinish:
+			p.updateStateWithLock(StateFinished)
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "split procedure persist")
 			}
-			p.updateStateWithLock(StateFinished)
 			return nil
 		}
 	}
@@ -335,7 +335,6 @@ func splitUpdateShardTablesCallback(event *fsm.Event) {
 
 	// Update shard tables.
 	originShardTables.Tables = remainingTables
-	originShardTables.Shard.Version++
 
 	getNodeShardsResult, err := request.cluster.GetNodeShards(ctx)
 	if err != nil {
@@ -357,7 +356,6 @@ func splitUpdateShardTablesCallback(event *fsm.Event) {
 		cancelEventWithLog(event, cluster.ErrShardNotFound, "new shard not found", zap.Uint32("shardID", uint32(request.newShardID)))
 		return
 	}
-	newShardInfo.Version++
 
 	// Find split tables in metadata.
 	var tables []cluster.TableInfo

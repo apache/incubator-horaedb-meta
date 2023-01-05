@@ -149,7 +149,7 @@ func (c *Cluster) UpdateShardTables(ctx context.Context, shardTablesArr []ShardT
 
 		_, err := c.topologyManager.UpdateShardView(ctx, storage.ShardView{
 			ShardID:   shardTables.Shard.ID,
-			Version:   shardTables.Shard.Version,
+			Version:   shardTables.Shard.Version + 1,
 			TableIDs:  tableIDs,
 			CreatedAt: uint64(time.Now().UnixMilli()),
 		})

@@ -258,7 +258,6 @@ func openPartitionTablesCallback(event *fsm.Event) {
 	for _, partitionTableShard := range req.partitionTableShards {
 		// Update table shard mapping.
 		originShardTables := req.cluster.GetShardTables([]storage.ShardID{partitionTableShard.ShardInfo.ID}, partitionTableShard.ShardNode.NodeName)[partitionTableShard.ShardInfo.ID]
-		originShardTables.Shard.Version++
 		originShardTables.Tables = append(originShardTables.Tables, cluster.TableInfo{
 			ID:         partitionTable.ID,
 			Name:       partitionTable.Name,

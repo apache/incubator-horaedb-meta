@@ -42,7 +42,12 @@ var (
 )
 
 func dropTablePrepareCallback(event *fsm.Event) {
-	request := event.Args[0].(*dropTableCallbackRequest)
+	request, err := getRequestFromEvent[*dropTableCallbackRequest](event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
+
 	table, exists, err := request.cluster.GetTable(request.rawReq.GetSchemaName(), request.rawReq.GetName())
 	if err != nil {
 		cancelEventWithLog(event, err, "cluster get table")

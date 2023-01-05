@@ -168,10 +168,10 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 				return errors.WithMessagef(err, "trasnferLeader procedure finish")
 			}
 		case stateTransferLeaderFinish:
+			p.updateStateWithLock(StateFinished)
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
-			p.updateStateWithLock(StateFinished)
 			return nil
 		}
 	}
