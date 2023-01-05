@@ -11,10 +11,8 @@ import (
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
-	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 )
 
 // fsm state change:
@@ -248,24 +246,15 @@ func openPartitionTablesCallback(event *fsm.Event) {
 		return
 	}
 
-	partitionTable, _, err := req.cluster.GetTable(req.sourceReq.GetSchemaName(), req.sourceReq.GetName())
-	if err != nil {
-		cancelEventWithLog(event, err, "get table", zap.String("schemaName", req.sourceReq.GetSchemaName()), zap.String("tableName", req.sourceReq.GetName()))
-		return
-	}
-
 	req.partitionTableShards = append(req.partitionTableShards[:0], req.partitionTableShards[1:]...)
 	for _, partitionTableShard := range req.partitionTableShards {
-		// Update table shard mapping.
-		originShardTables := req.cluster.GetShardTables([]storage.ShardID{partitionTableShard.ShardInfo.ID}, partitionTableShard.ShardNode.NodeName)[partitionTableShard.ShardInfo.ID]
-		originShardTables.Tables = append(originShardTables.Tables, cluster.TableInfo{
-			ID:         partitionTable.ID,
-			Name:       partitionTable.Name,
-			SchemaID:   partitionTable.SchemaID,
-			SchemaName: req.sourceReq.GetSchemaName(),
-		})
-		if err := req.cluster.UpdateShardTables(req.ctx, []cluster.ShardTables{originShardTables}); err != nil {
-			cancelEventWithLog(event, err, "update shard tables")
+		if err := req.cluster.OpenTable(req.ctx, cluster.OpenTableRequest{
+			SchemaName: req.sourceReq.SchemaName,
+			TableName:  req.sourceReq.Name,
+			ShardID:    partitionTableShard.ShardInfo.ID,
+			NodeName:   partitionTableShard.ShardNode.NodeName,
+		}); err != nil {
+			cancelEventWithLog(event, err, "open table")
 			return
 		}
 

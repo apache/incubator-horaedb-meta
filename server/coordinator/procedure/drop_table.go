@@ -70,6 +70,11 @@ func dropTablePrepareCallback(event *fsm.Event) {
 		return
 	}
 
+	if len(result.ShardVersionUpdate) != 1 {
+		cancelEventWithLog(event, ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult is %d", len(result.ShardVersionUpdate)))
+		return
+	}
+
 	shardNodes, ok := shardNodesResult.ShardNodes[table.ID]
 	if !ok {
 		cancelEventWithLog(event, ErrShardLeaderNotFound, fmt.Sprintf("cluster get shard by table id, table:%v", table))
@@ -101,11 +106,11 @@ func dropTablePrepareCallback(event *fsm.Event) {
 	err = request.dispatch.DropTableOnShard(request.ctx, leader.NodeName, eventdispatch.DropTableOnShardRequest{
 		UpdateShardInfo: eventdispatch.UpdateShardInfo{
 			CurrShardInfo: cluster.ShardInfo{
-				ID:      result.ShardVersionUpdate.ShardID,
+				ID:      result.ShardVersionUpdate[0].ShardID,
 				Role:    storage.ShardRoleLeader,
-				Version: result.ShardVersionUpdate.CurrVersion,
+				Version: result.ShardVersionUpdate[0].CurrVersion,
 			},
-			PrevVersion: result.ShardVersionUpdate.PrevVersion,
+			PrevVersion: result.ShardVersionUpdate[0].PrevVersion,
 		},
 		TableInfo: tableInfo,
 	})

@@ -109,6 +109,8 @@ func (c *Cluster) GetShardTables(shardIDs []storage.ShardID, nodeName string) ma
 	return result
 }
 
+// DropTable will drop table metadata and all mapping of this table.
+// If the table to be dropped has been opened multiple times, all its mapping will be dropped.
 func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (DropTableResult, error) {
 	log.Info("drop table start", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
 
@@ -128,19 +130,19 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 	}
 
 	// Remove dropped table in shard view.
-	updateVersion, err := c.topologyManager.RemoveTable(ctx, table.ID)
+	updateVersions, err := c.topologyManager.RemoveTable(ctx, table.ID)
 	if err != nil {
 		return DropTableResult{}, errors.WithMessagef(err, "topology manager remove table")
 	}
 
 	ret := DropTableResult{
-		ShardVersionUpdate: updateVersion,
+		ShardVersionUpdate: updateVersions,
 	}
 	log.Info("drop table success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("result", fmt.Sprintf("%+v", ret)))
 	return ret, nil
 }
 
-func (c *Cluster) UpdateShardTables(ctx context.Context, shardTablesArr []ShardTables) error {
+func (c *Cluster) updateShardTables(ctx context.Context, shardTablesArr []ShardTables) error {
 	for _, shardTables := range shardTablesArr {
 		tableIDs := make([]storage.TableID, 0, len(shardTables.Tables))
 		for _, table := range shardTables.Tables {
@@ -156,6 +158,146 @@ func (c *Cluster) UpdateShardTables(ctx context.Context, shardTablesArr []ShardT
 		if err != nil {
 			return errors.WithMessagef(err, "update shard tables")
 		}
+	}
+
+	return nil
+}
+
+// OpenTable will open an existing table on the specified shard.
+// The table to be opened must have been created.
+func (c *Cluster) OpenTable(ctx context.Context, request OpenTableRequest) error {
+	table, _, err := c.GetTable(request.SchemaName, request.TableName)
+	if err != nil {
+		log.Error("get table", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
+		return err
+	}
+
+	shardTables, exists := c.GetShardTables([]storage.ShardID{request.ShardID}, request.NodeName)[request.ShardID]
+	if !exists {
+		log.Error("get shard tables", zap.Error(ErrShardNotFound), zap.Uint64("shardID", uint64(request.ShardID)), zap.String("nodeName", request.NodeName))
+		return errors.WithMessage(ErrShardNotFound, fmt.Sprintf("shard tables not found, shardID:%d, nodeName:%s", request.ShardID, request.NodeName))
+	}
+
+	shardTables.Tables = append(shardTables.Tables, TableInfo{
+		table.ID,
+		table.Name,
+		table.SchemaID,
+		request.SchemaName,
+		table.Partitioned,
+	})
+
+	if err := c.updateShardTables(ctx, []ShardTables{shardTables}); err != nil {
+		log.Error("update shard tables", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (c *Cluster) CloseTable(ctx context.Context, request CloseTableRequest) error {
+	table, _, err := c.GetTable(request.SchemaName, request.TableName)
+	if err != nil {
+		log.Error("get table", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
+		return err
+	}
+
+	shardTables, exists := c.GetShardTables([]storage.ShardID{request.ShardID}, request.NodeName)[request.ShardID]
+	if !exists {
+		log.Error("get shard tables", zap.Error(ErrShardNotFound), zap.Uint64("shardID", uint64(request.ShardID)), zap.String("nodeName", request.NodeName))
+		return errors.WithMessage(ErrShardNotFound, fmt.Sprintf("shard tables not found, shardID:%d, nodeName:%s", request.ShardID, request.NodeName))
+	}
+
+	found := false
+	for i, tableInfo := range shardTables.Tables {
+		if tableInfo.ID == table.ID {
+			found = true
+			shardTables.Tables = append(shardTables.Tables[:i], shardTables.Tables[i+1:]...)
+			break
+		}
+	}
+	if !found {
+		return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not found on shard, shardID:%d, tableID:%d, tableName:%s", request.ShardID, table.ID, table.Name))
+	}
+
+	if err := c.updateShardTables(ctx, []ShardTables{shardTables}); err != nil {
+		log.Error("update shard tables", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+// MigrateTable used to migrate tables from old shard to new shard.
+// The mapping relationship between table and shard will be modified.
+func (c *Cluster) MigrateTable(ctx context.Context, request MigrateTableRequest) error {
+	originShardTables := c.GetShardTables([]storage.ShardID{request.OldShardID}, request.NodeName)[request.OldShardID]
+
+	// Find remaining tables in old shard.
+	var remainingTables []TableInfo
+
+	for _, tableInfo := range originShardTables.Tables {
+		found := false
+		for _, tableName := range request.TableNames {
+			if tableInfo.Name == tableName && tableInfo.SchemaName == request.SchemaName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remainingTables = append(remainingTables, tableInfo)
+		}
+	}
+
+	// Update shard tables.
+	originShardTables.Tables = remainingTables
+
+	getNodeShardsResult, err := c.GetNodeShards(ctx)
+	if err != nil {
+		log.Error("get node shards", zap.Error(err))
+		return err
+	}
+
+	// Find new shard in metadata.
+	var newShardInfo ShardInfo
+	found := false
+	for _, shardNodeWithVersion := range getNodeShardsResult.NodeShards {
+		if shardNodeWithVersion.ShardInfo.ID == request.NewShardID {
+			newShardInfo = shardNodeWithVersion.ShardInfo
+			found = true
+			break
+		}
+	}
+	if !found {
+		log.Error("new shard not found", zap.Error(ErrShardNotFound), zap.Uint64("shardID", uint64(request.NewShardID)))
+		return errors.WithMessage(ErrShardNotFound, fmt.Sprintf("new shard not found, shardID:%d", request.NewShardID))
+	}
+
+	// Find split tables in metadata.
+	var tables []TableInfo
+	for _, tableName := range request.TableNames {
+		table, exists, err := c.GetTable(request.SchemaName, tableName)
+		if err != nil {
+			log.Error("get table", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
+			return err
+		}
+		if !exists {
+			log.Error("table not found", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
+			return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not found, schemaName:%s, tableName:%s", request.SchemaName, tableName))
+		}
+		tables = append(tables, TableInfo{
+			ID:         table.ID,
+			Name:       table.Name,
+			SchemaID:   table.SchemaID,
+			SchemaName: request.SchemaName,
+		})
+	}
+	newShardTables := ShardTables{
+		Shard:  newShardInfo,
+		Tables: tables,
+	}
+	if err := c.updateShardTables(ctx, []ShardTables{originShardTables, newShardTables}); err != nil {
+		log.Error("update shard tables", zap.Error(err))
+		return err
 	}
 
 	return nil

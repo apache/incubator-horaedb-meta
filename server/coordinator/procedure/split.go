@@ -313,75 +313,14 @@ func splitUpdateShardTablesCallback(event *fsm.Event) {
 		cancelEventWithLog(event, err, "get request from event")
 		return
 	}
-	ctx := request.ctx
 
-	originShardTables := request.cluster.GetShardTables([]storage.ShardID{request.shardID}, request.targetNodeName)[request.shardID]
-
-	// Find remaining tables in old shard.
-	var remainingTables []cluster.TableInfo
-
-	for _, tableInfo := range originShardTables.Tables {
-		found := false
-		for _, tableName := range request.tableNames {
-			if tableInfo.Name == tableName && tableInfo.SchemaName == request.schemaName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remainingTables = append(remainingTables, tableInfo)
-		}
-	}
-
-	// Update shard tables.
-	originShardTables.Tables = remainingTables
-
-	getNodeShardsResult, err := request.cluster.GetNodeShards(ctx)
-	if err != nil {
-		cancelEventWithLog(event, err, "get node shards")
-		return
-	}
-
-	// Find new shard in metadata.
-	var newShardInfo cluster.ShardInfo
-	found := false
-	for _, shardNodeWithVersion := range getNodeShardsResult.NodeShards {
-		if shardNodeWithVersion.ShardInfo.ID == request.newShardID {
-			newShardInfo = shardNodeWithVersion.ShardInfo
-			found = true
-			break
-		}
-	}
-	if !found {
-		cancelEventWithLog(event, cluster.ErrShardNotFound, "new shard not found", zap.Uint32("shardID", uint32(request.newShardID)))
-		return
-	}
-
-	// Find split tables in metadata.
-	var tables []cluster.TableInfo
-	for _, tableName := range request.tableNames {
-		table, exists, err := request.cluster.GetTable(request.schemaName, tableName)
-		if err != nil {
-			cancelEventWithLog(event, err, "get table", zap.String("schemaName", request.schemaName), zap.String("tableName", tableName))
-			return
-		}
-		if !exists {
-			cancelEventWithLog(event, cluster.ErrTableNotFound, "table not found", zap.String("schemaName", request.schemaName), zap.String("tableName", tableName))
-			return
-		}
-		tables = append(tables, cluster.TableInfo{
-			ID:         table.ID,
-			Name:       table.Name,
-			SchemaID:   table.SchemaID,
-			SchemaName: request.schemaName,
-		})
-	}
-	newShardTables := cluster.ShardTables{
-		Shard:  newShardInfo,
-		Tables: tables,
-	}
-
-	if err := request.cluster.UpdateShardTables(ctx, []cluster.ShardTables{originShardTables, newShardTables}); err != nil {
+	if err := request.cluster.MigrateTable(request.ctx, cluster.MigrateTableRequest{
+		SchemaName: request.schemaName,
+		TableNames: request.tableNames,
+		NodeName:   request.targetNodeName,
+		OldShardID: request.shardID,
+		NewShardID: request.newShardID,
+	}); err != nil {
 		cancelEventWithLog(event, err, "update shard tables")
 		return
 	}
