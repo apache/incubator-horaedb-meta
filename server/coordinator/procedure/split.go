@@ -286,6 +286,25 @@ func splitCreateShardViewCallback(event *fsm.Event) {
 	}
 }
 
+func splitUpdateShardTablesCallback(event *fsm.Event) {
+	request, err := getRequestFromEvent[splitCallbackRequest](event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
+
+	if err := request.cluster.MigrateTable(request.ctx, cluster.MigrateTableRequest{
+		SchemaName: request.schemaName,
+		TableNames: request.tableNames,
+		NodeName:   request.targetNodeName,
+		OldShardID: request.shardID,
+		NewShardID: request.newShardID,
+	}); err != nil {
+		cancelEventWithLog(event, err, "update shard tables")
+		return
+	}
+}
+
 func splitOpenShardCallback(event *fsm.Event) {
 	request, err := getRequestFromEvent[splitCallbackRequest](event)
 	if err != nil {
@@ -303,25 +322,6 @@ func splitOpenShardCallback(event *fsm.Event) {
 		},
 	}); err != nil {
 		cancelEventWithLog(event, err, "open shard failed")
-		return
-	}
-}
-
-func splitUpdateShardTablesCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[splitCallbackRequest](event)
-	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
-		return
-	}
-
-	if err := request.cluster.MigrateTable(request.ctx, cluster.MigrateTableRequest{
-		SchemaName: request.schemaName,
-		TableNames: request.tableNames,
-		NodeName:   request.targetNodeName,
-		OldShardID: request.shardID,
-		NewShardID: request.newShardID,
-	}); err != nil {
-		cancelEventWithLog(event, err, "update shard tables")
 		return
 	}
 }

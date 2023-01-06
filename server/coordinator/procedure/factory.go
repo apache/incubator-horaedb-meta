@@ -81,7 +81,7 @@ func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage
 		dispatch:                        dispatch,
 		storage:                         storage,
 		clusterManager:                  manager,
-		shardPicker:                     NewRandomShardPicker(manager),
+		shardPicker:                     NewRandomBalancedShardPicker(manager),
 		partitionTableProportionOfNodes: partitionTableProportionOfNodes,
 	}
 }
