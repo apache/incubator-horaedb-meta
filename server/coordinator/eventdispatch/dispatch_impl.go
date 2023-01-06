@@ -88,6 +88,21 @@ func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, reques
 	return nil
 }
 
+func (d *DispatchImpl) CloseTableOnShard(ctx context.Context, addr string, request CloseTableOnShardRequest) error {
+	client, err := d.getMetaEventClient(ctx, addr)
+	if err != nil {
+		return err
+	}
+	resp, err := client.CloseTableOnShard(ctx, convertCloseTableOnShardRequestToPB(request))
+	if err != nil {
+		return errors.WithMessage(err, "close table on shard")
+	}
+	if resp.GetHeader().Code != 0 {
+		return ErrDispatch.WithCausef("close table on shard, err:%s", resp.GetHeader().GetError())
+	}
+	return nil
+}
+
 func (d *DispatchImpl) getGrpcClient(ctx context.Context, addr string) (*grpc.ClientConn, error) {
 	client, ok := d.conns.Load(addr)
 	if !ok {
@@ -123,6 +138,13 @@ func convertCreateTableOnShardRequestToPB(request CreateTableOnShardRequest) *me
 
 func convertDropTableOnShardRequestToPB(request DropTableOnShardRequest) *metaeventpb.DropTableOnShardRequest {
 	return &metaeventpb.DropTableOnShardRequest{
+		UpdateShardInfo: convertUpdateShardInfoToPB(request.UpdateShardInfo),
+		TableInfo:       cluster.ConvertTableInfoToPB(request.TableInfo),
+	}
+}
+
+func convertCloseTableOnShardRequestToPB(request CloseTableOnShardRequest) *metaeventpb.CloseTableOnShardRequest {
+	return &metaeventpb.CloseTableOnShardRequest{
 		UpdateShardInfo: convertUpdateShardInfoToPB(request.UpdateShardInfo),
 		TableInfo:       cluster.ConvertTableInfoToPB(request.TableInfo),
 	}

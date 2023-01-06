@@ -160,6 +160,7 @@ func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
 }
 
 // Load meta and restore procedure.
+// TODO: impl restoreProcedure
 func restoreProcedure(meta *Meta) Procedure {
 	switch meta.Typ {
 	case Create:
@@ -175,6 +176,14 @@ func restoreProcedure(meta *Meta) Procedure {
 	case Merge:
 		return nil
 	case Scatter:
+		return nil
+	case CreateTable:
+		return nil
+	case DropTable:
+		return nil
+	case CreatePartitionTable:
+		return nil
+	case DropPartitionTable:
 		return nil
 	}
 	return nil

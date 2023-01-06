@@ -101,3 +101,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
+
+replace github.com/CeresDB/ceresdbproto/golang v0.0.0-20230103124322-6e12241032e0 => github.com/chunshao90/ceresdbproto/golang v0.0.0-20230105030022-760be4219100
