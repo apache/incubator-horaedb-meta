@@ -155,10 +155,11 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 				return errors.WithMessagef(err, "create partition table procedure open partition tables")
 			}
 		case stateFinish:
+			// TODO: The state update sequence here is inconsistent with the previous one. Consider reconstructing the state update logic of the state machine.
+			p.updateStateWithLock(StateFinished)
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "create partition table procedure persist")
 			}
-			p.updateStateWithLock(StateFinished)
 			return nil
 		}
 	}
@@ -202,7 +203,7 @@ func createPartitionTableCallback(event *fsm.Event) {
 	// Select first shard to create partition table.
 	partitionTableShardNode := req.partitionTableShards[0]
 
-	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), partitionTableShardNode.ShardNode.NodeName, true)
+	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), partitionTableShardNode.ShardInfo.ID, true)
 	if err != nil {
 		cancelEventWithLog(event, err, "create table metadata")
 		return
@@ -224,7 +225,7 @@ func createDataTablesCallback(event *fsm.Event) {
 	}
 
 	for i, dataTableShard := range req.dataTablesShards {
-		createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetPartitionTableInfo().SubTableNames[i], dataTableShard.ShardNode.NodeName, false)
+		createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetPartitionTableInfo().SubTableNames[i], dataTableShard.ShardInfo.ID, false)
 		if err != nil {
 			cancelEventWithLog(event, err, "create table metadata")
 			return
@@ -252,7 +253,6 @@ func openPartitionTablesCallback(event *fsm.Event) {
 			SchemaName: req.sourceReq.SchemaName,
 			TableName:  req.sourceReq.Name,
 			ShardID:    partitionTableShard.ShardInfo.ID,
-			NodeName:   partitionTableShard.ShardNode.NodeName,
 		}); err != nil {
 			cancelEventWithLog(event, err, "open table")
 			return

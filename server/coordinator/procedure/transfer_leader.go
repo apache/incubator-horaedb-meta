@@ -110,7 +110,17 @@ func NewTransferLeaderProcedure(dispatch eventdispatch.Dispatch, c *cluster.Clus
 		transferLeaderCallbacks,
 	)
 
-	return &TransferLeaderProcedure{id: id, fsm: transferLeaderOperationFsm, dispatch: dispatch, cluster: c, storage: s, shardID: shardID, oldLeaderNodeName: oldLeaderNodeName, newLeaderNodeName: newLeaderNodeName, state: StateInit}, nil
+	return &TransferLeaderProcedure{
+		id:                id,
+		fsm:               transferLeaderOperationFsm,
+		dispatch:          dispatch,
+		cluster:           c,
+		storage:           s,
+		shardID:           shardID,
+		oldLeaderNodeName: oldLeaderNodeName,
+		newLeaderNodeName: newLeaderNodeName,
+		state:             StateInit,
+	}, nil
 }
 
 func (p *TransferLeaderProcedure) ID() uint64 {
@@ -168,6 +178,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 				return errors.WithMessagef(err, "trasnferLeader procedure finish")
 			}
 		case stateTransferLeaderFinish:
+			// TODO: The state update sequence here is inconsistent with the previous one. Consider reconstructing the state update logic of the state machine.
 			p.updateStateWithLock(StateFinished)
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "transferLeader procedure persist")

@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 	"sync"
-	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -130,7 +130,7 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 	}
 
 	// Remove dropped table in shard view.
-	updateVersions, err := c.topologyManager.RemoveTable(ctx, table.ID)
+	updateVersions, err := c.topologyManager.EvictTable(ctx, table.ID)
 	if err != nil {
 		return DropTableResult{}, errors.WithMessagef(err, "topology manager remove table")
 	}
@@ -139,88 +139,54 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 		ShardVersionUpdate: updateVersions,
 	}
 	log.Info("drop table success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("result", fmt.Sprintf("%+v", ret)))
+
 	return ret, nil
-}
-
-func (c *Cluster) updateShardTables(ctx context.Context, shardTablesArr []ShardTables) error {
-	for _, shardTables := range shardTablesArr {
-		tableIDs := make([]storage.TableID, 0, len(shardTables.Tables))
-		for _, table := range shardTables.Tables {
-			tableIDs = append(tableIDs, table.ID)
-		}
-
-		_, err := c.topologyManager.UpdateShardView(ctx, storage.ShardView{
-			ShardID:   shardTables.Shard.ID,
-			Version:   shardTables.Shard.Version + 1,
-			TableIDs:  tableIDs,
-			CreatedAt: uint64(time.Now().UnixMilli()),
-		})
-		if err != nil {
-			return errors.WithMessagef(err, "update shard tables")
-		}
-	}
-
-	return nil
 }
 
 // OpenTable will open an existing table on the specified shard.
 // The table to be opened must have been created.
 func (c *Cluster) OpenTable(ctx context.Context, request OpenTableRequest) error {
-	table, _, err := c.GetTable(request.SchemaName, request.TableName)
+	log.Info("open table", zap.String("nodeName", request.NodeName), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName), zap.Uint64("shardID", uint64(request.ShardID)))
+
+	table, exists, err := c.GetTable(request.SchemaName, request.TableName)
 	if err != nil {
 		log.Error("get table", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
 		return err
 	}
 
-	shardTables, exists := c.GetShardTables([]storage.ShardID{request.ShardID}, request.NodeName)[request.ShardID]
 	if !exists {
-		log.Error("get shard tables", zap.Error(ErrShardNotFound), zap.Uint64("shardID", uint64(request.ShardID)), zap.String("nodeName", request.NodeName))
-		return errors.WithMessage(ErrShardNotFound, fmt.Sprintf("shard tables not found, shardID:%d, nodeName:%s", request.ShardID, request.NodeName))
+		log.Error("the table to be opened does not exist", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
+		return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not exists, shcemaName:%s,tableName:%s", request.SchemaName, request.TableName))
 	}
 
-	shardTables.Tables = append(shardTables.Tables, TableInfo{
-		table.ID,
-		table.Name,
-		table.SchemaID,
-		request.SchemaName,
-		table.Partitioned,
-	})
+	if !table.Partitioned {
+		log.Error("try to open normal table", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
+		return errors.WithMessage(ErrOpenTable, fmt.Sprintf("try to open normal table, schemaName:%s, tableName:%s", request.SchemaName, request.TableName))
+	}
 
-	if err := c.updateShardTables(ctx, []ShardTables{shardTables}); err != nil {
-		log.Error("update shard tables", zap.Error(err))
-		return err
+	_, err = c.topologyManager.AddTable(ctx, request.ShardID, table)
+	if err != nil {
+		return errors.WithMessage(err, "add table to topology")
 	}
 
 	return nil
 }
 
 func (c *Cluster) CloseTable(ctx context.Context, request CloseTableRequest) error {
-	table, _, err := c.GetTable(request.SchemaName, request.TableName)
+	log.Info("close table", zap.String("nodeName", request.NodeName), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName), zap.Uint64("shardID", uint64(request.ShardID)))
+
+	table, exists, err := c.GetTable(request.SchemaName, request.TableName)
 	if err != nil {
 		log.Error("get table", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
 		return err
 	}
 
-	shardTables, exists := c.GetShardTables([]storage.ShardID{request.ShardID}, request.NodeName)[request.ShardID]
 	if !exists {
-		log.Error("get shard tables", zap.Error(ErrShardNotFound), zap.Uint64("shardID", uint64(request.ShardID)), zap.String("nodeName", request.NodeName))
-		return errors.WithMessage(ErrShardNotFound, fmt.Sprintf("shard tables not found, shardID:%d, nodeName:%s", request.ShardID, request.NodeName))
+		log.Error("the table to be closed does not exist", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
+		return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not exists, shcemaName:%s, tableName:%s", request.SchemaName, request.TableName))
 	}
 
-	found := false
-	for i, tableInfo := range shardTables.Tables {
-		if tableInfo.ID == table.ID {
-			found = true
-			shardTables.Tables = append(shardTables.Tables[:i], shardTables.Tables[i+1:]...)
-			break
-		}
-	}
-	if !found {
-		return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not found on shard, shardID:%d, tableID:%d, tableName:%s", request.ShardID, table.ID, table.Name))
-	}
-
-	if err := c.updateShardTables(ctx, []ShardTables{shardTables}); err != nil {
-		log.Error("update shard tables", zap.Error(err))
+	if _, err := c.topologyManager.RemoveTable(ctx, request.ShardID, table.ID); err != nil {
 		return err
 	}
 
@@ -230,74 +196,27 @@ func (c *Cluster) CloseTable(ctx context.Context, request CloseTableRequest) err
 // MigrateTable used to migrate tables from old shard to new shard.
 // The mapping relationship between table and shard will be modified.
 func (c *Cluster) MigrateTable(ctx context.Context, request MigrateTableRequest) error {
-	originShardTables := c.GetShardTables([]storage.ShardID{request.OldShardID}, request.NodeName)[request.OldShardID]
+	log.Info("migrate table", zap.String("nodeName", request.NodeName), zap.String("schemaName", request.SchemaName), zap.Uint64("oldShardID", uint64(request.OldShardID)), zap.Uint64("newShardID", uint64(request.NewShardID)), zap.String("tables", strings.Join(request.TableNames, ",")))
 
-	// Find remaining tables in old shard.
-	var remainingTables []TableInfo
-
-	for _, tableInfo := range originShardTables.Tables {
-		found := false
-		for _, tableName := range request.TableNames {
-			if tableInfo.Name == tableName && tableInfo.SchemaName == request.SchemaName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remainingTables = append(remainingTables, tableInfo)
-		}
-	}
-
-	// Update shard tables.
-	originShardTables.Tables = remainingTables
-
-	getNodeShardsResult, err := c.GetNodeShards(ctx)
-	if err != nil {
-		log.Error("get node shards", zap.Error(err))
-		return err
-	}
-
-	// Find new shard in metadata.
-	var newShardInfo ShardInfo
-	found := false
-	for _, shardNodeWithVersion := range getNodeShardsResult.NodeShards {
-		if shardNodeWithVersion.ShardInfo.ID == request.NewShardID {
-			newShardInfo = shardNodeWithVersion.ShardInfo
-			found = true
-			break
-		}
-	}
-	if !found {
-		log.Error("new shard not found", zap.Error(ErrShardNotFound), zap.Uint64("shardID", uint64(request.NewShardID)))
-		return errors.WithMessage(ErrShardNotFound, fmt.Sprintf("new shard not found, shardID:%d", request.NewShardID))
-	}
-
-	// Find split tables in metadata.
-	var tables []TableInfo
 	for _, tableName := range request.TableNames {
-		table, exists, err := c.GetTable(request.SchemaName, tableName)
+		table, exists, err := c.tableManager.GetTable(request.SchemaName, tableName)
 		if err != nil {
 			log.Error("get table", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
 			return err
 		}
 		if !exists {
-			log.Error("table not found", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
-			return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not found, schemaName:%s, tableName:%s", request.SchemaName, tableName))
+			log.Error("the table to be closed does not exist", zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
+			return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not exists, shcemaName:%s,tableName:%s", request.SchemaName, tableName))
 		}
-		tables = append(tables, TableInfo{
-			ID:         table.ID,
-			Name:       table.Name,
-			SchemaID:   table.SchemaID,
-			SchemaName: request.SchemaName,
-		})
-	}
-	newShardTables := ShardTables{
-		Shard:  newShardInfo,
-		Tables: tables,
-	}
-	if err := c.updateShardTables(ctx, []ShardTables{originShardTables, newShardTables}); err != nil {
-		log.Error("update shard tables", zap.Error(err))
-		return err
+
+		if _, err := c.topologyManager.RemoveTable(ctx, request.OldShardID, table.ID); err != nil {
+			log.Error("remove table from topology", zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
+			return err
+		}
+		if _, err := c.topologyManager.AddTable(ctx, request.NewShardID, table); err != nil {
+			log.Error("add table from topology", zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
+			return err
+		}
 	}
 
 	return nil
@@ -313,8 +232,8 @@ func (c *Cluster) GetTable(schemaName, tableName string) (storage.Table, bool, e
 	return c.tableManager.GetTable(schemaName, tableName)
 }
 
-func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName string, tableName string, partitioned bool) (CreateTableResult, error) {
-	log.Info("create table start", zap.String("cluster", c.Name()), zap.String("nodeName", nodeName), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
+func (c *Cluster) CreateTable(ctx context.Context, shardID storage.ShardID, schemaName string, tableName string, partitioned bool) (CreateTableResult, error) {
+	log.Info("create table start", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
 
 	_, exists, err := c.tableManager.GetTable(schemaName, tableName)
 	if err != nil {
@@ -332,7 +251,7 @@ func (c *Cluster) CreateTable(ctx context.Context, nodeName string, schemaName s
 	}
 
 	// Add table to topology manager.
-	result, err := c.topologyManager.AddTable(ctx, nodeName, table)
+	result, err := c.topologyManager.AddTable(ctx, shardID, table)
 	if err != nil {
 		return CreateTableResult{}, errors.WithMessage(err, "topology manager add table")
 	}

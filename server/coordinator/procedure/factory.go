@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -118,8 +119,25 @@ func (f *Factory) makeCreateNormalTableProcedure(ctx context.Context, request Cr
 	if err != nil {
 		return nil, err
 	}
-	procedure := NewCreateNormalTableProcedure(f.dispatch, request.Cluster, id,
-		request.SourceReq, request.OnSucceeded, request.OnFailed)
+	shards, err := f.shardPicker.PickShards(ctx, request.Cluster.Name(), 1, false)
+	if err != nil {
+		log.Error("pick table shard", zap.Error(err))
+		return nil, errors.WithMessage(err, "pick table shard")
+	}
+	if len(shards) != 1 {
+		log.Error("pick table shards length not equal 1", zap.Int("shards", len(shards)))
+		return nil, errors.WithMessage(ErrPickShard, fmt.Sprintf("pick table shard, shards length:%d", len(shards)))
+	}
+
+	procedure := NewCreateTableProcedure(CreateTableProcedureRequest{
+		Dispatch:    f.dispatch,
+		Cluster:     request.Cluster,
+		ID:          id,
+		ShardID:     shards[0].ShardInfo.ID,
+		Req:         request.SourceReq,
+		OnSucceeded: request.OnSucceeded,
+		OnFailed:    request.OnFailed,
+	})
 	return procedure, nil
 }
 
@@ -153,9 +171,15 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 	}
 
 	procedure := NewCreatePartitionTableProcedure(CreatePartitionTableProcedureRequest{
-		id: id, cluster: request.Cluster, dispatch: f.dispatch, storage: f.storage,
-		req: request.SourceReq, partitionTableShards: partitionTableShards, dataTablesShards: dataTableShards,
-		onSucceeded: request.OnSucceeded, onFailed: request.OnFailed,
+		id:                   id,
+		cluster:              request.Cluster,
+		dispatch:             f.dispatch,
+		storage:              f.storage,
+		req:                  request.SourceReq,
+		partitionTableShards: partitionTableShards,
+		dataTablesShards:     dataTableShards,
+		onSucceeded:          request.OnSucceeded,
+		onFailed:             request.OnFailed,
 	})
 	return procedure, nil
 }

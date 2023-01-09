@@ -169,6 +169,7 @@ func (p *SplitProcedure) Start(ctx context.Context) error {
 				return errors.WithMessagef(err, "split procedure delete shard tables")
 			}
 		case stateSplitFinish:
+			// TODO: The state update sequence here is inconsistent with the previous one. Consider reconstructing the state update logic of the state machine.
 			p.updateStateWithLock(StateFinished)
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "split procedure persist")

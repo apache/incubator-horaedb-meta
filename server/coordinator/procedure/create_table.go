@@ -10,6 +10,7 @@ import (
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
 )
@@ -45,7 +46,7 @@ func createTablePrepareCallback(event *fsm.Event) {
 		return
 	}
 
-	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), req.sourceReq.GetHeader().GetNode(), false)
+	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), req.shardID, false)
 	if err != nil {
 		cancelEventWithLog(event, err, "create table metadata")
 		return
@@ -89,6 +90,8 @@ type createTableCallbackRequest struct {
 	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
 
+	shardID storage.ShardID
+
 	sourceReq *metaservicepb.CreateTableRequest
 
 	onSucceeded func(cluster.CreateTableResult) error
@@ -97,45 +100,69 @@ type createTableCallbackRequest struct {
 	createTableResult cluster.CreateTableResult
 }
 
-func NewCreateNormalTableProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, req *metaservicepb.CreateTableRequest, onSucceeded func(cluster.CreateTableResult) error, onFailed func(error) error) Procedure {
+type CreateTableProcedureRequest struct {
+	Dispatch    eventdispatch.Dispatch
+	Cluster     *cluster.Cluster
+	ID          uint64
+	ShardID     storage.ShardID
+	Req         *metaservicepb.CreateTableRequest
+	OnSucceeded func(cluster.CreateTableResult) error
+	OnFailed    func(error) error
+}
+
+func NewCreateTableProcedure(request CreateTableProcedureRequest) Procedure {
 	fsm := fsm.NewFSM(
 		stateCreateTableBegin,
 		createTableEvents,
 		createTableCallbacks,
 	)
-	return &CreateNormalTableProcedure{id: id, fsm: fsm, cluster: cluster, dispatch: dispatch, req: req, state: StateInit, onSucceeded: onSucceeded, onFailed: onFailed}
+	return &CreateTableProcedure{
+		id:          request.ID,
+		fsm:         fsm,
+		cluster:     request.Cluster,
+		dispatch:    request.Dispatch,
+		shardID:     request.ShardID,
+		req:         request.Req,
+		state:       StateInit,
+		onSucceeded: request.OnSucceeded,
+		onFailed:    request.OnFailed,
+	}
 }
 
-type CreateNormalTableProcedure struct {
+type CreateTableProcedure struct {
 	id       uint64
 	fsm      *fsm.FSM
 	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
+
+	shardID storage.ShardID
 
 	req *metaservicepb.CreateTableRequest
 
 	onSucceeded func(cluster.CreateTableResult) error
 	onFailed    func(error) error
 
+	// Protect the state.
 	lock  sync.RWMutex
 	state State
 }
 
-func (p *CreateNormalTableProcedure) ID() uint64 {
+func (p *CreateTableProcedure) ID() uint64 {
 	return p.id
 }
 
-func (p *CreateNormalTableProcedure) Typ() Typ {
+func (p *CreateTableProcedure) Typ() Typ {
 	return CreateTable
 }
 
-func (p *CreateNormalTableProcedure) Start(ctx context.Context) error {
+func (p *CreateTableProcedure) Start(ctx context.Context) error {
 	p.updateState(StateRunning)
 
 	req := &createTableCallbackRequest{
 		cluster:     p.cluster,
 		ctx:         ctx,
 		dispatch:    p.dispatch,
+		shardID:     p.shardID,
 		sourceReq:   p.req,
 		onSucceeded: p.onSucceeded,
 		onFailed:    p.onFailed,
@@ -158,19 +185,19 @@ func (p *CreateNormalTableProcedure) Start(ctx context.Context) error {
 	return nil
 }
 
-func (p *CreateNormalTableProcedure) Cancel(_ context.Context) error {
+func (p *CreateTableProcedure) Cancel(_ context.Context) error {
 	p.updateState(StateCancelled)
 	return nil
 }
 
-func (p *CreateNormalTableProcedure) State() State {
+func (p *CreateTableProcedure) State() State {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.state
 }
 
-func (p *CreateNormalTableProcedure) updateState(state State) {
+func (p *CreateTableProcedure) updateState(state State) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

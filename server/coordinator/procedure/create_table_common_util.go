@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func createTableMetadata(ctx context.Context, c *cluster.Cluster, schemaName string, tableName string, nodeName string, partitioned bool) (cluster.CreateTableResult, error) {
+func createTableMetadata(ctx context.Context, c *cluster.Cluster, schemaName string, tableName string, shardID storage.ShardID, partitioned bool) (cluster.CreateTableResult, error) {
 	_, exists, err := c.GetTable(schemaName, tableName)
 	if err != nil {
 		return cluster.CreateTableResult{}, errors.WithMessage(err, "cluster get table")
@@ -22,7 +22,7 @@ func createTableMetadata(ctx context.Context, c *cluster.Cluster, schemaName str
 		return cluster.CreateTableResult{}, errors.WithMessage(ErrTableAlreadyExists, fmt.Sprintf("create an existing table, schemaName:%s, tableName:%s", schemaName, tableName))
 	}
 
-	createTableResult, err := c.CreateTable(ctx, nodeName, schemaName, tableName, partitioned)
+	createTableResult, err := c.CreateTable(ctx, shardID, schemaName, tableName, partitioned)
 	if err != nil {
 		return cluster.CreateTableResult{}, errors.WithMessage(err, "create table")
 	}

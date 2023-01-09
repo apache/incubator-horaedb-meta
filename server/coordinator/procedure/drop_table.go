@@ -158,7 +158,16 @@ func NewDropTableProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Clu
 		dropTableEvents,
 		dropTableCallbacks,
 	)
-	return &DropTableProcedure{id: id, fsm: fsm, cluster: cluster, dispatch: dispatch, req: req, onSucceeded: onSucceeded, onFailed: onFailed, state: StateInit}
+	return &DropTableProcedure{
+		id:          id,
+		fsm:         fsm,
+		cluster:     cluster,
+		dispatch:    dispatch,
+		req:         req,
+		onSucceeded: onSucceeded,
+		onFailed:    onFailed,
+		state:       StateInit,
+	}
 }
 
 type DropTableProcedure struct {

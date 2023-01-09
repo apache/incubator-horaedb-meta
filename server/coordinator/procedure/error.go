@@ -16,4 +16,5 @@ var (
 	ErrNodeNumberNotEnough   = coderr.NewCodeError(coderr.Internal, "node number not enough")
 	ErrEmptyPartitionNames   = coderr.NewCodeError(coderr.Internal, "partition names is empty")
 	ErrDropTableResult       = coderr.NewCodeError(coderr.Internal, "length of shard not correct")
+	ErrPickShard             = coderr.NewCodeError(coderr.Internal, "pick shard failed")
 )
