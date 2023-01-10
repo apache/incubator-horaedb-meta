@@ -93,6 +93,7 @@ func (d *DispatchImpl) CloseTableOnShard(ctx context.Context, addr string, reque
 	if err != nil {
 		return err
 	}
+
 	resp, err := client.CloseTableOnShard(ctx, convertCloseTableOnShardRequestToPB(request))
 	if err != nil {
 		return errors.WithMessage(err, "close table on shard")

@@ -19,9 +19,9 @@ import (
 )
 
 // fsm state change:
-// ┌────────┐     ┌──────────────────────┐     ┌────────────────────┐     ┌──────────────────────┐     ┌───────────┐
-// │ Begin  ├─────▶     DropDataTable    ├─────▶ DropPartitionTable ├─────▶ ClosePartitionTables ├─────▶  Finish   │
-// └────────┘     └──────────────────────┘     └────────────────────┘     └──────────────────────┘     └───────────┘
+// ┌────────┐     ┌────────────────┐     ┌────────────────────┐     ┌──────────────────────┐     ┌───────────┐
+// │ Begin  ├─────▶  DropDataTable ├─────▶ DropPartitionTable ├─────▶ ClosePartitionTables ├─────▶  Finish   │
+// └────────┘     └────────────────┘     └────────────────────┘     └──────────────────────┘     └───────────┘
 const (
 	eventDropDataTable            = "EventDropDataTable"
 	eventDropPartitionTable       = "EventDropPartitionTable"
@@ -57,10 +57,10 @@ type DropPartitionTableProcedure struct {
 	dispatch eventdispatch.Dispatch
 	storage  Storage
 
-	req *metaservicepb.DropTableRequest
-
 	onSucceeded func(cluster.TableInfo) error
 	onFailed    func(error) error
+
+	req *metaservicepb.DropTableRequest
 
 	lock  sync.RWMutex
 	state State
@@ -233,7 +233,6 @@ type dropPartitionTableCallbackRequest struct {
 	onFailed    func(error) error
 
 	sourceReq *metaservicepb.DropTableRequest
-	ret       cluster.TableInfo
 	versions  []cluster.ShardVersionUpdate
 	table     storage.Table
 }
@@ -284,6 +283,7 @@ func dropPartitionTableCallback(event *fsm.Event) {
 	table, dropTableRet, err := dropTableMetaData(event, request.tableName())
 	if err != nil {
 		cancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", table.Name))
+		return
 	}
 
 	if len(dropTableRet.ShardVersionUpdate) == 0 {
@@ -327,7 +327,7 @@ func closePartitionTableCallback(event *fsm.Event) {
 	}
 
 	for _, shardNode := range shardNodes {
-		// Reopen partition table shard.
+		// Close partition table shard.
 		if err = request.dispatch.CloseTableOnShard(request.ctx, shardNode.NodeName, eventdispatch.CloseTableOnShardRequest{
 			UpdateShardInfo: eventdispatch.UpdateShardInfo{},
 			TableInfo:       tableInfo,
@@ -339,14 +339,21 @@ func closePartitionTableCallback(event *fsm.Event) {
 }
 
 func finishDropPartitionTableCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*dropPartitionTableCallbackRequest](event)
+	request, err := getRequestFromEvent[*dropPartitionTableCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	log.Info("drop partition table finish")
 
-	if err = req.onSucceeded(req.ret); err != nil {
+	tableInfo := cluster.TableInfo{
+		ID:         request.table.ID,
+		Name:       request.table.Name,
+		SchemaID:   request.table.SchemaID,
+		SchemaName: request.sourceReq.GetSchemaName(),
+	}
+
+	if err = request.onSucceeded(tableInfo); err != nil {
 		cancelEventWithLog(event, err, "drop partition table on succeeded")
 		return
 	}
@@ -383,7 +390,7 @@ func dispatchDropTable(event *fsm.Event, table storage.Table, version cluster.Sh
 	shardNodes, err := request.cluster.GetShardNodesByShardID(version.ShardID)
 	if err != nil {
 		cancelEventWithLog(event, err, "get shard nodes by shard id")
-		return errors.WithMessage(err, "cluster get shard by table id")
+		return errors.WithMessage(err, "cluster get shard by shard id")
 	}
 
 	tableInfo := cluster.TableInfo{
