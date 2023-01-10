@@ -19,7 +19,7 @@ func TestCreateAndDropPartitionTable(t *testing.T) {
 	manager, c := prepare(t)
 	s := NewTestStorage(t)
 
-	shardPicker := NewRandomShardPicker(manager)
+	shardPicker := NewRandomBalancedShardPicker(manager)
 
 	testTableNum := 20
 	testSubTableNum := 4
