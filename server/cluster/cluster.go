@@ -156,15 +156,15 @@ func (c *Cluster) OpenTable(ctx context.Context, request OpenTableRequest) error
 
 	if !exists {
 		log.Error("the table to be opened does not exist", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
-		return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not exists, shcemaName:%s,tableName:%s", request.SchemaName, request.TableName))
+		return errors.WithMessagef(ErrTableNotFound, "table not exists, shcemaName:%s,tableName:%s", request.SchemaName, request.TableName)
 	}
 
 	if !table.Partitioned {
 		log.Error("try to open normal table", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
-		return errors.WithMessage(ErrOpenTable, fmt.Sprintf("try to open normal table, schemaName:%s, tableName:%s", request.SchemaName, request.TableName))
+		return errors.WithMessagef(ErrOpenTable, "try to open normal table, schemaName:%s, tableName:%s", request.SchemaName, request.TableName)
 	}
 
-	_, err = c.topologyManager.AddTable(ctx, request.ShardID, table)
+	_, err = c.topologyManager.AddTable(ctx, request.ShardID, []storage.Table{table})
 	if err != nil {
 		return errors.WithMessage(err, "add table to topology")
 	}
@@ -183,10 +183,10 @@ func (c *Cluster) CloseTable(ctx context.Context, request CloseTableRequest) err
 
 	if !exists {
 		log.Error("the table to be closed does not exist", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
-		return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not exists, shcemaName:%s, tableName:%s", request.SchemaName, request.TableName))
+		return errors.WithMessagef(ErrTableNotFound, "table not exists, shcemaName:%s, tableName:%s", request.SchemaName, request.TableName)
 	}
 
-	if _, err := c.topologyManager.RemoveTable(ctx, request.ShardID, table.ID); err != nil {
+	if _, err := c.topologyManager.RemoveTable(ctx, request.ShardID, []storage.TableID{table.ID}); err != nil {
 		return err
 	}
 
@@ -198,25 +198,33 @@ func (c *Cluster) CloseTable(ctx context.Context, request CloseTableRequest) err
 func (c *Cluster) MigrateTable(ctx context.Context, request MigrateTableRequest) error {
 	log.Info("migrate table", zap.String("nodeName", request.NodeName), zap.String("schemaName", request.SchemaName), zap.Uint64("oldShardID", uint64(request.OldShardID)), zap.Uint64("newShardID", uint64(request.NewShardID)), zap.String("tables", strings.Join(request.TableNames, ",")))
 
+	tables := make([]storage.Table, 0, len(request.TableNames))
+	tableIDs := make([]storage.TableID, 0, len(request.TableNames))
+
 	for _, tableName := range request.TableNames {
 		table, exists, err := c.tableManager.GetTable(request.SchemaName, tableName)
 		if err != nil {
 			log.Error("get table", zap.Error(err), zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
 			return err
 		}
+
 		if !exists {
 			log.Error("the table to be closed does not exist", zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
-			return errors.WithMessage(ErrTableNotFound, fmt.Sprintf("table not exists, shcemaName:%s,tableName:%s", request.SchemaName, tableName))
+			return errors.WithMessagef(ErrTableNotFound, "table not exists, shcemaName:%s,tableName:%s", request.SchemaName, tableName)
 		}
 
-		if _, err := c.topologyManager.RemoveTable(ctx, request.OldShardID, table.ID); err != nil {
-			log.Error("remove table from topology", zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
-			return err
-		}
-		if _, err := c.topologyManager.AddTable(ctx, request.NewShardID, table); err != nil {
-			log.Error("add table from topology", zap.String("schemaName", request.SchemaName), zap.String("tableName", tableName))
-			return err
-		}
+		tables = append(tables, table)
+		tableIDs = append(tableIDs, table.ID)
+	}
+
+	if _, err := c.topologyManager.RemoveTable(ctx, request.OldShardID, tableIDs); err != nil {
+		log.Error("remove table from topology")
+		return err
+	}
+
+	if _, err := c.topologyManager.AddTable(ctx, request.NewShardID, tables); err != nil {
+		log.Error("add table from topology")
+		return err
 	}
 
 	return nil
@@ -251,7 +259,7 @@ func (c *Cluster) CreateTable(ctx context.Context, shardID storage.ShardID, sche
 	}
 
 	// Add table to topology manager.
-	result, err := c.topologyManager.AddTable(ctx, shardID, table)
+	result, err := c.topologyManager.AddTable(ctx, shardID, []storage.Table{table})
 	if err != nil {
 		return CreateTableResult{}, errors.WithMessage(err, "topology manager add table")
 	}

@@ -4,7 +4,6 @@ package procedure
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -15,6 +14,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
+
+const defaultPartitionTableNum = 1
 
 type Factory struct {
 	idAllocator    id.Allocator
@@ -111,10 +112,10 @@ func (f *Factory) MakeCreateTableProcedure(ctx context.Context, request CreateTa
 		})
 	}
 
-	return f.makeCreateNormalTableProcedure(ctx, request)
+	return f.makeCreateTableProcedure(ctx, request)
 }
 
-func (f *Factory) makeCreateNormalTableProcedure(ctx context.Context, request CreateTableRequest) (Procedure, error) {
+func (f *Factory) makeCreateTableProcedure(ctx context.Context, request CreateTableRequest) (Procedure, error) {
 	id, err := f.allocProcedureID(ctx)
 	if err != nil {
 		return nil, err
@@ -126,7 +127,7 @@ func (f *Factory) makeCreateNormalTableProcedure(ctx context.Context, request Cr
 	}
 	if len(shards) != 1 {
 		log.Error("pick table shards length not equal 1", zap.Int("shards", len(shards)))
-		return nil, errors.WithMessage(ErrPickShard, fmt.Sprintf("pick table shard, shards length:%d", len(shards)))
+		return nil, errors.WithMessagef(ErrPickShard, "pick table shard, shards length:%d", len(shards))
 	}
 
 	procedure := NewCreateTableProcedure(CreateTableProcedureRequest{
@@ -158,7 +159,7 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 		nodeNames[nodeShard.ShardNode.NodeName] = 1
 	}
 
-	partitionTableNum := Max(1, int(float32(len(nodeNames))*request.PartitionTableRatioOfNodes))
+	partitionTableNum := Max(defaultPartitionTableNum, int(float32(len(nodeNames))*request.PartitionTableRatioOfNodes))
 
 	partitionTableShards, err := f.shardPicker.PickShards(ctx, request.Cluster.Name(), partitionTableNum, false)
 	if err != nil {
