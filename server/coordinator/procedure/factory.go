@@ -41,6 +41,17 @@ type CreateTableRequest struct {
 	OnFailed    func(error) error
 }
 
+func (request *CreateTableRequest) isPartitionTable() (bool, error) {
+	if request.SourceReq.PartitionTableInfo != nil {
+		if len(request.SourceReq.PartitionTableInfo.SubTableNames) == 0 {
+			log.Error("fail to create table", zap.Error(ErrEmptyPartitionNames))
+			return false, ErrEmptyPartitionNames
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 type DropTableRequest struct {
 	Cluster   *cluster.Cluster
 	SourceReq *metaservicepb.DropTableRequest
@@ -98,11 +109,12 @@ func (f *Factory) CreateScatterProcedure(ctx context.Context, request ScatterReq
 }
 
 func (f *Factory) MakeCreateTableProcedure(ctx context.Context, request CreateTableRequest) (Procedure, error) {
-	if request.SourceReq.PartitionTableInfo != nil {
-		if len(request.SourceReq.PartitionTableInfo.SubTableNames) == 0 {
-			log.Error("fail to create table", zap.Error(ErrEmptyPartitionNames))
-			return nil, ErrEmptyPartitionNames
-		}
+	isPartitionTable, err := request.isPartitionTable()
+	if err != nil {
+		return nil, err
+	}
+
+	if isPartitionTable {
 		return f.makeCreatePartitionTableProcedure(ctx, CreatePartitionTableRequest{
 			Cluster:                    request.Cluster,
 			SourceReq:                  request.SourceReq,

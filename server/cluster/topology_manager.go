@@ -244,7 +244,9 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 	for i, tableID := range m.shardTablesMapping[shardID].TableIDs {
 		for _, tableIDToRemove := range tableIDs {
 			if tableIDToRemove == tableID {
-				m.shardTablesMapping[shardID].TableIDs = append(m.shardTablesMapping[shardID].TableIDs[:i], m.shardTablesMapping[shardID].TableIDs[i+1:]...)
+				lastElementIndex := len(m.shardTablesMapping[shardID].TableIDs) - 1
+				m.shardTablesMapping[shardID].TableIDs[i] = m.shardTablesMapping[shardID].TableIDs[lastElementIndex]
+				m.shardTablesMapping[shardID].TableIDs = append(m.shardTablesMapping[shardID].TableIDs[:lastElementIndex], m.shardTablesMapping[shardID].TableIDs[lastElementIndex+1:]...)
 			}
 		}
 	}
@@ -270,7 +272,7 @@ func (m *TopologyManagerImpl) EvictTable(ctx context.Context, tableID storage.Ta
 	for _, shardID := range shardIDs {
 		shardView, ok := m.shardTablesMapping[shardID]
 		if !ok {
-			return result, ErrShardNotFound.WithCausef("shard id:%d", shardID)
+			return nil, ErrShardNotFound.WithCausef("shard id:%d", shardID)
 		}
 		prevVersion := shardView.Version
 
@@ -292,7 +294,7 @@ func (m *TopologyManagerImpl) EvictTable(ctx context.Context, tableID storage.Ta
 			},
 			LatestVersion: prevVersion,
 		}); err != nil {
-			return result, errors.WithMessage(err, "storage update shard view")
+			return nil, errors.WithMessage(err, "storage update shard view")
 		}
 
 		// Update shardView in memory.

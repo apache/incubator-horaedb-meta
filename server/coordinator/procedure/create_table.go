@@ -90,9 +90,8 @@ type createTableCallbackRequest struct {
 	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
 
-	shardID storage.ShardID
-
 	sourceReq *metaservicepb.CreateTableRequest
+	shardID   storage.ShardID
 
 	onSucceeded func(cluster.CreateTableResult) error
 	onFailed    func(error) error

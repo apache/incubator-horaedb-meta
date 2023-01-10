@@ -134,7 +134,7 @@ func (p *SplitProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventSplitCreateNewShardMetadata, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "split procedure create new shard metadata")
+				return errors.WithMessage(err, "split procedure create new shard metadata")
 			}
 		case stateSplitCreateNewShardMetadata:
 			if err := p.persist(ctx); err != nil {
@@ -142,7 +142,7 @@ func (p *SplitProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventSplitCreateNewShardView, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "split procedure create new shard view")
+				return errors.WithMessage(err, "split procedure create new shard view")
 			}
 		case stateSplitCreateNewShardView:
 			if err := p.persist(ctx); err != nil {
@@ -150,7 +150,7 @@ func (p *SplitProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventSplitUpdateShardTables, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "split procedure create new shard")
+				return errors.WithMessage(err, "split procedure create new shard")
 			}
 		case stateSplitUpdateShardTables:
 			if err := p.persist(ctx); err != nil {
@@ -158,7 +158,7 @@ func (p *SplitProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventSplitOpenNewShard, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "split procedure create shard tables")
+				return errors.WithMessage(err, "split procedure create shard tables")
 			}
 		case stateSplitOpenNewShard:
 			if err := p.persist(ctx); err != nil {
@@ -166,7 +166,7 @@ func (p *SplitProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventSplitFinish, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "split procedure delete shard tables")
+				return errors.WithMessage(err, "split procedure delete shard tables")
 			}
 		case stateSplitFinish:
 			// TODO: The state update sequence here is inconsistent with the previous one. Consider reconstructing the state update logic of the state machine.
@@ -297,7 +297,6 @@ func splitUpdateShardTablesCallback(event *fsm.Event) {
 	if err := request.cluster.MigrateTable(request.ctx, cluster.MigrateTableRequest{
 		SchemaName: request.schemaName,
 		TableNames: request.tableNames,
-		NodeName:   request.targetNodeName,
 		OldShardID: request.shardID,
 		NewShardID: request.newShardID,
 	}); err != nil {

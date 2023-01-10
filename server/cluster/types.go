@@ -68,13 +68,8 @@ type CloseTableRequest struct {
 type MigrateTableRequest struct {
 	SchemaName string
 	TableNames []string
-	NodeName   string
 	OldShardID storage.ShardID
 	NewShardID storage.ShardID
-}
-
-type UpdateShardTablesResult struct {
-	ShardVersionUpdate ShardVersionUpdate
 }
 
 type ShardVersionUpdate struct {

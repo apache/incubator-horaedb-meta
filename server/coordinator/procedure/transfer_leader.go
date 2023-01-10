@@ -151,7 +151,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventTransferLeaderUpdateMetadata, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "trasnferLeader procedure update metadata")
+				return errors.WithMessage(err, "transferLeader procedure update metadata")
 			}
 		case stateTransferLeaderUpdateMetadata:
 			if err := p.persist(ctx); err != nil {
@@ -159,7 +159,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventTransferLeaderCloseOldLeader, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "trasnferLeader procedure close old leader")
+				return errors.WithMessage(err, "transferLeader procedure close old leader")
 			}
 		case stateTransferLeaderCloseOldLeader:
 			if err := p.persist(ctx); err != nil {
@@ -167,7 +167,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventTransferLeaderOpenNewLeader, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "trasnferLeader procedure oepn new leader")
+				return errors.WithMessage(err, "transferLeader procedure open new leader")
 			}
 		case stateTransferLeaderOpenNewLeader:
 			if err := p.persist(ctx); err != nil {
@@ -175,7 +175,7 @@ func (p *TransferLeaderProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventTransferLeaderFinish, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessagef(err, "trasnferLeader procedure finish")
+				return errors.WithMessage(err, "transferLeader procedure finish")
 			}
 		case stateTransferLeaderFinish:
 			// TODO: The state update sequence here is inconsistent with the previous one. Consider reconstructing the state update logic of the state machine.

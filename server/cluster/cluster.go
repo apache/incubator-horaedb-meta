@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"strings"
 	"sync"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -126,13 +125,13 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 	// Drop table.
 	err = c.tableManager.DropTable(ctx, schemaName, tableName)
 	if err != nil {
-		return DropTableResult{}, errors.WithMessagef(err, "table manager drop table")
+		return DropTableResult{}, errors.WithMessage(err, "table manager drop table")
 	}
 
 	// Remove dropped table in shard view.
 	updateVersions, err := c.topologyManager.EvictTable(ctx, table.ID)
 	if err != nil {
-		return DropTableResult{}, errors.WithMessagef(err, "topology manager remove table")
+		return DropTableResult{}, errors.WithMessage(err, "topology manager remove table")
 	}
 
 	ret := DropTableResult{
@@ -146,7 +145,7 @@ func (c *Cluster) DropTable(ctx context.Context, schemaName, tableName string) (
 // OpenTable will open an existing table on the specified shard.
 // The table to be opened must have been created.
 func (c *Cluster) OpenTable(ctx context.Context, request OpenTableRequest) error {
-	log.Info("open table", zap.String("nodeName", request.NodeName), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName), zap.Uint64("shardID", uint64(request.ShardID)))
+	log.Info("open table", zap.String("request", fmt.Sprintf("%v", request)))
 
 	table, exists, err := c.GetTable(request.SchemaName, request.TableName)
 	if err != nil {
@@ -160,8 +159,8 @@ func (c *Cluster) OpenTable(ctx context.Context, request OpenTableRequest) error
 	}
 
 	if !table.Partitioned {
-		log.Error("try to open normal table", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
-		return errors.WithMessagef(ErrOpenTable, "try to open normal table, schemaName:%s, tableName:%s", request.SchemaName, request.TableName)
+		log.Error("normal table cannot be opened on multiple shards", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
+		return errors.WithMessagef(ErrOpenTable, "normal table cannot be opened on multiple shards, schemaName:%s, tableName:%s", request.SchemaName, request.TableName)
 	}
 
 	_, err = c.topologyManager.AddTable(ctx, request.ShardID, []storage.Table{table})
@@ -169,11 +168,12 @@ func (c *Cluster) OpenTable(ctx context.Context, request OpenTableRequest) error
 		return errors.WithMessage(err, "add table to topology")
 	}
 
+	log.Info("open table finish", zap.String("request", fmt.Sprintf("%v", request)))
 	return nil
 }
 
 func (c *Cluster) CloseTable(ctx context.Context, request CloseTableRequest) error {
-	log.Info("close table", zap.String("nodeName", request.NodeName), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName), zap.Uint64("shardID", uint64(request.ShardID)))
+	log.Info("close table", zap.String("request", fmt.Sprintf("%v", request)))
 
 	table, exists, err := c.GetTable(request.SchemaName, request.TableName)
 	if err != nil {
@@ -190,13 +190,14 @@ func (c *Cluster) CloseTable(ctx context.Context, request CloseTableRequest) err
 		return err
 	}
 
+	log.Info("close table finish", zap.String("request", fmt.Sprintf("%v", request)))
 	return nil
 }
 
 // MigrateTable used to migrate tables from old shard to new shard.
 // The mapping relationship between table and shard will be modified.
 func (c *Cluster) MigrateTable(ctx context.Context, request MigrateTableRequest) error {
-	log.Info("migrate table", zap.String("nodeName", request.NodeName), zap.String("schemaName", request.SchemaName), zap.Uint64("oldShardID", uint64(request.OldShardID)), zap.Uint64("newShardID", uint64(request.NewShardID)), zap.String("tables", strings.Join(request.TableNames, ",")))
+	log.Info("migrate table", zap.String("request", fmt.Sprintf("%v", request)))
 
 	tables := make([]storage.Table, 0, len(request.TableNames))
 	tableIDs := make([]storage.TableID, 0, len(request.TableNames))
@@ -227,6 +228,7 @@ func (c *Cluster) MigrateTable(ctx context.Context, request MigrateTableRequest)
 		return err
 	}
 
+	log.Info("migrate table finish", zap.String("request", fmt.Sprintf("%v", request)))
 	return nil
 }
 
