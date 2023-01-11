@@ -13,6 +13,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 // fsm state change:
@@ -20,30 +21,34 @@ import (
 // │ Begin  ├─────▶ CreatePartitionTable ├─────▶  CreateDataTables  ├─────▶OpenPartitionTables ├─────▶  Finish   │
 // └────────┘     └──────────────────────┘     └────────────────────┘     └────────────────────┘     └───────────┘
 const (
-	eventCreatePartitionTable = "EventCreatePartitionTable"
-	eventCreateDataTables     = "EventCreateDataTables"
-	eventOpenPartitionTables  = "EventOpenPartitionTables"
-	eventFinish               = "EventSuccess"
+	eventCreatePartitionTable        = "EventCreatePartitionTable"
+	eventCreateDataTables            = "EventCreateDataTables"
+	eventOpenPartitionTablesMetaData = "EventOpenPartitionTablesMetaData"
+	eventOpenPartitionTables         = "EventOpenPartitionTables"
+	eventFinish                      = "EventFinish"
 
-	stateBegin                = "StateCreatePartitionTableBegin"
-	stateCreatePartitionTable = "StateCreatePartitionTable"
-	stateCreateDataTables     = "StateCreatePartitionTableCreateDataTables"
-	stateOpenPartitionTables  = "StateOpenPartitionTables"
-	stateFinish               = "StateCreatePartitionTableFinish"
+	stateBegin                       = "StateBegin"
+	stateCreatePartitionTable        = "StateCreatePartitionTable"
+	stateCreateDataTables            = "stateCreateDataTables"
+	stateOpenPartitionTablesMetadata = "stateOpenPartitionTablesMetadata"
+	stateOpenPartitionTables         = "StateOpenPartitionTables"
+	stateFinish                      = "StateFinish"
 )
 
 var (
 	createPartitionTableEvents = fsm.Events{
 		{Name: eventCreatePartitionTable, Src: []string{stateBegin}, Dst: stateCreatePartitionTable},
 		{Name: eventCreateDataTables, Src: []string{stateCreatePartitionTable}, Dst: stateCreateDataTables},
-		{Name: eventOpenPartitionTables, Src: []string{stateCreateDataTables}, Dst: stateOpenPartitionTables},
+		{Name: eventOpenPartitionTablesMetaData, Src: []string{stateCreateDataTables}, Dst: stateOpenPartitionTablesMetadata},
+		{Name: eventOpenPartitionTables, Src: []string{stateOpenPartitionTablesMetadata}, Dst: stateOpenPartitionTables},
 		{Name: eventFinish, Src: []string{stateOpenPartitionTables}, Dst: stateFinish},
 	}
 	createPartitionTableCallbacks = fsm.Callbacks{
-		eventCreatePartitionTable: createPartitionTableCallback,
-		eventCreateDataTables:     createDataTablesCallback,
-		eventOpenPartitionTables:  openPartitionTablesCallback,
-		eventFinish:               finishCallback,
+		eventCreatePartitionTable:        createPartitionTableCallback,
+		eventCreateDataTables:            createDataTablesCallback,
+		eventOpenPartitionTablesMetaData: openPartitionTableMetadataCallback,
+		eventOpenPartitionTables:         openPartitionTableCallback,
+		eventFinish:                      finishCallback,
 	}
 )
 
@@ -109,7 +114,7 @@ func (p *CreatePartitionTableProcedure) Typ() Typ {
 func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 	p.updateStateWithLock(StateRunning)
 
-	createPartitionTableRequest := CreatePartitionTableCallbackRequest{
+	createPartitionTableRequest := &CreatePartitionTableCallbackRequest{
 		ctx:                  ctx,
 		cluster:              p.cluster,
 		dispatch:             p.dispatch,
@@ -128,7 +133,7 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventCreatePartitionTable, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessage(err, "create partition table procedure create new shard view")
+				return errors.WithMessage(err, "create partition table")
 			}
 		case stateCreatePartitionTable:
 			if err := p.persist(ctx); err != nil {
@@ -136,15 +141,23 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventCreateDataTables, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessage(err, "create partition table procedure create partition table")
+				return errors.WithMessage(err, "create data tables")
 			}
 		case stateCreateDataTables:
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "create partition table procedure persist")
 			}
+			if err := p.fsm.Event(eventOpenPartitionTablesMetaData, createPartitionTableRequest); err != nil {
+				p.updateStateWithLock(StateFailed)
+				return errors.WithMessage(err, "open partition tables metadata")
+			}
+		case stateOpenPartitionTablesMetadata:
+			if err := p.persist(ctx); err != nil {
+				return errors.WithMessage(err, "create partition table procedure persist")
+			}
 			if err := p.fsm.Event(eventOpenPartitionTables, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessage(err, "create partition table procedure create data tables")
+				return errors.WithMessage(err, "open partition tables")
 			}
 		case stateOpenPartitionTables:
 			if err := p.persist(ctx); err != nil {
@@ -152,7 +165,7 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 			}
 			if err := p.fsm.Event(eventFinish, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessage(err, "create partition table procedure open partition tables")
+				return errors.WithMessage(err, "finish")
 			}
 		case stateFinish:
 			// TODO: The state update sequence here is inconsistent with the previous one. Consider reconstructing the state update logic of the state machine.
@@ -190,11 +203,12 @@ type CreatePartitionTableCallbackRequest struct {
 	createTableResult    cluster.CreateTableResult
 	partitionTableShards []cluster.ShardNodeWithVersion
 	dataTablesShards     []cluster.ShardNodeWithVersion
+	versions             []cluster.ShardVersionUpdate
 }
 
 // 1. Create partition table in target node.
 func createPartitionTableCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[CreatePartitionTableCallbackRequest](event)
+	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
@@ -218,7 +232,7 @@ func createPartitionTableCallback(event *fsm.Event) {
 
 // 2. Create data tables in target nodes.
 func createDataTablesCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[CreatePartitionTableCallbackRequest](event)
+	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
@@ -238,45 +252,79 @@ func createDataTablesCallback(event *fsm.Event) {
 	}
 }
 
-// 3. Open partition table in target nodes.
-// TODO: Replace open table implementation, avoid reopening shard.
-func openPartitionTablesCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[CreatePartitionTableCallbackRequest](event)
+// 3. Update table shard mapping.
+func openPartitionTableMetadataCallback(event *fsm.Event) {
+	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
 	req.partitionTableShards = append(req.partitionTableShards[:0], req.partitionTableShards[1:]...)
+	versions := make([]cluster.ShardVersionUpdate, 0, len(req.partitionTableShards))
 	for _, partitionTableShard := range req.partitionTableShards {
-		if err := req.cluster.OpenTable(req.ctx, cluster.OpenTableRequest{
+		shardVersionUpdate, err := req.cluster.OpenTable(req.ctx, cluster.OpenTableRequest{
 			SchemaName: req.sourceReq.SchemaName,
 			TableName:  req.sourceReq.Name,
 			ShardID:    partitionTableShard.ShardInfo.ID,
-		}); err != nil {
+		})
+		if err != nil {
 			cancelEventWithLog(event, err, "open table")
 			return
 		}
+		versions = append(versions, shardVersionUpdate)
+	}
+	req.versions = versions
+}
 
-		// Reopen partition table shard.
-		if err := req.dispatch.CloseShard(req.ctx, partitionTableShard.ShardNode.NodeName, eventdispatch.CloseShardRequest{
-			ShardID: uint32(partitionTableShard.ShardNode.ID),
-		}); err != nil {
-			cancelEventWithLog(event, err, "close shard")
+// 4. Open table on target shard.
+func openPartitionTableCallback(event *fsm.Event) {
+	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
+	if err != nil {
+		cancelEventWithLog(event, err, "get request from event")
+		return
+	}
+	table, exists, err := req.cluster.GetTable(req.sourceReq.SchemaName, req.sourceReq.Name)
+	if err != nil {
+		log.Error("get table", zap.Error(err))
+		cancelEventWithLog(event, err, "get table")
+		return
+	}
+
+	if !exists {
+		cancelEventWithLog(event, err, "the table to be closed does not exist")
+		return
+	}
+
+	for _, version := range req.versions {
+		shardNodes, err := req.cluster.GetShardNodesByShardID(version.ShardID)
+		if err != nil {
+			cancelEventWithLog(event, err, "get shard nodes by shard id")
 			return
 		}
 
-		if err := req.dispatch.OpenShard(req.ctx, partitionTableShard.ShardNode.NodeName, eventdispatch.OpenShardRequest{
-			Shard: partitionTableShard.ShardInfo,
-		}); err != nil {
-			cancelEventWithLog(event, err, "open shard")
-			return
+		for _, shardNode := range shardNodes {
+			// Open partition table on target shard.
+			if err := req.dispatch.OpenTableOnShard(req.ctx, shardNode.NodeName, eventdispatch.OpenTableOnShardRequest{UpdateShardInfo: eventdispatch.UpdateShardInfo{CurrShardInfo: cluster.ShardInfo{
+				ID:      shardNode.ID,
+				Role:    shardNode.ShardRole,
+				Version: version.CurrVersion,
+			}, PrevVersion: version.PrevVersion}, TableInfo: cluster.TableInfo{
+				ID:          table.ID,
+				Name:        table.Name,
+				SchemaID:    table.SchemaID,
+				SchemaName:  req.sourceReq.SchemaName,
+				Partitioned: true,
+			}}); err != nil {
+				cancelEventWithLog(event, err, "open table on shard")
+				return
+			}
 		}
 	}
 }
 
 func finishCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[CreatePartitionTableCallbackRequest](event)
+	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
 		cancelEventWithLog(event, err, "get request from event")
 		return
