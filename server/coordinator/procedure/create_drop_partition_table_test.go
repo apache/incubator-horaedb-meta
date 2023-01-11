@@ -105,7 +105,7 @@ func testDropPartitionTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cl
 	re := require.New(t)
 	// New DropPartitionTableProcedure to drop table.
 	req := DropPartitionTableProcedureRequest{
-		ID: uint64(1), Dispatch: dispatch, Cluster: c, Req: &metaservicepb.DropTableRequest{
+		ID: uint64(1), Dispatch: dispatch, Cluster: c, Request: &metaservicepb.DropTableRequest{
 			Header: &metaservicepb.RequestHeader{
 				Node:        nodeName0,
 				ClusterName: clusterName,

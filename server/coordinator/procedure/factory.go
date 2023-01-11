@@ -213,7 +213,7 @@ func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTabl
 			Cluster:     request.Cluster,
 			Dispatch:    f.dispatch,
 			Storage:     f.storage,
-			Req:         request.SourceReq,
+			Request:     request.SourceReq,
 			OnSucceeded: request.OnSucceeded,
 			OnFailed:    request.OnFailed,
 		}
