@@ -47,6 +47,7 @@ func TestCreateAndDropPartitionTable(t *testing.T) {
 		subTableNames := genSubTables(tableName, testSubTableNum)
 		testDropPartitionTable(t, dispatch, c, s, tableName, subTableNames)
 	}
+
 	// Check table not exists.
 	for i := 0; i < testTableNum; i++ {
 		tableName := fmt.Sprintf("%s_%d", testTableName0, i)

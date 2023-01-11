@@ -33,10 +33,10 @@ func (d *DispatchImpl) OpenShard(ctx context.Context, addr string, request OpenS
 		Shard: cluster.ConvertShardsInfoToPB(request.Shard),
 	})
 	if err != nil {
-		return errors.WithMessage(err, "open shard")
+		return errors.WithMessagef(err, "open shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return ErrDispatch.WithCausef("open shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("open shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
 	return nil
 }
@@ -50,10 +50,10 @@ func (d *DispatchImpl) CloseShard(ctx context.Context, addr string, request Clos
 		ShardId: request.ShardID,
 	})
 	if err != nil {
-		return errors.WithMessage(err, "close shard")
+		return errors.WithMessagef(err, "close shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return ErrDispatch.WithCausef("close shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("close shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
 	return nil
 }
@@ -65,10 +65,10 @@ func (d *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, requ
 	}
 	resp, err := client.CreateTableOnShard(ctx, convertCreateTableOnShardRequestToPB(request))
 	if err != nil {
-		return errors.WithMessage(err, "create table on shard")
+		return errors.WithMessagef(err, "create table on shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return ErrDispatch.WithCausef("create table on shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("create table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
 	return nil
 }
@@ -80,10 +80,10 @@ func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, reques
 	}
 	resp, err := client.DropTableOnShard(ctx, convertDropTableOnShardRequestToPB(request))
 	if err != nil {
-		return errors.WithMessage(err, "drop table on shard")
+		return errors.WithMessagef(err, "drop table on shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return ErrDispatch.WithCausef("drop table on shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("drop table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
 	return nil
 }
@@ -96,10 +96,10 @@ func (d *DispatchImpl) CloseTableOnShard(ctx context.Context, addr string, reque
 
 	resp, err := client.CloseTableOnShard(ctx, convertCloseTableOnShardRequestToPB(request))
 	if err != nil {
-		return errors.WithMessage(err, "close table on shard")
+		return errors.WithMessagef(err, "close table on shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return ErrDispatch.WithCausef("close table on shard, err:%s", resp.GetHeader().GetError())
+		return ErrDispatch.WithCausef("close table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
 	return nil
 }
