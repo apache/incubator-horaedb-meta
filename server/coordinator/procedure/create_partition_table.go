@@ -21,34 +21,34 @@ import (
 // │ Begin  ├─────▶ CreatePartitionTable ├─────▶  CreateDataTables  ├─────▶OpenPartitionTables ├─────▶  Finish   │
 // └────────┘     └──────────────────────┘     └────────────────────┘     └────────────────────┘     └───────────┘
 const (
-	eventCreatePartitionTable        = "EventCreatePartitionTable"
-	eventCreateDataTables            = "EventCreateDataTables"
-	eventOpenPartitionTablesMetaData = "EventOpenPartitionTablesMetaData"
-	eventOpenPartitionTables         = "EventOpenPartitionTables"
-	eventFinish                      = "EventFinish"
+	eventCreatePartitionTable     = "EventCreatePartitionTable"
+	eventCreateSubTables          = "EventCreateSubTables"
+	eventUpdateTableShardMetadata = "EventUpdateTableShardMetadata"
+	eventOpenPartitionTables      = "EventOpenPartitionTables"
+	eventFinish                   = "EventFinish"
 
-	stateBegin                       = "StateBegin"
-	stateCreatePartitionTable        = "StateCreatePartitionTable"
-	stateCreateDataTables            = "stateCreateDataTables"
-	stateOpenPartitionTablesMetadata = "stateOpenPartitionTablesMetadata"
-	stateOpenPartitionTables         = "StateOpenPartitionTables"
-	stateFinish                      = "StateFinish"
+	stateBegin                    = "StateBegin"
+	stateCreatePartitionTable     = "StateCreatePartitionTable"
+	stateCreateSubTables          = "StateCreateSubTables"
+	stateUpdateTableShardMetadata = "StateUpdateTableShardMetadata"
+	stateOpenPartitionTables      = "StateOpenPartitionTables"
+	stateFinish                   = "StateFinish"
 )
 
 var (
 	createPartitionTableEvents = fsm.Events{
 		{Name: eventCreatePartitionTable, Src: []string{stateBegin}, Dst: stateCreatePartitionTable},
-		{Name: eventCreateDataTables, Src: []string{stateCreatePartitionTable}, Dst: stateCreateDataTables},
-		{Name: eventOpenPartitionTablesMetaData, Src: []string{stateCreateDataTables}, Dst: stateOpenPartitionTablesMetadata},
-		{Name: eventOpenPartitionTables, Src: []string{stateOpenPartitionTablesMetadata}, Dst: stateOpenPartitionTables},
+		{Name: eventCreateSubTables, Src: []string{stateCreatePartitionTable}, Dst: stateCreateSubTables},
+		{Name: eventUpdateTableShardMetadata, Src: []string{stateCreateSubTables}, Dst: stateUpdateTableShardMetadata},
+		{Name: eventOpenPartitionTables, Src: []string{stateUpdateTableShardMetadata}, Dst: stateOpenPartitionTables},
 		{Name: eventFinish, Src: []string{stateOpenPartitionTables}, Dst: stateFinish},
 	}
 	createPartitionTableCallbacks = fsm.Callbacks{
-		eventCreatePartitionTable:        createPartitionTableCallback,
-		eventCreateDataTables:            createDataTablesCallback,
-		eventOpenPartitionTablesMetaData: openPartitionTableMetadataCallback,
-		eventOpenPartitionTables:         openPartitionTableCallback,
-		eventFinish:                      finishCallback,
+		eventCreatePartitionTable:     createPartitionTableCallback,
+		eventCreateSubTables:          createDataTablesCallback,
+		eventUpdateTableShardMetadata: openPartitionTableMetadataCallback,
+		eventOpenPartitionTables:      openPartitionTableCallback,
+		eventFinish:                   finishCallback,
 	}
 )
 
@@ -62,7 +62,7 @@ type CreatePartitionTableProcedure struct {
 	req *metaservicepb.CreateTableRequest
 
 	partitionTableShards []cluster.ShardNodeWithVersion
-	dataTablesShards     []cluster.ShardNodeWithVersion
+	subTablesShards      []cluster.ShardNodeWithVersion
 
 	onSucceeded func(cluster.CreateTableResult) error
 	onFailed    func(error) error
@@ -78,7 +78,7 @@ type CreatePartitionTableProcedureRequest struct {
 	storage              Storage
 	req                  *metaservicepb.CreateTableRequest
 	partitionTableShards []cluster.ShardNodeWithVersion
-	dataTablesShards     []cluster.ShardNodeWithVersion
+	subTablesShards      []cluster.ShardNodeWithVersion
 	onSucceeded          func(cluster.CreateTableResult) error
 	onFailed             func(error) error
 }
@@ -97,7 +97,7 @@ func NewCreatePartitionTableProcedure(request CreatePartitionTableProcedureReque
 		storage:              request.storage,
 		req:                  request.req,
 		partitionTableShards: request.partitionTableShards,
-		dataTablesShards:     request.dataTablesShards,
+		subTablesShards:      request.subTablesShards,
 		onSucceeded:          request.onSucceeded,
 		onFailed:             request.onFailed,
 	}
@@ -120,7 +120,7 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 		dispatch:             p.dispatch,
 		sourceReq:            p.req,
 		partitionTableShards: p.partitionTableShards,
-		dataTablesShards:     p.dataTablesShards,
+		subTablesShards:      p.subTablesShards,
 		onSucceeded:          p.onSucceeded,
 		onFailed:             p.onFailed,
 	}
@@ -129,7 +129,7 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 		switch p.fsm.Current() {
 		case stateBegin:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "create partition table procedure persist")
+				return errors.WithMessage(err, "persist create partition table procedure")
 			}
 			if err := p.fsm.Event(eventCreatePartitionTable, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
@@ -137,23 +137,23 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 			}
 		case stateCreatePartitionTable:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "create partition table procedure persist")
+				return errors.WithMessage(err, "persist create partition table procedure")
 			}
-			if err := p.fsm.Event(eventCreateDataTables, createPartitionTableRequest); err != nil {
+			if err := p.fsm.Event(eventCreateSubTables, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
 				return errors.WithMessage(err, "create data tables")
 			}
-		case stateCreateDataTables:
+		case stateCreateSubTables:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "create partition table procedure persist")
+				return errors.WithMessage(err, "persist create partition table procedure")
 			}
-			if err := p.fsm.Event(eventOpenPartitionTablesMetaData, createPartitionTableRequest); err != nil {
+			if err := p.fsm.Event(eventUpdateTableShardMetadata, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
-				return errors.WithMessage(err, "open partition tables metadata")
+				return errors.WithMessage(err, "update table shard metadata")
 			}
-		case stateOpenPartitionTablesMetadata:
+		case stateUpdateTableShardMetadata:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "create partition table procedure persist")
+				return errors.WithMessage(err, "persist create partition table procedure")
 			}
 			if err := p.fsm.Event(eventOpenPartitionTables, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
@@ -161,7 +161,7 @@ func (p *CreatePartitionTableProcedure) Start(ctx context.Context) error {
 			}
 		case stateOpenPartitionTables:
 			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "create partition table procedure persist")
+				return errors.WithMessage(err, "persist create partition table procedure")
 			}
 			if err := p.fsm.Event(eventFinish, createPartitionTableRequest); err != nil {
 				p.updateStateWithLock(StateFailed)
@@ -202,7 +202,7 @@ type CreatePartitionTableCallbackRequest struct {
 
 	createTableResult    cluster.CreateTableResult
 	partitionTableShards []cluster.ShardNodeWithVersion
-	dataTablesShards     []cluster.ShardNodeWithVersion
+	subTablesShards      []cluster.ShardNodeWithVersion
 	versions             []cluster.ShardVersionUpdate
 }
 
@@ -238,14 +238,14 @@ func createDataTablesCallback(event *fsm.Event) {
 		return
 	}
 
-	for i, dataTableShard := range req.dataTablesShards {
-		createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetPartitionTableInfo().SubTableNames[i], dataTableShard.ShardInfo.ID, false)
+	for i, subTableShard := range req.subTablesShards {
+		createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetPartitionTableInfo().SubTableNames[i], subTableShard.ShardInfo.ID, false)
 		if err != nil {
 			cancelEventWithLog(event, err, "create table metadata")
 			return
 		}
 
-		if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, dataTableShard.ShardInfo.ID, buildCreateTableRequest(createTableResult, req.sourceReq, false)); err != nil {
+		if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, subTableShard.ShardInfo.ID, buildCreateTableRequest(createTableResult, req.sourceReq, false)); err != nil {
 			cancelEventWithLog(event, err, "dispatch create table on shard")
 			return
 		}
@@ -363,7 +363,7 @@ type CreatePartitionTableRawData struct {
 
 	CreateTableResult    cluster.CreateTableResult
 	PartitionTableShards []cluster.ShardNodeWithVersion
-	DataTablesShards     []cluster.ShardNodeWithVersion
+	SubTablesShards      []cluster.ShardNodeWithVersion
 }
 
 func (p *CreatePartitionTableProcedure) convertToMeta() (Meta, error) {
@@ -375,7 +375,7 @@ func (p *CreatePartitionTableProcedure) convertToMeta() (Meta, error) {
 		FsmState:             p.fsm.Current(),
 		State:                p.state,
 		PartitionTableShards: p.partitionTableShards,
-		DataTablesShards:     p.dataTablesShards,
+		SubTablesShards:      p.subTablesShards,
 	}
 	rawDataBytes, err := json.Marshal(rawData)
 	if err != nil {
