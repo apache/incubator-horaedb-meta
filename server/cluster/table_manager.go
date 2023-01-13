@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -24,7 +25,7 @@ type TableManager interface {
 	// GetTablesByIDs get tables with tableIDs.
 	GetTablesByIDs(tableIDs []storage.TableID) []storage.Table
 	// CreateTable create table with schemaName and tableName.
-	CreateTable(ctx context.Context, schemaName string, tableName string, partitioned bool) (storage.Table, error)
+	CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo *clusterpb.PartitionInfo) (storage.Table, error)
 	// DropTable drop table with schemaName and tableName.
 	DropTable(ctx context.Context, schemaName string, tableName string) error
 	// GetSchemaByName get schema with schemaName.
@@ -102,7 +103,7 @@ func (m *TableManagerImpl) GetTablesByIDs(tableIDs []storage.TableID) []storage.
 	return result
 }
 
-func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, tableName string, partitioned bool) (storage.Table, error) {
+func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo *clusterpb.PartitionInfo) (storage.Table, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	_, exists, err := m.getTable(schemaName, tableName)
@@ -126,11 +127,11 @@ func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, t
 	}
 
 	table := storage.Table{
-		ID:          storage.TableID(id),
-		Name:        tableName,
-		SchemaID:    schema.ID,
-		CreatedAt:   uint64(time.Now().UnixMilli()),
-		Partitioned: partitioned,
+		ID:            storage.TableID(id),
+		Name:          tableName,
+		SchemaID:      schema.ID,
+		CreatedAt:     uint64(time.Now().UnixMilli()),
+		PartitionInfo: partitionInfo,
 	}
 	err = m.storage.CreateTable(ctx, storage.CreateTableRequest{
 		ClusterID: m.clusterID,

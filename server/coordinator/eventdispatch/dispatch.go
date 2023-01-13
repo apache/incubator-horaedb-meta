@@ -5,6 +5,7 @@ package eventdispatch
 import (
 	"context"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 )
 
@@ -31,13 +32,13 @@ type UpdateShardInfo struct {
 }
 
 type CreateTableOnShardRequest struct {
-	UpdateShardInfo      UpdateShardInfo
-	TableInfo            cluster.TableInfo
-	EncodedSchema        []byte
-	Engine               string
-	CreateIfNotExist     bool
-	Options              map[string]string
-	EncodedPartitionInfo []byte
+	UpdateShardInfo  UpdateShardInfo
+	TableInfo        cluster.TableInfo
+	EncodedSchema    []byte
+	Engine           string
+	CreateIfNotExist bool
+	Options          map[string]string
+	PartitionInfo    *clusterpb.PartitionInfo
 }
 
 type DropTableOnShardRequest struct {
