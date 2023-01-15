@@ -82,6 +82,5 @@ func buildCreateTableRequest(createTableResult cluster.CreateTableResult, req *m
 		Engine:           req.Engine,
 		CreateIfNotExist: req.CreateIfNotExist,
 		Options:          req.Options,
-		PartitionInfo:    partitionInfo,
 	}
 }
