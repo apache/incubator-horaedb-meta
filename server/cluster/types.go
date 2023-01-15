@@ -3,7 +3,6 @@
 package cluster
 
 import (
-	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/storage"
 )
@@ -17,7 +16,7 @@ type TableInfo struct {
 	Name          string
 	SchemaID      storage.SchemaID
 	SchemaName    string
-	PartitionInfo *clusterpb.PartitionInfo
+	PartitionInfo storage.PartitionInfo
 }
 
 type ShardTables struct {
@@ -47,7 +46,7 @@ type CreateTableRequest struct {
 	ShardID       storage.ShardID
 	SchemaName    string
 	TableName     string
-	PartitionInfo *clusterpb.PartitionInfo
+	PartitionInfo storage.PartitionInfo
 }
 
 type CreateTableResult struct {

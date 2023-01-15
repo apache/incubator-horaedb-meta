@@ -161,7 +161,7 @@ func (c *Cluster) OpenTable(ctx context.Context, request OpenTableRequest) (Shar
 		return ShardVersionUpdate{}, errors.WithMessagef(ErrTableNotFound, "table not exists, shcemaName:%s,tableName:%s", request.SchemaName, request.TableName)
 	}
 
-	if table.PartitionInfo == nil {
+	if !table.IsPartitioned() {
 		log.Error("normal table cannot be opened on multiple shards", zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
 		return ShardVersionUpdate{}, errors.WithMessagef(ErrOpenTable, "normal table cannot be opened on multiple shards, schemaName:%s, tableName:%s", request.SchemaName, request.TableName)
 	}

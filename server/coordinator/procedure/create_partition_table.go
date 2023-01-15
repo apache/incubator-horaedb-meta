@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/CeresDB/ceresmeta/server/storage"
+
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -305,17 +307,26 @@ func openPartitionTableCallback(event *fsm.Event) {
 
 		for _, shardNode := range shardNodes {
 			// Open partition table on target shard.
-			if err := req.dispatch.OpenTableOnShard(req.ctx, shardNode.NodeName, eventdispatch.OpenTableOnShardRequest{UpdateShardInfo: eventdispatch.UpdateShardInfo{CurrShardInfo: cluster.ShardInfo{
-				ID:      shardNode.ID,
-				Role:    shardNode.ShardRole,
-				Version: version.CurrVersion,
-			}, PrevVersion: version.PrevVersion}, TableInfo: cluster.TableInfo{
-				ID:            table.ID,
-				Name:          table.Name,
-				SchemaID:      table.SchemaID,
-				SchemaName:    req.sourceReq.SchemaName,
-				PartitionInfo: req.sourceReq.GetPartitionTableInfo().GetPartitionInfo(),
-			}}); err != nil {
+			if err := req.dispatch.OpenTableOnShard(req.ctx, shardNode.NodeName,
+				eventdispatch.OpenTableOnShardRequest{
+					UpdateShardInfo: eventdispatch.UpdateShardInfo{
+						CurrShardInfo: cluster.ShardInfo{
+							ID:      shardNode.ID,
+							Role:    shardNode.ShardRole,
+							Version: version.CurrVersion,
+						},
+						PrevVersion: version.PrevVersion,
+					},
+					TableInfo: cluster.TableInfo{
+						ID:         table.ID,
+						Name:       table.Name,
+						SchemaID:   table.SchemaID,
+						SchemaName: req.sourceReq.SchemaName,
+						PartitionInfo: storage.PartitionInfo{
+							Info: req.sourceReq.GetPartitionTableInfo().GetPartitionInfo(),
+						},
+					},
+				}); err != nil {
 				cancelEventWithLog(event, err, "open table on shard")
 				return
 			}

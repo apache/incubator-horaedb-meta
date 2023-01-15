@@ -26,7 +26,7 @@ func createTableMetadata(ctx context.Context, c *cluster.Cluster, schemaName str
 		ShardID:       shardID,
 		SchemaName:    schemaName,
 		TableName:     tableName,
-		PartitionInfo: partitionInfo,
+		PartitionInfo: storage.PartitionInfo{Info: partitionInfo},
 	})
 	if err != nil {
 		return cluster.CreateTableResult{}, errors.WithMessage(err, "create table")
@@ -76,7 +76,7 @@ func buildCreateTableRequest(createTableResult cluster.CreateTableResult, req *m
 			Name:          createTableResult.Table.Name,
 			SchemaID:      createTableResult.Table.SchemaID,
 			SchemaName:    req.GetSchemaName(),
-			PartitionInfo: partitionInfo,
+			PartitionInfo: storage.PartitionInfo{Info: partitionInfo},
 		},
 		EncodedSchema:    req.EncodedSchema,
 		Engine:           req.Engine,

@@ -163,12 +163,20 @@ type Schema struct {
 	CreatedAt uint64
 }
 
+type PartitionInfo struct {
+	Info *clusterpb.PartitionInfo
+}
+
 type Table struct {
 	ID            TableID
 	Name          string
 	SchemaID      SchemaID
 	CreatedAt     uint64
-	PartitionInfo *clusterpb.PartitionInfo
+	PartitionInfo PartitionInfo
+}
+
+func (t Table) IsPartitioned() bool {
+	return t.PartitionInfo.Info != nil
 }
 
 type ShardView struct {
@@ -337,17 +345,19 @@ func convertTableToPB(table Table) clusterpb.Table {
 		SchemaId:      uint32(table.SchemaID),
 		Desc:          "",
 		CreatedAt:     table.CreatedAt,
-		PartitionInfo: table.PartitionInfo,
+		PartitionInfo: table.PartitionInfo.Info,
 	}
 }
 
 func convertTablePB(table *clusterpb.Table) Table {
 	return Table{
-		ID:            TableID(table.Id),
-		Name:          table.Name,
-		SchemaID:      SchemaID(table.SchemaId),
-		CreatedAt:     table.CreatedAt,
-		PartitionInfo: table.PartitionInfo,
+		ID:        TableID(table.Id),
+		Name:      table.Name,
+		SchemaID:  SchemaID(table.SchemaId),
+		CreatedAt: table.CreatedAt,
+		PartitionInfo: PartitionInfo{
+			Info: table.PartitionInfo,
+		},
 	}
 }
 
