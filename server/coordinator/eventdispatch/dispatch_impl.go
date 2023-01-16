@@ -149,7 +149,6 @@ func convertCreateTableOnShardRequestToPB(request CreateTableOnShardRequest) *me
 		Engine:           request.Engine,
 		CreateIfNotExist: request.CreateIfNotExist,
 		Options:          request.Options,
-		PartitionInfo:    request.TableInfo.PartitionInfo.Info,
 	}
 }
 

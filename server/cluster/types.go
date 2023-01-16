@@ -138,9 +138,10 @@ func ConvertShardsInfoPB(shard *metaservicepb.ShardInfo) ShardInfo {
 
 func ConvertTableInfoToPB(table TableInfo) *metaservicepb.TableInfo {
 	return &metaservicepb.TableInfo{
-		Id:         uint64(table.ID),
-		Name:       table.Name,
-		SchemaId:   uint32(table.SchemaID),
-		SchemaName: table.SchemaName,
+		Id:            uint64(table.ID),
+		Name:          table.Name,
+		SchemaId:      uint32(table.SchemaID),
+		SchemaName:    table.SchemaName,
+		PartitionInfo: table.PartitionInfo.Info,
 	}
 }
