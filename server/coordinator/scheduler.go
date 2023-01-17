@@ -15,11 +15,11 @@ import (
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
-	heartbeatCheckInterval               = 10 * time.Second
-	heartbeatKeepAliveIntervalSec uint64 = 15
+	heartbeatCheckInterval = 10 * time.Second
 )
 
 type Scheduler struct {
@@ -102,17 +102,26 @@ func (s *Scheduler) checkNode(ctx context.Context, ticker *time.Ticker) {
 }
 
 func (s *Scheduler) processNodes(ctx context.Context, nodes []cluster.RegisteredNode, t time.Time, nodeShardsMapping map[string][]cluster.ShardInfo) {
+	group := new(errgroup.Group)
 	for _, node := range nodes {
+		// Refer to: https://go.dev/doc/faq#closures_and_goroutines
+		node := node
 		// Determines whether node is expired.
-		if !node.IsExpired(uint64(t.Unix()), heartbeatKeepAliveIntervalSec) {
+		if !node.IsExpired(uint64(t.Unix()), cluster.HeartbeatKeepAliveIntervalSec) {
 			// Shard versions of CeresDB and CeresMeta may be inconsistent. And close extra shards and open missing shards if so.
-			realShards := node.ShardInfos
-			expectShards := nodeShardsMapping[node.Node.Name]
-			err := s.applyMetadataShardInfo(ctx, node.Node.Name, realShards, expectShards)
-			if err != nil {
-				log.Error("apply metadata failed", zap.Error(err))
-			}
+			group.Go(func() error {
+				realShards := node.ShardInfos
+				expectShards := nodeShardsMapping[node.Node.Name]
+				err := s.applyMetadataShardInfo(ctx, node.Node.Name, realShards, expectShards)
+				if err != nil {
+					log.Error("apply metadata failed", zap.Error(err))
+				}
+				return nil
+			})
 		}
+	}
+	if err := group.Wait(); err != nil {
+		log.Error("error group wait", zap.Error(err))
 	}
 }
 
