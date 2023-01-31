@@ -199,9 +199,9 @@ func (p *SplitProcedure) updateStateWithLock(state State) {
 
 // splitOpenNewShardMetadataCallback create new shard and update metadata, table mapping will be updated in splitCloseTableCallback & splitOpenTableCallback callbacks.
 func splitOpenNewShardMetadataCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[splitCallbackRequest](event)
+	request, err := GetRequestFromEvent[splitCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	ctx := request.ctx
@@ -209,7 +209,7 @@ func splitOpenNewShardMetadataCallback(event *fsm.Event) {
 	// Validate cluster state.
 	curState := request.cluster.GetClusterState()
 	if curState != storage.ClusterStateStable {
-		cancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable")
+		CancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable")
 		return
 	}
 
@@ -223,13 +223,13 @@ func splitOpenNewShardMetadataCallback(event *fsm.Event) {
 	}
 
 	if !IsSubSlice(request.tableNames, tableNames) {
-		cancelEventWithLog(event, cluster.ErrTableNotFound, "split tables not found in shard", zap.String("requestTableNames", strings.Join(request.tableNames, ",")), zap.String("tableNames", strings.Join(tableNames, ",")))
+		CancelEventWithLog(event, cluster.ErrTableNotFound, "split tables not found in shard", zap.String("requestTableNames", strings.Join(request.tableNames, ",")), zap.String("tableNames", strings.Join(tableNames, ",")))
 		return
 	}
 
 	shardNodes, err := request.cluster.GetShardNodesByShardID(request.shardID)
 	if err != nil {
-		cancelEventWithLog(event, err, "cluster get shardNode by id")
+		CancelEventWithLog(event, err, "cluster get shardNode by id")
 		return
 	}
 
@@ -242,14 +242,14 @@ func splitOpenNewShardMetadataCallback(event *fsm.Event) {
 		}
 	}
 	if !found {
-		cancelEventWithLog(event, ErrShardLeaderNotFound, "shard leader not found")
+		CancelEventWithLog(event, ErrShardLeaderNotFound, "shard leader not found")
 		return
 	}
 
 	// Create a new shard on origin node.
 	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
 	if err != nil {
-		cancelEventWithLog(event, err, "get node shards failed")
+		CancelEventWithLog(event, err, "get node shards failed")
 		return
 	}
 
@@ -265,15 +265,15 @@ func splitOpenNewShardMetadataCallback(event *fsm.Event) {
 
 	// Update cluster view metadata.
 	if err = request.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, updateShardNodes); err != nil {
-		cancelEventWithLog(event, err, "update cluster view failed")
+		CancelEventWithLog(event, err, "update cluster view failed")
 		return
 	}
 }
 
 func splitCreateShardViewCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[splitCallbackRequest](event)
+	request, err := GetRequestFromEvent[splitCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	ctx := request.ctx
@@ -282,15 +282,15 @@ func splitCreateShardViewCallback(event *fsm.Event) {
 		ShardID: request.newShardID,
 		Tables:  []storage.TableID{},
 	}}); err != nil {
-		cancelEventWithLog(event, err, "create shard views")
+		CancelEventWithLog(event, err, "create shard views")
 		return
 	}
 }
 
 func splitUpdateShardTablesCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[splitCallbackRequest](event)
+	request, err := GetRequestFromEvent[splitCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
@@ -300,15 +300,15 @@ func splitUpdateShardTablesCallback(event *fsm.Event) {
 		OldShardID: request.shardID,
 		NewShardID: request.newShardID,
 	}); err != nil {
-		cancelEventWithLog(event, err, "update shard tables")
+		CancelEventWithLog(event, err, "update shard tables")
 		return
 	}
 }
 
 func splitOpenShardCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[splitCallbackRequest](event)
+	request, err := GetRequestFromEvent[splitCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	ctx := request.ctx
@@ -321,15 +321,15 @@ func splitOpenShardCallback(event *fsm.Event) {
 			Version: 0,
 		},
 	}); err != nil {
-		cancelEventWithLog(event, err, "open shard failed")
+		CancelEventWithLog(event, err, "open shard failed")
 		return
 	}
 }
 
 func splitFinishCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[splitCallbackRequest](event)
+	request, err := GetRequestFromEvent[splitCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	log.Info("split procedure finish", zap.Uint32("shardID", uint32(request.shardID)), zap.Uint32("newShardID", uint32(request.newShardID)))

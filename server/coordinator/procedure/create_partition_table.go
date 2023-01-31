@@ -209,9 +209,9 @@ type CreatePartitionTableCallbackRequest struct {
 
 // 1. Create partition table in target node.
 func createPartitionTableCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
@@ -219,36 +219,36 @@ func createPartitionTableCallback(event *fsm.Event) {
 	partitionTableShardNode := req.partitionTableShards[0]
 
 	partitionInfo := req.sourceReq.GetPartitionTableInfo().GetPartitionInfo()
-	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), partitionTableShardNode.ShardInfo.ID, partitionInfo)
+	createTableResult, err := CreateTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), partitionTableShardNode.ShardInfo.ID, partitionInfo)
 	if err != nil {
-		cancelEventWithLog(event, err, "create table metadata")
+		CancelEventWithLog(event, err, "create table metadata")
 		return
 	}
 	req.createTableResult = createTableResult
 
-	if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, partitionTableShardNode.ShardInfo.ID, buildCreateTableRequest(createTableResult, req.sourceReq, partitionInfo)); err != nil {
-		cancelEventWithLog(event, err, "dispatch create table on shard")
+	if err = CreateTableOnShard(req.ctx, req.cluster, req.dispatch, partitionTableShardNode.ShardInfo.ID, BuildCreateTableRequest(createTableResult, req.sourceReq, partitionInfo)); err != nil {
+		CancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}
 }
 
 // 2. Create data tables in target nodes.
 func createDataTablesCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
 	for i, subTableShard := range req.subTablesShards {
-		createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetPartitionTableInfo().SubTableNames[i], subTableShard.ShardInfo.ID, nil)
+		createTableResult, err := CreateTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetPartitionTableInfo().SubTableNames[i], subTableShard.ShardInfo.ID, nil)
 		if err != nil {
-			cancelEventWithLog(event, err, "create table metadata")
+			CancelEventWithLog(event, err, "create table metadata")
 			return
 		}
 
-		if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, subTableShard.ShardInfo.ID, buildCreateTableRequest(createTableResult, req.sourceReq, nil)); err != nil {
-			cancelEventWithLog(event, err, "dispatch create table on shard")
+		if err = CreateTableOnShard(req.ctx, req.cluster, req.dispatch, subTableShard.ShardInfo.ID, BuildCreateTableRequest(createTableResult, req.sourceReq, nil)); err != nil {
+			CancelEventWithLog(event, err, "dispatch create table on shard")
 			return
 		}
 	}
@@ -256,9 +256,9 @@ func createDataTablesCallback(event *fsm.Event) {
 
 // 3. Update table shard mapping.
 func openPartitionTableMetadataCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
@@ -272,7 +272,7 @@ func openPartitionTableMetadataCallback(event *fsm.Event) {
 				ShardID:    partitionTableShard.ShardInfo.ID,
 			})
 		if err != nil {
-			cancelEventWithLog(event, err, "open table")
+			CancelEventWithLog(event, err, "open table")
 			return
 		}
 		versions = append(versions, shardVersionUpdate)
@@ -282,27 +282,27 @@ func openPartitionTableMetadataCallback(event *fsm.Event) {
 
 // 4. Open table on target shard.
 func openPartitionTableCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	table, exists, err := req.cluster.GetTable(req.sourceReq.SchemaName, req.sourceReq.Name)
 	if err != nil {
 		log.Error("get table", zap.Error(err))
-		cancelEventWithLog(event, err, "get table")
+		CancelEventWithLog(event, err, "get table")
 		return
 	}
 
 	if !exists {
-		cancelEventWithLog(event, err, "the table to be closed does not exist")
+		CancelEventWithLog(event, err, "the table to be closed does not exist")
 		return
 	}
 
 	for _, version := range req.versions {
 		shardNodes, err := req.cluster.GetShardNodesByShardID(version.ShardID)
 		if err != nil {
-			cancelEventWithLog(event, err, "get shard nodes by shard id")
+			CancelEventWithLog(event, err, "get shard nodes by shard id")
 			return
 		}
 
@@ -328,7 +328,7 @@ func openPartitionTableCallback(event *fsm.Event) {
 						},
 					},
 				}); err != nil {
-				cancelEventWithLog(event, err, "open table on shard")
+				CancelEventWithLog(event, err, "open table on shard")
 				return
 			}
 		}
@@ -336,15 +336,15 @@ func openPartitionTableCallback(event *fsm.Event) {
 }
 
 func finishCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*CreatePartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	log.Info("create partition table finish")
 
 	if err := req.onSucceeded(req.createTableResult); err != nil {
-		cancelEventWithLog(event, err, "create partition table on succeeded")
+		CancelEventWithLog(event, err, "create partition table on succeeded")
 		return
 	}
 }

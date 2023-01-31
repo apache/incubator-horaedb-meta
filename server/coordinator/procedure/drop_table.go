@@ -42,15 +42,15 @@ var (
 )
 
 func dropTablePrepareCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[*dropTableCallbackRequest](event)
+	request, err := GetRequestFromEvent[*dropTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
 	table, exists, err := request.cluster.GetTable(request.rawReq.GetSchemaName(), request.rawReq.GetName())
 	if err != nil {
-		cancelEventWithLog(event, err, "cluster get table")
+		CancelEventWithLog(event, err, "cluster get table")
 		return
 	}
 	if !exists {
@@ -60,24 +60,24 @@ func dropTablePrepareCallback(event *fsm.Event) {
 
 	shardNodesResult, err := request.cluster.GetShardNodeByTableIDs([]storage.TableID{table.ID})
 	if err != nil {
-		cancelEventWithLog(event, err, "cluster get shard by table id")
+		CancelEventWithLog(event, err, "cluster get shard by table id")
 		return
 	}
 
 	result, err := request.cluster.DropTable(request.ctx, request.rawReq.GetSchemaName(), request.rawReq.GetName())
 	if err != nil {
-		cancelEventWithLog(event, err, "cluster drop table")
+		CancelEventWithLog(event, err, "cluster drop table")
 		return
 	}
 
 	if len(result.ShardVersionUpdate) != 1 {
-		cancelEventWithLog(event, ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult is %d", len(result.ShardVersionUpdate)))
+		CancelEventWithLog(event, ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult is %d", len(result.ShardVersionUpdate)))
 		return
 	}
 
 	shardNodes, ok := shardNodesResult.ShardNodes[table.ID]
 	if !ok {
-		cancelEventWithLog(event, ErrShardLeaderNotFound, fmt.Sprintf("cluster get shard by table id, table:%v", table))
+		CancelEventWithLog(event, ErrShardLeaderNotFound, fmt.Sprintf("cluster get shard by table id, table:%v", table))
 		return
 	}
 
@@ -93,7 +93,7 @@ func dropTablePrepareCallback(event *fsm.Event) {
 	}
 
 	if !found {
-		cancelEventWithLog(event, ErrShardLeaderNotFound, "can't find leader")
+		CancelEventWithLog(event, ErrShardLeaderNotFound, "can't find leader")
 		return
 	}
 
@@ -115,7 +115,7 @@ func dropTablePrepareCallback(event *fsm.Event) {
 		TableInfo: tableInfo,
 	})
 	if err != nil {
-		cancelEventWithLog(event, err, "dispatch drop table on shard")
+		CancelEventWithLog(event, err, "dispatch drop table on shard")
 		return
 	}
 

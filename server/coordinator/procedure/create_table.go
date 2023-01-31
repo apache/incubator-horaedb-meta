@@ -40,20 +40,20 @@ var (
 )
 
 func createTablePrepareCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*createTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*createTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
-	createTableResult, err := createTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), req.shardID, nil)
+	createTableResult, err := CreateTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), req.shardID, nil)
 	if err != nil {
-		cancelEventWithLog(event, err, "create table metadata")
+		CancelEventWithLog(event, err, "create table metadata")
 		return
 	}
 
-	if err = createTableOnShard(req.ctx, req.cluster, req.dispatch, createTableResult.ShardVersionUpdate.ShardID, buildCreateTableRequest(createTableResult, req.sourceReq, req.sourceReq.GetPartitionTableInfo().GetPartitionInfo())); err != nil {
-		cancelEventWithLog(event, err, "dispatch create table on shard")
+	if err = CreateTableOnShard(req.ctx, req.cluster, req.dispatch, createTableResult.ShardVersionUpdate.ShardID, BuildCreateTableRequest(createTableResult, req.sourceReq, req.sourceReq.GetPartitionTableInfo().GetPartitionInfo())); err != nil {
+		CancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}
 
@@ -61,9 +61,9 @@ func createTablePrepareCallback(event *fsm.Event) {
 }
 
 func createTableSuccessCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*createTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*createTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
@@ -73,9 +73,9 @@ func createTableSuccessCallback(event *fsm.Event) {
 }
 
 func createTableFailedCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*createTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*createTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 

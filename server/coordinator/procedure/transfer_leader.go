@@ -212,21 +212,21 @@ func (p *TransferLeaderProcedure) State() State {
 }
 
 func transferLeaderUpdateMetadataCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[TransferLeaderCallbackRequest](event)
+	request, err := GetRequestFromEvent[TransferLeaderCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	ctx := request.ctx
 
 	if request.cluster.GetClusterState() != storage.ClusterStateStable {
-		cancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable", zap.Int("currentState", int(request.cluster.GetClusterState())))
+		CancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable", zap.Int("currentState", int(request.cluster.GetClusterState())))
 		return
 	}
 
 	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
 	if err != nil {
-		cancelEventWithLog(event, err, "get shardNodes by shardID failed")
+		CancelEventWithLog(event, err, "get shardNodes by shardID failed")
 		return
 	}
 
@@ -244,21 +244,21 @@ func transferLeaderUpdateMetadataCallback(event *fsm.Event) {
 		}
 	}
 	if !found {
-		cancelEventWithLog(event, ErrShardLeaderNotFound, "shard leader not found", zap.Uint32("shardID", uint32(request.shardID)))
+		CancelEventWithLog(event, ErrShardLeaderNotFound, "shard leader not found", zap.Uint32("shardID", uint32(request.shardID)))
 		return
 	}
 
 	err = request.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes)
 	if err != nil {
-		cancelEventWithLog(event, storage.ErrUpdateClusterViewConflict, "update cluster view")
+		CancelEventWithLog(event, storage.ErrUpdateClusterViewConflict, "update cluster view")
 		return
 	}
 }
 
 func transferLeaderCloseOldLeaderCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[TransferLeaderCallbackRequest](event)
+	request, err := GetRequestFromEvent[TransferLeaderCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	ctx := request.ctx
@@ -267,22 +267,22 @@ func transferLeaderCloseOldLeaderCallback(event *fsm.Event) {
 		ShardID: uint32(request.shardID),
 	}
 	if err := request.dispatch.CloseShard(ctx, request.oldLeaderNodeName, closeShardRequest); err != nil {
-		cancelEventWithLog(event, err, "close shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("oldLeaderName", request.oldLeaderNodeName))
+		CancelEventWithLog(event, err, "close shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("oldLeaderName", request.oldLeaderNodeName))
 		return
 	}
 }
 
 func transferLeaderOpenNewShardCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[TransferLeaderCallbackRequest](event)
+	request, err := GetRequestFromEvent[TransferLeaderCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	ctx := request.ctx
 
 	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
 	if err != nil {
-		cancelEventWithLog(event, err, "get node shards")
+		CancelEventWithLog(event, err, "get node shards")
 		return
 	}
 	var preVersion uint64
@@ -297,15 +297,15 @@ func transferLeaderOpenNewShardCallback(event *fsm.Event) {
 	}
 
 	if err := request.dispatch.OpenShard(ctx, request.newLeaderNodeName, openShardRequest); err != nil {
-		cancelEventWithLog(event, err, "open shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("newLeaderNode", request.newLeaderNodeName))
+		CancelEventWithLog(event, err, "open shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("newLeaderNode", request.newLeaderNodeName))
 		return
 	}
 }
 
 func transferLeaderFinishCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[TransferLeaderCallbackRequest](event)
+	request, err := GetRequestFromEvent[TransferLeaderCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 

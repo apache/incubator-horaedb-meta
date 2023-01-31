@@ -43,9 +43,9 @@ var (
 )
 
 func scatterPrepareCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[*ScatterCallbackRequest](event)
+	request, err := GetRequestFromEvent[*ScatterCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
@@ -64,7 +64,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 
 	shardNodes, err := allocNodeShards(shardTotal, minNodeCount, registeredNodes, request.shardIDs)
 	if err != nil {
-		cancelEventWithLog(event, err, "alloc node shardNodes failed")
+		CancelEventWithLog(event, err, "alloc node shardNodes failed")
 		return
 	}
 
@@ -77,12 +77,12 @@ func scatterPrepareCallback(event *fsm.Event) {
 	}
 
 	if err := c.UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes); err != nil {
-		cancelEventWithLog(event, err, "update cluster view")
+		CancelEventWithLog(event, err, "update cluster view")
 		return
 	}
 
 	if err := c.CreateShardViews(ctx, shardViews); err != nil {
-		cancelEventWithLog(event, err, "create shard views")
+		CancelEventWithLog(event, err, "create shard views")
 		return
 	}
 
@@ -95,7 +95,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 			},
 		}
 		if err := request.dispatch.OpenShard(ctx, shard.NodeName, openShardRequest); err != nil {
-			cancelEventWithLog(event, err, "open shard failed")
+			CancelEventWithLog(event, err, "open shard failed")
 			return
 		}
 	}

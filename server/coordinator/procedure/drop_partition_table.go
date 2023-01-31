@@ -247,21 +247,21 @@ func (d *dropPartitionTableCallbackRequest) tableName() string {
 
 // 1. Drop data tables in target nodes.
 func dropDataTablesCallback(event *fsm.Event) {
-	req, err := getRequestFromEvent[*dropPartitionTableCallbackRequest](event)
+	req, err := GetRequestFromEvent[*dropPartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
 	if len(req.request.PartitionTableInfo.SubTableNames) == 0 {
-		cancelEventWithLog(event, ErrEmptyPartitionNames, fmt.Sprintf("drop table, table:%s", req.request.Name))
+		CancelEventWithLog(event, ErrEmptyPartitionNames, fmt.Sprintf("drop table, table:%s", req.request.Name))
 		return
 	}
 
 	for _, tableName := range req.request.PartitionTableInfo.SubTableNames {
 		table, dropTableResult, exists, err := dropTableMetaData(event, tableName)
 		if err != nil {
-			cancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", tableName))
+			CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", tableName))
 			return
 		}
 
@@ -270,12 +270,12 @@ func dropDataTablesCallback(event *fsm.Event) {
 		}
 
 		if len(dropTableResult.ShardVersionUpdate) != 1 {
-			cancelEventWithLog(event, ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult!=1, current is %d", len(dropTableResult.ShardVersionUpdate)))
+			CancelEventWithLog(event, ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult!=1, current is %d", len(dropTableResult.ShardVersionUpdate)))
 			return
 		}
 
 		if err := dispatchDropTable(event, table, dropTableResult.ShardVersionUpdate[0]); err != nil {
-			cancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", tableName))
+			CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", tableName))
 			return
 		}
 	}
@@ -283,24 +283,24 @@ func dropDataTablesCallback(event *fsm.Event) {
 
 // 2. Drop partition table in target node.
 func dropPartitionTableCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[*dropPartitionTableCallbackRequest](event)
+	request, err := GetRequestFromEvent[*dropPartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
 	table, dropTableRet, exists, err := dropTableMetaData(event, request.tableName())
 	if err != nil {
-		cancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", request.tableName()))
+		CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", request.tableName()))
 		return
 	}
 	if !exists {
-		cancelEventWithLog(event, ErrTableNotExists, fmt.Sprintf("table:%s", request.tableName()))
+		CancelEventWithLog(event, ErrTableNotExists, fmt.Sprintf("table:%s", request.tableName()))
 		return
 	}
 
 	if len(dropTableRet.ShardVersionUpdate) == 0 {
-		cancelEventWithLog(event, ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult need >=1, current is %d", len(dropTableRet.ShardVersionUpdate)))
+		CancelEventWithLog(event, ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult need >=1, current is %d", len(dropTableRet.ShardVersionUpdate)))
 		return
 	}
 
@@ -309,16 +309,16 @@ func dropPartitionTableCallback(event *fsm.Event) {
 
 	// Drop table in the first shard.
 	if err := dispatchDropTable(event, table, dropTableRet.ShardVersionUpdate[0]); err != nil {
-		cancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", table.Name))
+		CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", table.Name))
 		return
 	}
 }
 
 // 3. Close partition table in target node.
 func closePartitionTableCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[*dropPartitionTableCallbackRequest](event)
+	request, err := GetRequestFromEvent[*dropPartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
@@ -332,7 +332,7 @@ func closePartitionTableCallback(event *fsm.Event) {
 	for _, version := range request.versions[1:] {
 		shardNodes, err := request.cluster.GetShardNodesByShardID(version.ShardID)
 		if err != nil {
-			cancelEventWithLog(event, err, "get shard nodes by shard id")
+			CancelEventWithLog(event, err, "get shard nodes by shard id")
 			return
 		}
 		// Close partition table shard.
@@ -345,7 +345,7 @@ func closePartitionTableCallback(event *fsm.Event) {
 				}, PrevVersion: version.PrevVersion},
 				TableInfo: tableInfo,
 			}); err != nil {
-				cancelEventWithLog(event, err, "close shard")
+				CancelEventWithLog(event, err, "close shard")
 				return
 			}
 		}
@@ -353,9 +353,9 @@ func closePartitionTableCallback(event *fsm.Event) {
 }
 
 func finishDropPartitionTableCallback(event *fsm.Event) {
-	request, err := getRequestFromEvent[*dropPartitionTableCallbackRequest](event)
+	request, err := GetRequestFromEvent[*dropPartitionTableCallbackRequest](event)
 	if err != nil {
-		cancelEventWithLog(event, err, "get request from event")
+		CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 	log.Info("drop partition table finish")
@@ -368,13 +368,13 @@ func finishDropPartitionTableCallback(event *fsm.Event) {
 	}
 
 	if err = request.onSucceeded(tableInfo); err != nil {
-		cancelEventWithLog(event, err, "drop partition table on succeeded")
+		CancelEventWithLog(event, err, "drop partition table on succeeded")
 		return
 	}
 }
 
 func dropTableMetaData(event *fsm.Event, tableName string) (storage.Table, cluster.DropTableResult, bool, error) {
-	request, err := getRequestFromEvent[*dropPartitionTableCallbackRequest](event)
+	request, err := GetRequestFromEvent[*dropPartitionTableCallbackRequest](event)
 	if err != nil {
 		return storage.Table{}, cluster.DropTableResult{}, false, errors.WithMessage(err, "get request from event")
 	}
@@ -397,13 +397,13 @@ func dropTableMetaData(event *fsm.Event, tableName string) (storage.Table, clust
 }
 
 func dispatchDropTable(event *fsm.Event, table storage.Table, version cluster.ShardVersionUpdate) error {
-	request, err := getRequestFromEvent[*dropPartitionTableCallbackRequest](event)
+	request, err := GetRequestFromEvent[*dropPartitionTableCallbackRequest](event)
 	if err != nil {
 		return errors.WithMessage(err, "get request from event")
 	}
 	shardNodes, err := request.cluster.GetShardNodesByShardID(version.ShardID)
 	if err != nil {
-		cancelEventWithLog(event, err, "get shard nodes by shard id")
+		CancelEventWithLog(event, err, "get shard nodes by shard id")
 		return errors.WithMessage(err, "cluster get shard by shard id")
 	}
 
