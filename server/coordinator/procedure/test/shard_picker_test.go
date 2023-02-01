@@ -1,11 +1,12 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package procedure
+package test
 
 import (
 	"context"
 	"testing"
 
+	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +15,7 @@ func TestRandomShardPicker(t *testing.T) {
 	ctx := context.Background()
 	manager, _ := prepare(t)
 
-	shardPicker := NewRandomBalancedShardPicker(manager)
+	shardPicker := coordinator.NewRandomBalancedShardPicker(manager)
 	nodeShards, err := shardPicker.PickShards(ctx, clusterName, 2, false)
 	re.NoError(err)
 

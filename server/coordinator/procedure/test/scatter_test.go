@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package procedure
+package test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/scatter"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +27,7 @@ func newClusterAndRegisterNode(t *testing.T) (cluster.Manager, *cluster.Cluster)
 		re.NoError(err)
 		shardIDs = append(shardIDs, storage.ShardID(shardID))
 	}
-	p := NewScatterProcedure(dispatch, c, 1, shardIDs)
+	p := scatter.NewScatterProcedure(dispatch, c, 1, shardIDs)
 	go func() {
 		err := p.Start(ctx)
 		re.NoError(err)
@@ -98,7 +99,7 @@ func TestAllocNodeShard(t *testing.T) {
 	}
 	// NodeCount = 4, shardTotal = 2
 	// Two shard distributed in node0,node1
-	shardView, err := allocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList, shardIDs)
+	shardView, err := scatter.AllocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList, shardIDs)
 	re.NoError(err)
 	re.Equal(shardTotal, len(shardView))
 	re.Equal("node0", shardView[0].NodeName)
@@ -120,7 +121,7 @@ func TestAllocNodeShard(t *testing.T) {
 	for i := uint32(0); i < uint32(shardTotal); i++ {
 		shardIDs = append(shardIDs, storage.ShardID(i))
 	}
-	shardView, err = allocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList, shardIDs)
+	shardView, err = scatter.AllocNodeShards(uint32(shardTotal), uint32(minNodeCount), nodeList, shardIDs)
 	re.NoError(err)
 	re.Equal(shardTotal, len(shardView))
 	re.Equal("node0", shardView[0].NodeName)

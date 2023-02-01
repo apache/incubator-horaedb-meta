@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package procedure
+package droptable
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
@@ -18,39 +19,39 @@ import (
 )
 
 const (
-	eventDropTablePrepare = "EventDropTablePrepare"
-	eventDropTableFailed  = "EventDropTableFailed"
-	eventDropTableSuccess = "EventDropTableSuccess"
+	eventPrepare = "EventPrepare"
+	eventFailed  = "EventFailed"
+	eventSuccess = "EventSuccess"
 
-	stateDropTableBegin   = "StateDropTableBegin"
-	stateDropTableWaiting = "StateDropTableWaiting"
-	stateDropTableFinish  = "StateDropTableFinish"
-	stateDropTableFailed  = "StateDropTableFailed"
+	stateBegin   = "StateBegin"
+	stateWaiting = "StateWaiting"
+	stateFinish  = "StateFinish"
+	stateFailed  = "StateFailed"
 )
 
 var (
 	dropTableEvents = fsm.Events{
-		{Name: eventDropTablePrepare, Src: []string{stateDropTableBegin}, Dst: stateDropTableWaiting},
-		{Name: eventDropTableSuccess, Src: []string{stateDropTableWaiting}, Dst: stateDropTableFinish},
-		{Name: eventDropTableFailed, Src: []string{stateDropTableWaiting}, Dst: stateDropTableFailed},
+		{Name: eventPrepare, Src: []string{stateBegin}, Dst: stateWaiting},
+		{Name: eventSuccess, Src: []string{stateWaiting}, Dst: stateFinish},
+		{Name: eventFailed, Src: []string{stateWaiting}, Dst: stateFailed},
 	}
 	dropTableCallbacks = fsm.Callbacks{
-		eventDropTablePrepare: dropTablePrepareCallback,
-		eventDropTableFailed:  dropTableFailedCallback,
-		eventDropTableSuccess: dropTableSuccessCallback,
+		eventPrepare: prepareCallback,
+		eventFailed:  failedCallback,
+		eventSuccess: successCallback,
 	}
 )
 
-func dropTablePrepareCallback(event *fsm.Event) {
-	request, err := GetRequestFromEvent[*dropTableCallbackRequest](event)
+func prepareCallback(event *fsm.Event) {
+	request, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
-		CancelEventWithLog(event, err, "get request from event")
+		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
 	table, exists, err := request.cluster.GetTable(request.rawReq.GetSchemaName(), request.rawReq.GetName())
 	if err != nil {
-		CancelEventWithLog(event, err, "cluster get table")
+		procedure.CancelEventWithLog(event, err, "cluster get table")
 		return
 	}
 	if !exists {
@@ -60,24 +61,24 @@ func dropTablePrepareCallback(event *fsm.Event) {
 
 	shardNodesResult, err := request.cluster.GetShardNodeByTableIDs([]storage.TableID{table.ID})
 	if err != nil {
-		CancelEventWithLog(event, err, "cluster get shard by table id")
+		procedure.CancelEventWithLog(event, err, "cluster get shard by table id")
 		return
 	}
 
 	result, err := request.cluster.DropTable(request.ctx, request.rawReq.GetSchemaName(), request.rawReq.GetName())
 	if err != nil {
-		CancelEventWithLog(event, err, "cluster drop table")
+		procedure.CancelEventWithLog(event, err, "cluster drop table")
 		return
 	}
 
 	if len(result.ShardVersionUpdate) != 1 {
-		CancelEventWithLog(event, ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult is %d", len(result.ShardVersionUpdate)))
+		procedure.CancelEventWithLog(event, procedure.ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult is %d", len(result.ShardVersionUpdate)))
 		return
 	}
 
 	shardNodes, ok := shardNodesResult.ShardNodes[table.ID]
 	if !ok {
-		CancelEventWithLog(event, ErrShardLeaderNotFound, fmt.Sprintf("cluster get shard by table id, table:%v", table))
+		procedure.CancelEventWithLog(event, procedure.ErrShardLeaderNotFound, fmt.Sprintf("cluster get shard by table id, table:%v", table))
 		return
 	}
 
@@ -93,7 +94,7 @@ func dropTablePrepareCallback(event *fsm.Event) {
 	}
 
 	if !found {
-		CancelEventWithLog(event, ErrShardLeaderNotFound, "can't find leader")
+		procedure.CancelEventWithLog(event, procedure.ErrShardLeaderNotFound, "can't find leader")
 		return
 	}
 
@@ -115,31 +116,31 @@ func dropTablePrepareCallback(event *fsm.Event) {
 		TableInfo: tableInfo,
 	})
 	if err != nil {
-		CancelEventWithLog(event, err, "dispatch drop table on shard")
+		procedure.CancelEventWithLog(event, err, "dispatch drop table on shard")
 		return
 	}
 
 	request.ret = tableInfo
 }
 
-func dropTableSuccessCallback(event *fsm.Event) {
-	req := event.Args[0].(*dropTableCallbackRequest)
+func successCallback(event *fsm.Event) {
+	req := event.Args[0].(*callbackRequest)
 
 	if err := req.onSucceeded(req.ret); err != nil {
 		log.Error("exec success callback failed")
 	}
 }
 
-func dropTableFailedCallback(event *fsm.Event) {
-	req := event.Args[0].(*dropTableCallbackRequest)
+func failedCallback(event *fsm.Event) {
+	req := event.Args[0].(*callbackRequest)
 
 	if err := req.onFailed(event.Err); err != nil {
 		log.Error("exec failed callback failed")
 	}
 }
 
-// dropTableCallbackRequest is fsm callbacks param.
-type dropTableCallbackRequest struct {
+// callbackRequest is fsm callbacks param.
+type callbackRequest struct {
 	ctx      context.Context
 	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
@@ -152,13 +153,13 @@ type dropTableCallbackRequest struct {
 	ret cluster.TableInfo
 }
 
-func NewDropTableProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, req *metaservicepb.DropTableRequest, onSucceeded func(cluster.TableInfo) error, onFailed func(error) error) Procedure {
+func NewDropTableProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, req *metaservicepb.DropTableRequest, onSucceeded func(cluster.TableInfo) error, onFailed func(error) error) procedure.Procedure {
 	fsm := fsm.NewFSM(
-		stateDropTableBegin,
+		stateBegin,
 		dropTableEvents,
 		dropTableCallbacks,
 	)
-	return &DropTableProcedure{
+	return &Procedure{
 		id:          id,
 		fsm:         fsm,
 		cluster:     cluster,
@@ -166,11 +167,11 @@ func NewDropTableProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Clu
 		req:         req,
 		onSucceeded: onSucceeded,
 		onFailed:    onFailed,
-		state:       StateInit,
+		state:       procedure.StateInit,
 	}
 }
 
-type DropTableProcedure struct {
+type Procedure struct {
 	id       uint64
 	fsm      *fsm.FSM
 	cluster  *cluster.Cluster
@@ -181,21 +182,21 @@ type DropTableProcedure struct {
 	onFailed    func(error) error
 
 	lock  sync.RWMutex
-	state State
+	state procedure.State
 }
 
-func (p *DropTableProcedure) ID() uint64 {
+func (p *Procedure) ID() uint64 {
 	return p.id
 }
 
-func (p *DropTableProcedure) Typ() Typ {
-	return DropTable
+func (p *Procedure) Typ() procedure.Typ {
+	return procedure.DropTable
 }
 
-func (p *DropTableProcedure) Start(ctx context.Context) error {
-	p.updateState(StateRunning)
+func (p *Procedure) Start(ctx context.Context) error {
+	p.updateState(procedure.StateRunning)
 
-	req := &dropTableCallbackRequest{
+	req := &callbackRequest{
 		cluster:     p.cluster,
 		ctx:         ctx,
 		dispatch:    p.dispatch,
@@ -204,36 +205,36 @@ func (p *DropTableProcedure) Start(ctx context.Context) error {
 		onFailed:    p.onFailed,
 	}
 
-	if err := p.fsm.Event(eventDropTablePrepare, req); err != nil {
-		err1 := p.fsm.Event(eventDropTableFailed, req)
-		p.updateState(StateFailed)
+	if err := p.fsm.Event(eventPrepare, req); err != nil {
+		err1 := p.fsm.Event(eventFailed, req)
+		p.updateState(procedure.StateFailed)
 		if err1 != nil {
-			err = errors.WithMessagef(err, "send eventDropTableFailed, err:%v", err1)
+			err = errors.WithMessagef(err, "send eventFailed, err:%v", err1)
 		}
-		return errors.WithMessage(err, "send eventDropTablePrepare")
+		return errors.WithMessage(err, "send eventPrepare")
 	}
 
-	if err := p.fsm.Event(eventDropTableSuccess, req); err != nil {
-		return errors.WithMessage(err, "send eventDropTableSuccess")
+	if err := p.fsm.Event(eventSuccess, req); err != nil {
+		return errors.WithMessage(err, "send eventSuccess")
 	}
 
-	p.updateState(StateFinished)
+	p.updateState(procedure.StateFinished)
 	return nil
 }
 
-func (p *DropTableProcedure) Cancel(_ context.Context) error {
-	p.updateState(StateCancelled)
+func (p *Procedure) Cancel(_ context.Context) error {
+	p.updateState(procedure.StateCancelled)
 	return nil
 }
 
-func (p *DropTableProcedure) State() State {
+func (p *Procedure) State() procedure.State {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.state
 }
 
-func (p *DropTableProcedure) updateState(state State) {
+func (p *Procedure) updateState(state procedure.State) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

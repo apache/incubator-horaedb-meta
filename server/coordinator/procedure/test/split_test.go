@@ -1,12 +1,13 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package procedure
+package test
 
 import (
 	"context"
 	"testing"
 
 	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/split"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )
@@ -44,8 +45,8 @@ func TestSplit(t *testing.T) {
 	re.NoError(err)
 	newShardID, err := c.AllocShardID(ctx)
 	re.NoError(err)
-	procedure := NewSplitProcedure(1, dispatch, s, c, testSchemaName, targetShardNode.ID, storage.ShardID(newShardID), []string{testTableName0}, targetShardNode.NodeName)
-	err = procedure.Start(ctx)
+	p := split.NewSplitProcedure(1, dispatch, s, c, testSchemaName, targetShardNode.ID, storage.ShardID(newShardID), []string{testTableName0}, targetShardNode.NodeName)
+	err = p.Start(ctx)
 	re.NoError(err)
 
 	// Validate split result:

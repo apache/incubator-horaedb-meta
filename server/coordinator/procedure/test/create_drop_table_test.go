@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package procedure
+package test
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dml/createtable"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dml/droptable"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )
@@ -83,7 +85,7 @@ func TestCreateAndDropTable(t *testing.T) {
 func testCreateTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Cluster, shardID storage.ShardID, tableName string) {
 	re := require.New(t)
 	// New CreateTableProcedure to create a new table.
-	procedure := NewCreateTableProcedure(CreateTableProcedureRequest{
+	p := createtable.NewCreateTableProcedure(createtable.ProcedureRequest{
 		Dispatch: dispatch,
 		Cluster:  c,
 		ID:       uint64(1),
@@ -103,14 +105,14 @@ func testCreateTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.C
 			return nil
 		},
 	})
-	err := procedure.Start(context.Background())
+	err := p.Start(context.Background())
 	re.NoError(err)
 }
 
 func testDropTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Cluster, tableName string) {
 	re := require.New(t)
 	// New DropTableProcedure to drop table.
-	procedure := NewDropTableProcedure(dispatch, c, uint64(1), &metaservicepb.DropTableRequest{
+	procedure := droptable.NewDropTableProcedure(dispatch, c, uint64(1), &metaservicepb.DropTableRequest{
 		Header: &metaservicepb.RequestHeader{
 			Node:        nodeName0,
 			ClusterName: clusterName,

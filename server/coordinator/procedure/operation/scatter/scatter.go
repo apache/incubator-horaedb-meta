@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package procedure
+package scatter
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
@@ -17,35 +18,35 @@ import (
 )
 
 const (
-	eventScatterPrepare = "EventScatterPrepare"
-	eventScatterFailed  = "EventScatterFailed"
-	eventScatterSuccess = "EventScatterSuccess"
+	eventPrepare = "EventPrepare"
+	eventFailed  = "EventFailed"
+	eventSuccess = "EventSuccess"
 
-	stateScatterBegin   = "StateScatterBegin"
-	stateScatterWaiting = "StateScatterWaiting"
-	stateScatterFinish  = "StateScatterFinish"
-	stateScatterFailed  = "StateScatterFailed"
+	stateBegin   = "StateBegin"
+	stateWaiting = "StateWaiting"
+	stateFinish  = "StateFinish"
+	stateFailed  = "StateFailed"
 
 	defaultCheckNodeNumTimeInterval = time.Second * 3
 )
 
 var (
 	scatterEvents = fsm.Events{
-		{Name: eventScatterPrepare, Src: []string{stateScatterBegin}, Dst: stateScatterWaiting},
-		{Name: eventScatterSuccess, Src: []string{stateScatterWaiting}, Dst: stateScatterFinish},
-		{Name: eventScatterFailed, Src: []string{stateScatterWaiting}, Dst: stateScatterFailed},
+		{Name: eventPrepare, Src: []string{stateBegin}, Dst: stateWaiting},
+		{Name: eventSuccess, Src: []string{stateWaiting}, Dst: stateFinish},
+		{Name: eventFailed, Src: []string{stateWaiting}, Dst: stateFailed},
 	}
 	scatterCallbacks = fsm.Callbacks{
-		eventScatterPrepare: scatterPrepareCallback,
-		eventScatterFailed:  scatterFailedCallback,
-		eventScatterSuccess: scatterSuccessCallback,
+		eventPrepare: prepareCallback,
+		eventFailed:  failedCallback,
+		eventSuccess: successCallback,
 	}
 )
 
-func scatterPrepareCallback(event *fsm.Event) {
-	request, err := GetRequestFromEvent[*ScatterCallbackRequest](event)
+func prepareCallback(event *fsm.Event) {
+	request, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
-		CancelEventWithLog(event, err, "get request from event")
+		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
@@ -62,9 +63,9 @@ func scatterPrepareCallback(event *fsm.Event) {
 	shardTotal := c.GetTotalShardNum()
 	minNodeCount := c.GetClusterMinNodeCount()
 
-	shardNodes, err := allocNodeShards(shardTotal, minNodeCount, registeredNodes, request.shardIDs)
+	shardNodes, err := AllocNodeShards(shardTotal, minNodeCount, registeredNodes, request.shardIDs)
 	if err != nil {
-		CancelEventWithLog(event, err, "alloc node shardNodes failed")
+		procedure.CancelEventWithLog(event, err, "alloc node shardNodes failed")
 		return
 	}
 
@@ -77,12 +78,12 @@ func scatterPrepareCallback(event *fsm.Event) {
 	}
 
 	if err := c.UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes); err != nil {
-		CancelEventWithLog(event, err, "update cluster view")
+		procedure.CancelEventWithLog(event, err, "update cluster view")
 		return
 	}
 
 	if err := c.CreateShardViews(ctx, shardViews); err != nil {
-		CancelEventWithLog(event, err, "create shard views")
+		procedure.CancelEventWithLog(event, err, "create shard views")
 		return
 	}
 
@@ -95,7 +96,7 @@ func scatterPrepareCallback(event *fsm.Event) {
 			},
 		}
 		if err := request.dispatch.OpenShard(ctx, shard.NodeName, openShardRequest); err != nil {
-			CancelEventWithLog(event, err, "open shard failed")
+			procedure.CancelEventWithLog(event, err, "open shard failed")
 			return
 		}
 	}
@@ -129,8 +130,8 @@ func computeOnlineNodeNum(nodes []cluster.RegisteredNode) uint32 {
 	return onlineNodeNum
 }
 
-// Allocates shard ids across the registered nodes, and caller should ensure `minNodeCount <= len(allNodes)`.
-func allocNodeShards(shardTotal uint32, minNodeCount uint32, allNodes []cluster.RegisteredNode, shardIDs []storage.ShardID) ([]storage.ShardNode, error) {
+// AllocNodeShards Allocates shard ids across the registered nodes, and caller should ensure `minNodeCount <= len(allNodes)`.
+func AllocNodeShards(shardTotal uint32, minNodeCount uint32, allNodes []cluster.RegisteredNode, shardIDs []storage.ShardID) ([]storage.ShardNode, error) {
 	// If the number of registered nodes exceeds the required number of nodes, intercept the first registered nodes.
 	if len(allNodes) > int(minNodeCount) {
 		allNodes = allNodes[:minNodeCount]
@@ -160,33 +161,33 @@ func allocNodeShards(shardTotal uint32, minNodeCount uint32, allNodes []cluster.
 	return shards, nil
 }
 
-func scatterSuccessCallback(_ *fsm.Event) {
+func successCallback(_ *fsm.Event) {
 	log.Info("scatter procedure execute finish")
 }
 
-func scatterFailedCallback(_ *fsm.Event) {
+func failedCallback(_ *fsm.Event) {
 	// TODO: Use RollbackProcedure to rollback transfer failed
 }
 
-// ScatterCallbackRequest is fsm callbacks param.
-type ScatterCallbackRequest struct {
+// callbackRequest is fsm callbacks param.
+type callbackRequest struct {
 	cluster  *cluster.Cluster
 	ctx      context.Context
 	dispatch eventdispatch.Dispatch
 	shardIDs []storage.ShardID
 }
 
-func NewScatterProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, shardIDs []storage.ShardID) Procedure {
+func NewScatterProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, shardIDs []storage.ShardID) procedure.Procedure {
 	scatterProcedureFsm := fsm.NewFSM(
-		stateScatterBegin,
+		stateBegin,
 		scatterEvents,
 		scatterCallbacks,
 	)
 
-	return &ScatterProcedure{id: id, state: StateInit, fsm: scatterProcedureFsm, dispatch: dispatch, cluster: cluster, shardIDs: shardIDs}
+	return &Procedure{id: id, state: procedure.StateInit, fsm: scatterProcedureFsm, dispatch: dispatch, cluster: cluster, shardIDs: shardIDs}
 }
 
-type ScatterProcedure struct {
+type Procedure struct {
 	id       uint64
 	fsm      *fsm.FSM
 	dispatch eventdispatch.Dispatch
@@ -194,54 +195,54 @@ type ScatterProcedure struct {
 	shardIDs []storage.ShardID
 
 	lock  sync.RWMutex
-	state State
+	state procedure.State
 }
 
-func (p *ScatterProcedure) ID() uint64 {
+func (p *Procedure) ID() uint64 {
 	return p.id
 }
 
-func (p *ScatterProcedure) Typ() Typ {
-	return Scatter
+func (p *Procedure) Typ() procedure.Typ {
+	return procedure.Scatter
 }
 
-func (p *ScatterProcedure) Start(ctx context.Context) error {
-	p.updateStateWithLock(StateRunning)
+func (p *Procedure) Start(ctx context.Context) error {
+	p.updateStateWithLock(procedure.StateRunning)
 
-	scatterCallbackRequest := &ScatterCallbackRequest{
+	scatterCallbackRequest := &callbackRequest{
 		cluster:  p.cluster,
 		ctx:      ctx,
 		dispatch: p.dispatch,
 		shardIDs: p.shardIDs,
 	}
 
-	if err := p.fsm.Event(eventScatterPrepare, scatterCallbackRequest); err != nil {
-		err1 := p.fsm.Event(eventScatterFailed, scatterCallbackRequest)
-		p.updateStateWithLock(StateFailed)
+	if err := p.fsm.Event(eventPrepare, scatterCallbackRequest); err != nil {
+		err1 := p.fsm.Event(eventFailed, scatterCallbackRequest)
+		p.updateStateWithLock(procedure.StateFailed)
 		if err1 != nil {
 			err = errors.WithMessagef(err, "scatter procedure start, fail to send eventScatterFailed err:%v", err1)
 		}
 		return errors.WithMessage(err, "scatter procedure start")
 	}
 
-	if err := p.fsm.Event(eventScatterSuccess, scatterCallbackRequest); err != nil {
+	if err := p.fsm.Event(eventSuccess, scatterCallbackRequest); err != nil {
 		return errors.WithMessage(err, "scatter procedure start")
 	}
 
-	p.updateStateWithLock(StateFinished)
+	p.updateStateWithLock(procedure.StateFinished)
 	return nil
 }
 
-func (p *ScatterProcedure) Cancel(_ context.Context) error {
-	p.updateStateWithLock(StateCancelled)
+func (p *Procedure) Cancel(_ context.Context) error {
+	p.updateStateWithLock(procedure.StateCancelled)
 	return nil
 }
 
-func (p *ScatterProcedure) State() State {
+func (p *Procedure) State() procedure.State {
 	return p.state
 }
 
-func (p *ScatterProcedure) updateStateWithLock(state State) {
+func (p *Procedure) updateStateWithLock(state procedure.State) {
 	p.lock.Lock()
 	p.state = state
 	p.lock.Unlock()

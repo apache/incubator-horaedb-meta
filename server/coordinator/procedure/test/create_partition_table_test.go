@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package procedure
+package test
 
 import (
 	"context"
@@ -8,6 +8,9 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/coordinator"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dml/createpartitiontable"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +21,7 @@ func TestCreatePartitionTable(t *testing.T) {
 	manager, c := prepare(t)
 	s := NewTestStorage(t)
 
-	shardPicker := NewRandomBalancedShardPicker(manager)
+	shardPicker := coordinator.NewRandomBalancedShardPicker(manager)
 
 	request := &metaservicepb.CreateTableRequest{
 		Header: &metaservicepb.RequestHeader{
@@ -40,17 +43,17 @@ func TestCreatePartitionTable(t *testing.T) {
 		nodeNames[nodeShard.ShardNode.NodeName] = 1
 	}
 
-	partitionTableNum := Max(1, int(float32(len(nodeNames))*defaultPartitionTableProportionOfNodes))
+	partitionTableNum := procedure.Max(1, int(float32(len(nodeNames))*defaultPartitionTableProportionOfNodes))
 
 	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), partitionTableNum, false)
 	re.NoError(err)
 	dataTableShards, err := shardPicker.PickShards(ctx, c.Name(), len(request.GetPartitionTableInfo().SubTableNames), true)
 	re.NoError(err)
 
-	procedure := NewCreatePartitionTableProcedure(CreatePartitionTableProcedureRequest{
-		1, c, dispatch, s, request, partitionTableShards, dataTableShards, func(_ cluster.CreateTableResult) error {
+	procedure := createpartitiontable.NewCreatePartitionTableProcedure(createpartitiontable.ProcedureRequest{
+		ID: 1, Cluster: c, Dispatch: dispatch, Storage: s, Req: request, PartitionTableShards: partitionTableShards, SubTablesShards: dataTableShards, OnSucceeded: func(_ cluster.CreateTableResult) error {
 			return nil
-		}, func(_ error) error {
+		}, OnFailed: func(_ error) error {
 			return nil
 		},
 	})

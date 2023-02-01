@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package procedure
+package test
 
 import (
 	"context"
@@ -10,7 +10,11 @@ import (
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dml/createpartitiontable"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dml/droppartitiontable"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +26,7 @@ func TestCreateAndDropPartitionTable(t *testing.T) {
 	manager, c := prepare(t)
 	s := NewTestStorage(t)
 
-	shardPicker := NewRandomBalancedShardPicker(manager)
+	shardPicker := coordinator.NewRandomBalancedShardPicker(manager)
 
 	testTableNum := 8
 	testSubTableNum := 4
@@ -63,7 +67,7 @@ func TestCreateAndDropPartitionTable(t *testing.T) {
 	}
 }
 
-func testCreatePartitionTable(ctx context.Context, t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Cluster, s Storage, shardPicker ShardPicker, tableName string, subTableNames []string) {
+func testCreatePartitionTable(ctx context.Context, t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Cluster, s procedure.Storage, shardPicker coordinator.ShardPicker, tableName string, subTableNames []string) {
 	re := require.New(t)
 
 	request := &metaservicepb.CreateTableRequest{
@@ -87,17 +91,17 @@ func testCreatePartitionTable(ctx context.Context, t *testing.T, dispatch eventd
 		nodeNames[nodeShard.ShardNode.NodeName] = 1
 	}
 
-	partitionTableNum := Max(1, int(float32(len(nodeNames))*defaultPartitionTableProportionOfNodes))
+	partitionTableNum := procedure.Max(1, int(float32(len(nodeNames))*defaultPartitionTableProportionOfNodes))
 
 	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), partitionTableNum, true)
 	re.NoError(err)
 	dataTableShards, err := shardPicker.PickShards(ctx, c.Name(), len(request.GetPartitionTableInfo().SubTableNames), true)
 	re.NoError(err)
 
-	procedure := NewCreatePartitionTableProcedure(CreatePartitionTableProcedureRequest{
-		1, c, dispatch, s, request, partitionTableShards, dataTableShards, func(_ cluster.CreateTableResult) error {
+	procedure := createpartitiontable.NewCreatePartitionTableProcedure(createpartitiontable.ProcedureRequest{
+		ID: 1, Cluster: c, Dispatch: dispatch, Storage: s, Req: request, PartitionTableShards: partitionTableShards, SubTablesShards: dataTableShards, OnSucceeded: func(_ cluster.CreateTableResult) error {
 			return nil
-		}, func(_ error) error {
+		}, OnFailed: func(_ error) error {
 			return nil
 		},
 	})
@@ -106,10 +110,10 @@ func testCreatePartitionTable(ctx context.Context, t *testing.T, dispatch eventd
 	re.NoError(err)
 }
 
-func testDropPartitionTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Cluster, s Storage, tableName string, subTableNames []string) {
+func testDropPartitionTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Cluster, s procedure.Storage, tableName string, subTableNames []string) {
 	re := require.New(t)
 	// New DropPartitionTableProcedure to drop table.
-	req := DropPartitionTableProcedureRequest{
+	req := droppartitiontable.ProcedureRequest{
 		ID: uint64(1), Dispatch: dispatch, Cluster: c, Request: &metaservicepb.DropTableRequest{
 			Header: &metaservicepb.RequestHeader{
 				Node:        nodeName0,
@@ -125,7 +129,7 @@ func testDropPartitionTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cl
 		}, Storage: s,
 	}
 
-	procedure := NewDropPartitionTableProcedure(req)
+	procedure := droppartitiontable.NewDropPartitionTableProcedure(req)
 	err := procedure.Start(context.Background())
 	re.NoError(err)
 }
