@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package test
+package droppartitiontable_test
 
 import (
 	"context"
@@ -15,6 +15,8 @@ import (
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dml/createpartitiontable"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dml/droppartitiontable"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/scatter"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/test"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )
@@ -22,9 +24,9 @@ import (
 func TestCreateAndDropPartitionTable(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
-	dispatch := MockDispatch{}
-	manager, c := prepare(t)
-	s := NewTestStorage(t)
+	dispatch := test.MockDispatch{}
+	manager, c := scatter.Prepare(t)
+	s := test.NewTestStorage(t)
 
 	shardPicker := coordinator.NewRandomBalancedShardPicker(manager)
 
@@ -33,14 +35,14 @@ func TestCreateAndDropPartitionTable(t *testing.T) {
 
 	// Create table.
 	for i := 0; i < testTableNum; i++ {
-		tableName := fmt.Sprintf("%s_%d", testTableName0, i)
+		tableName := fmt.Sprintf("%s_%d", test.TestTableName0, i)
 		subTableNames := genSubTables(tableName, testSubTableNum)
 		testCreatePartitionTable(ctx, t, dispatch, c, s, shardPicker, tableName, subTableNames)
 	}
 
 	// Check get table.
 	for i := 0; i < testTableNum; i++ {
-		tableName := fmt.Sprintf("%s_%d", testTableName0, i)
+		tableName := fmt.Sprintf("%s_%d", test.TestTableName0, i)
 		table := checkTable(t, c, tableName, true)
 		re.Equal(table.PartitionInfo.Info != nil, true)
 		subTableNames := genSubTables(tableName, testSubTableNum)
@@ -51,14 +53,14 @@ func TestCreateAndDropPartitionTable(t *testing.T) {
 
 	// Drop table.
 	for i := 0; i < testTableNum; i++ {
-		tableName := fmt.Sprintf("%s_%d", testTableName0, i)
+		tableName := fmt.Sprintf("%s_%d", test.TestTableName0, i)
 		subTableNames := genSubTables(tableName, testSubTableNum)
 		testDropPartitionTable(t, dispatch, c, s, tableName, subTableNames)
 	}
 
 	// Check table not exists.
 	for i := 0; i < testTableNum; i++ {
-		tableName := fmt.Sprintf("%s_%d", testTableName0, i)
+		tableName := fmt.Sprintf("%s_%d", test.TestTableName0, i)
 		checkTable(t, c, tableName, false)
 		subTableNames := genSubTables(tableName, testSubTableNum)
 		for _, subTableName := range subTableNames {
@@ -72,14 +74,14 @@ func testCreatePartitionTable(ctx context.Context, t *testing.T, dispatch eventd
 
 	request := &metaservicepb.CreateTableRequest{
 		Header: &metaservicepb.RequestHeader{
-			Node:        nodeName0,
-			ClusterName: clusterName,
+			Node:        test.NodeName0,
+			ClusterName: test.ClusterName,
 		},
 		PartitionTableInfo: &metaservicepb.PartitionTableInfo{
 			SubTableNames: subTableNames,
 			PartitionInfo: &clusterpb.PartitionInfo{},
 		},
-		SchemaName: testSchemaName,
+		SchemaName: test.TestSchemaName,
 		Name:       tableName,
 	}
 
@@ -91,7 +93,7 @@ func testCreatePartitionTable(ctx context.Context, t *testing.T, dispatch eventd
 		nodeNames[nodeShard.ShardNode.NodeName] = 1
 	}
 
-	partitionTableNum := procedure.Max(1, int(float32(len(nodeNames))*defaultPartitionTableProportionOfNodes))
+	partitionTableNum := procedure.Max(1, int(float32(len(nodeNames))*test.DefaultPartitionTableProportionOfNodes))
 
 	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), partitionTableNum, true)
 	re.NoError(err)
@@ -116,10 +118,10 @@ func testDropPartitionTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cl
 	req := droppartitiontable.ProcedureRequest{
 		ID: uint64(1), Dispatch: dispatch, Cluster: c, Request: &metaservicepb.DropTableRequest{
 			Header: &metaservicepb.RequestHeader{
-				Node:        nodeName0,
-				ClusterName: clusterName,
+				Node:        test.NodeName0,
+				ClusterName: test.ClusterName,
 			},
-			SchemaName:         testSchemaName,
+			SchemaName:         test.TestSchemaName,
 			Name:               tableName,
 			PartitionTableInfo: &metaservicepb.PartitionTableInfo{SubTableNames: subTableNames},
 		}, OnSucceeded: func(_ cluster.TableInfo) error {
@@ -144,7 +146,7 @@ func genSubTables(tableName string, tableNum int) []string {
 
 func checkTable(t *testing.T, c *cluster.Cluster, tableName string, exist bool) storage.Table {
 	re := require.New(t)
-	table, b, err := c.GetTable(testSchemaName, tableName)
+	table, b, err := c.GetTable(test.TestSchemaName, tableName)
 	re.NoError(err)
 	re.Equal(b, exist)
 	return table

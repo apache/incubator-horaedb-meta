@@ -1,13 +1,14 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package test
+package split
 
 import (
 	"context"
 	"testing"
 
 	"github.com/CeresDB/ceresmeta/server/cluster"
-	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/split"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/scatter"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/test"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )
@@ -15,9 +16,9 @@ import (
 func TestSplit(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
-	dispatch := MockDispatch{}
-	_, c := prepare(t)
-	s := NewTestStorage(t)
+	dispatch := test.MockDispatch{}
+	_, c := scatter.Prepare(t)
+	s := test.NewTestStorage(t)
 
 	getNodeShardsResult, err := c.GetNodeShards(ctx)
 	re.NoError(err)
@@ -28,14 +29,14 @@ func TestSplit(t *testing.T) {
 	// Create some tables in this shard.
 	createTableResult, err := c.CreateTable(ctx, cluster.CreateTableRequest{
 		ShardID:    createTableNodeShard.ID,
-		SchemaName: testSchemaName,
-		TableName:  testTableName0,
+		SchemaName: test.TestSchemaName,
+		TableName:  test.TestTableName0,
 	})
 	re.NoError(err)
 	_, err = c.CreateTable(ctx, cluster.CreateTableRequest{
 		ShardID:    createTableNodeShard.ID,
-		SchemaName: testSchemaName,
-		TableName:  testTableName1,
+		SchemaName: test.TestSchemaName,
+		TableName:  test.TestTableName1,
 	})
 	re.NoError(err)
 
@@ -45,7 +46,7 @@ func TestSplit(t *testing.T) {
 	re.NoError(err)
 	newShardID, err := c.AllocShardID(ctx)
 	re.NoError(err)
-	p := split.NewSplitProcedure(1, dispatch, s, c, testSchemaName, targetShardNode.ID, storage.ShardID(newShardID), []string{testTableName0}, targetShardNode.NodeName)
+	p := NewSplitProcedure(1, dispatch, s, c, test.TestSchemaName, targetShardNode.ID, storage.ShardID(newShardID), []string{test.TestTableName0}, targetShardNode.NodeName)
 	err = p.Start(ctx)
 	re.NoError(err)
 
@@ -75,13 +76,13 @@ func TestSplit(t *testing.T) {
 	for _, table := range splitShardTables.Tables {
 		splitShardTablesMapping[table.Name] = table
 	}
-	_, exists := splitShardTablesMapping[testTableName0]
+	_, exists := splitShardTablesMapping[test.TestTableName0]
 	re.False(exists)
 
 	newShardTablesMapping := make(map[string]cluster.TableInfo, 0)
 	for _, table := range newShardTables.Tables {
 		newShardTablesMapping[table.Name] = table
 	}
-	_, exists = newShardTablesMapping[testTableName0]
+	_, exists = newShardTablesMapping[test.TestTableName0]
 	re.True(exists)
 }

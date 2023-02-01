@@ -1,39 +1,32 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package test
+package procedure
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/stretchr/testify/require"
 )
 
 const (
 	TestClusterID       = 1
-	TestRootPath        = "/rootPath"
 	DefaultTimeout      = time.Second * 10
 	DefaultScanBatchSie = 100
+	TestRootPath        = "/rootPath"
 )
 
-func NewTestStorage(t *testing.T) procedure.Storage {
-	_, client, _ := etcdutil.PrepareEtcdServerAndClient(t)
-	storage := procedure.NewEtcdStorageImpl(client, TestRootPath)
-	return storage
-}
-
-func testWrite(t *testing.T, storage procedure.Storage) {
+func testWrite(t *testing.T, storage Storage) {
 	re := require.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
-	testMeta1 := procedure.Meta{
+	testMeta1 := Meta{
 		ID:      uint64(1),
-		Typ:     procedure.TransferLeader,
-		State:   procedure.StateInit,
+		Typ:     TransferLeader,
+		State:   StateInit,
 		RawData: []byte("test"),
 	}
 
@@ -41,10 +34,10 @@ func testWrite(t *testing.T, storage procedure.Storage) {
 	err := storage.CreateOrUpdate(ctx, testMeta1)
 	re.NoError(err)
 
-	testMeta2 := procedure.Meta{
+	testMeta2 := Meta{
 		ID:      uint64(2),
-		Typ:     procedure.TransferLeader,
-		State:   procedure.StateInit,
+		Typ:     TransferLeader,
+		State:   StateInit,
 		RawData: []byte("test"),
 	}
 	err = storage.CreateOrUpdate(ctx, testMeta2)
@@ -56,7 +49,7 @@ func testWrite(t *testing.T, storage procedure.Storage) {
 	re.NoError(err)
 }
 
-func testScan(t *testing.T, storage procedure.Storage) {
+func testScan(t *testing.T, storage Storage) {
 	re := require.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
@@ -68,15 +61,15 @@ func testScan(t *testing.T, storage procedure.Storage) {
 	re.Equal("test update", string(metas[1].RawData))
 }
 
-func testDelete(t *testing.T, storage procedure.Storage) {
+func testDelete(t *testing.T, storage Storage) {
 	re := require.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
-	testMeta1 := &procedure.Meta{
+	testMeta1 := &Meta{
 		ID:      uint64(1),
-		Typ:     procedure.TransferLeader,
-		State:   procedure.StateInit,
+		Typ:     TransferLeader,
+		State:   StateInit,
 		RawData: []byte("test"),
 	}
 	err := storage.MarkDeleted(ctx, testMeta1.ID)
@@ -85,6 +78,12 @@ func testDelete(t *testing.T, storage procedure.Storage) {
 	metas, err := storage.List(ctx, DefaultScanBatchSie)
 	re.NoError(err)
 	re.Equal(1, len(metas))
+}
+
+func NewTestStorage(t *testing.T) Storage {
+	_, client, _ := etcdutil.PrepareEtcdServerAndClient(t)
+	storage := NewEtcdStorageImpl(client, TestRootPath)
+	return storage
 }
 
 func TestStorage(t *testing.T) {

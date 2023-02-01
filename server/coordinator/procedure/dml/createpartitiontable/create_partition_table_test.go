@@ -1,6 +1,6 @@
 // Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package test
+package createpartitiontable_test
 
 import (
 	"context"
@@ -11,28 +11,30 @@ import (
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/dml/createpartitiontable"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/scatter"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCreatePartitionTable(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
-	dispatch := MockDispatch{}
-	manager, c := prepare(t)
-	s := NewTestStorage(t)
+	dispatch := test.MockDispatch{}
+	manager, c := scatter.Prepare(t)
+	s := test.NewTestStorage(t)
 
 	shardPicker := coordinator.NewRandomBalancedShardPicker(manager)
 
 	request := &metaservicepb.CreateTableRequest{
 		Header: &metaservicepb.RequestHeader{
-			Node:        nodeName0,
-			ClusterName: clusterName,
+			Node:        test.NodeName0,
+			ClusterName: test.ClusterName,
 		},
 		PartitionTableInfo: &metaservicepb.PartitionTableInfo{
 			SubTableNames: []string{"p1", "p2"},
 		},
-		SchemaName: testSchemaName,
-		Name:       testTableName0,
+		SchemaName: test.TestSchemaName,
+		Name:       test.TestTableName0,
 	}
 
 	getNodeShardResult, err := c.GetNodeShards(ctx)
@@ -43,7 +45,7 @@ func TestCreatePartitionTable(t *testing.T) {
 		nodeNames[nodeShard.ShardNode.NodeName] = 1
 	}
 
-	partitionTableNum := procedure.Max(1, int(float32(len(nodeNames))*defaultPartitionTableProportionOfNodes))
+	partitionTableNum := procedure.Max(1, int(float32(len(nodeNames))*test.DefaultPartitionTableProportionOfNodes))
 
 	partitionTableShards, err := shardPicker.PickShards(ctx, c.Name(), partitionTableNum, false)
 	re.NoError(err)

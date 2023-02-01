@@ -5,15 +5,20 @@ package scatter
 import (
 	"context"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/test"
+	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
 
@@ -246,4 +251,78 @@ func (p *Procedure) updateStateWithLock(state procedure.State) {
 	p.lock.Lock()
 	p.state = state
 	p.lock.Unlock()
+}
+
+// Following function is used for test.
+func newTestEtcdStorage(t *testing.T) (storage.Storage, clientv3.KV, etcdutil.CloseFn) {
+	_, client, closeSrv := etcdutil.PrepareEtcdServerAndClient(t)
+	storage := storage.NewStorageWithEtcdBackend(client, test.TestRootPath, storage.Options{
+		MaxScanLimit: 100, MinScanLimit: 10,
+	})
+	return storage, client, closeSrv
+}
+
+func newTestCluster(ctx context.Context, t *testing.T) (cluster.Manager, *cluster.Cluster) {
+	re := require.New(t)
+	storage, kv, _ := newTestEtcdStorage(t)
+	manager, err := cluster.NewManagerImpl(storage, kv, test.TestRootPath, test.DefaultIDAllocatorStep)
+	re.NoError(err)
+
+	cluster, err := manager.CreateCluster(ctx, test.ClusterName, cluster.CreateClusterOpts{
+		NodeCount:         test.DefaultNodeCount,
+		ReplicationFactor: test.DefaultReplicationFactor,
+		ShardTotal:        test.DefaultShardTotal,
+	})
+	re.NoError(err)
+	return manager, cluster
+}
+
+func newClusterAndRegisterNode(t *testing.T) (cluster.Manager, *cluster.Cluster) {
+	re := require.New(t)
+	ctx := context.Background()
+	dispatch := test.MockDispatch{}
+	m, c := newTestCluster(ctx, t)
+
+	totalShardNum := c.GetTotalShardNum()
+	shardIDs := make([]storage.ShardID, 0, totalShardNum)
+	for i := uint32(0); i < totalShardNum; i++ {
+		shardID, err := c.AllocShardID(ctx)
+		re.NoError(err)
+		shardIDs = append(shardIDs, storage.ShardID(shardID))
+	}
+	p := NewScatterProcedure(dispatch, c, 1, shardIDs)
+	go func() {
+		err := p.Start(ctx)
+		re.NoError(err)
+	}()
+
+	// Cluster is empty, it should be return and do nothing
+	err := c.RegisterNode(ctx, cluster.RegisteredNode{
+		Node: storage.Node{
+			Name: test.NodeName0,
+		}, ShardInfos: []cluster.ShardInfo{},
+	})
+	re.NoError(err)
+	re.Equal(storage.ClusterStateEmpty, c.GetClusterState())
+
+	// Register two node, DefaultNodeCount is satisfied, Initialize shard topology
+	err = c.RegisterNode(ctx, cluster.RegisteredNode{
+		Node: storage.Node{
+			Name: test.NodeName1,
+		}, ShardInfos: []cluster.ShardInfo{},
+	})
+	re.NoError(err)
+	return m, c
+}
+
+// Prepare a test cluster which has scattered shards and created test schema.
+// Notice: sleep(5s) will be called in this function.
+func Prepare(t *testing.T) (cluster.Manager, *cluster.Cluster) {
+	re := require.New(t)
+	manager, cluster := newClusterAndRegisterNode(t)
+	// Wait for the cluster to be ready.
+	time.Sleep(time.Second * 5)
+	_, _, err := cluster.GetOrCreateSchema(context.Background(), test.TestSchemaName)
+	re.NoError(err)
+	return manager, cluster
 }
