@@ -10,7 +10,7 @@ RUN apt update && apt install --yes gcc g++ libssl-dev pkg-config cmake && rm -r
 COPY . /ceresmeta
 WORKDIR /ceresmeta
 
-RUN make build
+RUN go build -o ceresmeta ./cmd/meta/...
 
 ## CeresMeta
 FROM ubuntu:20.04
