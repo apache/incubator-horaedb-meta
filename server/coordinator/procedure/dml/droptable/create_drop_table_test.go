@@ -86,7 +86,7 @@ func TestCreateAndDropTable(t *testing.T) {
 func testCreateTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Cluster, shardID storage.ShardID, tableName string) {
 	re := require.New(t)
 	// New CreateTableProcedure to create a new table.
-	p := createtable.NewCreateTableProcedure(createtable.ProcedureRequest{
+	p := createtable.NewProcedure(createtable.ProcedureRequest{
 		Dispatch: dispatch,
 		Cluster:  c,
 		ID:       uint64(1),

@@ -86,7 +86,7 @@ type callbackRequest struct {
 	newLeaderNodeName string
 }
 
-func NewTransferLeaderProcedure(dispatch eventdispatch.Dispatch, c *cluster.Cluster, s procedure.Storage, shardID storage.ShardID, oldLeaderNodeName string, newLeaderNodeName string, id uint64) (procedure.Procedure, error) {
+func NewProcedure(dispatch eventdispatch.Dispatch, c *cluster.Cluster, s procedure.Storage, shardID storage.ShardID, oldLeaderNodeName string, newLeaderNodeName string, id uint64) (procedure.Procedure, error) {
 	shardNodes, err := c.GetShardNodesByShardID(shardID)
 	if err != nil {
 		log.Error("get shard failed", zap.Error(err))

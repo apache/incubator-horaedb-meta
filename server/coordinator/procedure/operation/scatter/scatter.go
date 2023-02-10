@@ -182,7 +182,7 @@ type callbackRequest struct {
 	shardIDs []storage.ShardID
 }
 
-func NewScatterProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, shardIDs []storage.ShardID) procedure.Procedure {
+func NewProcedure(dispatch eventdispatch.Dispatch, cluster *cluster.Cluster, id uint64, shardIDs []storage.ShardID) procedure.Procedure {
 	scatterProcedureFsm := fsm.NewFSM(
 		stateBegin,
 		scatterEvents,
@@ -290,7 +290,7 @@ func newClusterAndRegisterNode(t *testing.T) (cluster.Manager, *cluster.Cluster)
 		re.NoError(err)
 		shardIDs = append(shardIDs, storage.ShardID(shardID))
 	}
-	p := NewScatterProcedure(dispatch, c, 1, shardIDs)
+	p := NewProcedure(dispatch, c, 1, shardIDs)
 	go func() {
 		err := p.Start(ctx)
 		re.NoError(err)

@@ -100,7 +100,7 @@ func testCreatePartitionTable(ctx context.Context, t *testing.T, dispatch eventd
 	dataTableShards, err := shardPicker.PickShards(ctx, c.Name(), len(request.GetPartitionTableInfo().SubTableNames), true)
 	re.NoError(err)
 
-	procedure := createpartitiontable.NewCreatePartitionTableProcedure(createpartitiontable.ProcedureRequest{
+	procedure := createpartitiontable.NewProcedure(createpartitiontable.ProcedureRequest{
 		ID: 1, Cluster: c, Dispatch: dispatch, Storage: s, Req: request, PartitionTableShards: partitionTableShards, SubTablesShards: dataTableShards, OnSucceeded: func(_ cluster.CreateTableResult) error {
 			return nil
 		}, OnFailed: func(_ error) error {
@@ -131,7 +131,7 @@ func testDropPartitionTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cl
 		}, Storage: s,
 	}
 
-	procedure := droppartitiontable.NewDropPartitionTableProcedure(req)
+	procedure := droppartitiontable.NewProcedure(req)
 	err := procedure.Start(context.Background())
 	re.NoError(err)
 }

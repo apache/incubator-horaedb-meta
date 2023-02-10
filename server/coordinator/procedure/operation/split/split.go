@@ -71,7 +71,7 @@ type Procedure struct {
 	state procedure.State
 }
 
-func NewSplitProcedure(id uint64, dispatch eventdispatch.Dispatch, storage procedure.Storage, c *cluster.Cluster, schemaName string, shardID storage.ShardID, newShardID storage.ShardID, tableNames []string, targetNodeName string) *Procedure {
+func NewProcedure(id uint64, dispatch eventdispatch.Dispatch, storage procedure.Storage, c *cluster.Cluster, schemaName string, shardID storage.ShardID, newShardID storage.ShardID, tableNames []string, targetNodeName string) *Procedure {
 	splitFsm := fsm.NewFSM(
 		stateBegin,
 		splitEvents,

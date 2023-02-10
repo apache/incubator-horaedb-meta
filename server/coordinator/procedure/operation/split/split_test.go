@@ -46,7 +46,7 @@ func TestSplit(t *testing.T) {
 	re.NoError(err)
 	newShardID, err := c.AllocShardID(ctx)
 	re.NoError(err)
-	p := NewSplitProcedure(1, dispatch, s, c, test.TestSchemaName, targetShardNode.ID, storage.ShardID(newShardID), []string{test.TestTableName0}, targetShardNode.NodeName)
+	p := NewProcedure(1, dispatch, s, c, test.TestSchemaName, targetShardNode.ID, storage.ShardID(newShardID), []string{test.TestTableName0}, targetShardNode.NodeName)
 	err = p.Start(ctx)
 	re.NoError(err)
 

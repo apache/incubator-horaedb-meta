@@ -38,7 +38,7 @@ func TestTransferLeader(t *testing.T) {
 	}
 	re.Equal(true, found)
 
-	p, err := NewTransferLeaderProcedure(dispatch, c, s, shardID, oldLeaderNodeName, newLeaderNodeName, uint64(1))
+	p, err := NewProcedure(dispatch, c, s, shardID, oldLeaderNodeName, newLeaderNodeName, uint64(1))
 	re.NoError(err)
 	err = p.Start(ctx)
 	re.NoError(err)

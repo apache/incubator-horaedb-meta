@@ -110,7 +110,7 @@ type ProcedureRequest struct {
 	OnFailed    func(error) error
 }
 
-func NewCreateTableProcedure(request ProcedureRequest) procedure.Procedure {
+func NewProcedure(request ProcedureRequest) procedure.Procedure {
 	fsm := fsm.NewFSM(
 		stateBegin,
 		createTableEvents,

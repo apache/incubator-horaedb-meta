@@ -78,7 +78,7 @@ type ProcedureRequest struct {
 	OnFailed    func(error) error
 }
 
-func NewDropPartitionTableProcedure(request ProcedureRequest) *Procedure {
+func NewProcedure(request ProcedureRequest) *Procedure {
 	fsm := fsm.NewFSM(
 		stateBegin,
 		createDropPartitionTableEvents,
