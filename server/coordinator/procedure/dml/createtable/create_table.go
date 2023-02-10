@@ -110,22 +110,22 @@ type ProcedureRequest struct {
 	OnFailed    func(error) error
 }
 
-func NewProcedure(request ProcedureRequest) procedure.Procedure {
+func NewProcedure(req ProcedureRequest) procedure.Procedure {
 	fsm := fsm.NewFSM(
 		stateBegin,
 		createTableEvents,
 		createTableCallbacks,
 	)
 	return &Procedure{
-		id:          request.ID,
+		id:          req.ID,
 		fsm:         fsm,
-		cluster:     request.Cluster,
-		dispatch:    request.Dispatch,
-		shardID:     request.ShardID,
-		req:         request.Req,
+		cluster:     req.Cluster,
+		dispatch:    req.Dispatch,
+		shardID:     req.ShardID,
+		req:         req.Req,
 		state:       procedure.StateInit,
-		onSucceeded: request.OnSucceeded,
-		onFailed:    request.OnFailed,
+		onSucceeded: req.OnSucceeded,
+		onFailed:    req.OnFailed,
 	}
 }
 

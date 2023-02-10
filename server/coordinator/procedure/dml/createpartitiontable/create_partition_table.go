@@ -85,23 +85,23 @@ type ProcedureRequest struct {
 	OnFailed             func(error) error
 }
 
-func NewProcedure(request ProcedureRequest) *Procedure {
+func NewProcedure(req ProcedureRequest) *Procedure {
 	fsm := fsm.NewFSM(
 		stateBegin,
 		createPartitionTableEvents,
 		createPartitionTableCallbacks,
 	)
 	return &Procedure{
-		id:                   request.ID,
+		id:                   req.ID,
 		fsm:                  fsm,
-		cluster:              request.Cluster,
-		dispatch:             request.Dispatch,
-		storage:              request.Storage,
-		req:                  request.Req,
-		partitionTableShards: request.PartitionTableShards,
-		subTablesShards:      request.SubTablesShards,
-		onSucceeded:          request.OnSucceeded,
-		onFailed:             request.OnFailed,
+		cluster:              req.Cluster,
+		dispatch:             req.Dispatch,
+		storage:              req.Storage,
+		req:                  req.Req,
+		partitionTableShards: req.PartitionTableShards,
+		subTablesShards:      req.SubTablesShards,
+		onSucceeded:          req.OnSucceeded,
+		onFailed:             req.OnFailed,
 	}
 }
 
@@ -217,17 +217,17 @@ func createPartitionTableCallback(event *fsm.Event) {
 	}
 
 	// Select first shard to create partition table.
-	partitionTableShardNode := req.partitionTableShards[0]
+	partTableShardNode := req.partitionTableShards[0]
 
-	partitionInfo := req.sourceReq.GetPartitionTableInfo().GetPartitionInfo()
-	createTableResult, err := procedure.CreateTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), partitionTableShardNode.ShardInfo.ID, partitionInfo)
+	partInfo := req.sourceReq.GetPartitionTableInfo().GetPartitionInfo()
+	createTableResult, err := procedure.CreateTableMetadata(req.ctx, req.cluster, req.sourceReq.GetSchemaName(), req.sourceReq.GetName(), partTableShardNode.ShardInfo.ID, partInfo)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "create table metadata")
 		return
 	}
 	req.createTableResult = createTableResult
 
-	if err = procedure.CreateTableOnShard(req.ctx, req.cluster, req.dispatch, partitionTableShardNode.ShardInfo.ID, procedure.BuildCreateTableRequest(createTableResult, req.sourceReq, partitionInfo)); err != nil {
+	if err = procedure.CreateTableOnShard(req.ctx, req.cluster, req.dispatch, partTableShardNode.ShardInfo.ID, procedure.BuildCreateTableRequest(createTableResult, req.sourceReq, partInfo)); err != nil {
 		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}

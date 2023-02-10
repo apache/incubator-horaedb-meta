@@ -213,19 +213,19 @@ func (p *Procedure) State() procedure.State {
 }
 
 func updateMetadataCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
+	req, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
-	ctx := request.ctx
+	ctx := req.ctx
 
-	if request.cluster.GetClusterState() != storage.ClusterStateStable {
-		procedure.CancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable", zap.Int("currentState", int(request.cluster.GetClusterState())))
+	if req.cluster.GetClusterState() != storage.ClusterStateStable {
+		procedure.CancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable", zap.Int("currentState", int(req.cluster.GetClusterState())))
 		return
 	}
 
-	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
+	getNodeShardResult, err := req.cluster.GetNodeShards(ctx)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get shardNodes by shardID failed")
 		return
@@ -237,19 +237,19 @@ func updateMetadataCallback(event *fsm.Event) {
 	for _, shardNodeWithVersion := range getNodeShardResult.NodeShards {
 		if shardNodeWithVersion.ShardNode.ShardRole == storage.ShardRoleLeader {
 			leaderShardNode = shardNodeWithVersion.ShardNode
-			if leaderShardNode.ID == request.shardID {
+			if leaderShardNode.ID == req.shardID {
 				found = true
-				leaderShardNode.NodeName = request.newLeaderNodeName
+				leaderShardNode.NodeName = req.newLeaderNodeName
 			}
 			shardNodes = append(shardNodes, leaderShardNode)
 		}
 	}
 	if !found {
-		procedure.CancelEventWithLog(event, procedure.ErrShardLeaderNotFound, "shard leader not found", zap.Uint32("shardID", uint32(request.shardID)))
+		procedure.CancelEventWithLog(event, procedure.ErrShardLeaderNotFound, "shard leader not found", zap.Uint32("shardID", uint32(req.shardID)))
 		return
 	}
 
-	err = request.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes)
+	err = req.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes)
 	if err != nil {
 		procedure.CancelEventWithLog(event, storage.ErrUpdateClusterViewConflict, "update cluster view")
 		return

@@ -61,7 +61,7 @@ type Procedure struct {
 	onSucceeded func(cluster.TableInfo) error
 	onFailed    func(error) error
 
-	request *metaservicepb.DropTableRequest
+	req *metaservicepb.DropTableRequest
 
 	// Protect the state.
 	lock  sync.RWMutex
@@ -78,21 +78,21 @@ type ProcedureRequest struct {
 	OnFailed    func(error) error
 }
 
-func NewProcedure(request ProcedureRequest) *Procedure {
+func NewProcedure(req ProcedureRequest) *Procedure {
 	fsm := fsm.NewFSM(
 		stateBegin,
 		createDropPartitionTableEvents,
 		createDropPartitionTableCallbacks,
 	)
 	return &Procedure{
-		id:          request.ID,
+		id:          req.ID,
 		fsm:         fsm,
-		cluster:     request.Cluster,
-		dispatch:    request.Dispatch,
-		storage:     request.Storage,
-		request:     request.Request,
-		onSucceeded: request.OnSucceeded,
-		onFailed:    request.OnFailed,
+		cluster:     req.Cluster,
+		dispatch:    req.Dispatch,
+		storage:     req.Storage,
+		req:         req.Request,
+		onSucceeded: req.OnSucceeded,
+		onFailed:    req.OnFailed,
 	}
 }
 
@@ -111,7 +111,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 		ctx:         ctx,
 		cluster:     p.cluster,
 		dispatch:    p.dispatch,
-		request:     p.request,
+		req:         p.req,
 		onSucceeded: p.onSucceeded,
 		onFailed:    p.onFailed,
 	}
@@ -199,7 +199,7 @@ func (p *Procedure) convertToMeta() (procedure.Meta, error) {
 		ID:               p.id,
 		FsmState:         p.fsm.Current(),
 		State:            p.state,
-		DropTableRequest: p.request,
+		DropTableRequest: p.req,
 	}
 	rawDataBytes, err := json.Marshal(rawData)
 	if err != nil {
@@ -233,17 +233,17 @@ type callbackRequest struct {
 	onSucceeded func(info cluster.TableInfo) error
 	onFailed    func(error) error
 
-	request  *metaservicepb.DropTableRequest
+	req      *metaservicepb.DropTableRequest
 	versions []cluster.ShardVersionUpdate
 	table    storage.Table
 }
 
 func (d *callbackRequest) schemaName() string {
-	return d.request.GetSchemaName()
+	return d.req.GetSchemaName()
 }
 
 func (d *callbackRequest) tableName() string {
-	return d.request.GetName()
+	return d.req.GetName()
 }
 
 // 1. Drop data tables in target nodes.
@@ -254,12 +254,12 @@ func dropDataTablesCallback(event *fsm.Event) {
 		return
 	}
 
-	if len(req.request.PartitionTableInfo.SubTableNames) == 0 {
-		procedure.CancelEventWithLog(event, procedure.ErrEmptyPartitionNames, fmt.Sprintf("drop table, table:%s", req.request.Name))
+	if len(req.req.PartitionTableInfo.SubTableNames) == 0 {
+		procedure.CancelEventWithLog(event, procedure.ErrEmptyPartitionNames, fmt.Sprintf("drop table, table:%s", req.req.Name))
 		return
 	}
 
-	for _, tableName := range req.request.PartitionTableInfo.SubTableNames {
+	for _, tableName := range req.req.PartitionTableInfo.SubTableNames {
 		table, dropTableResult, exists, err := dropTableMetaData(event, tableName)
 		if err != nil {
 			procedure.CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", tableName))
@@ -284,19 +284,19 @@ func dropDataTablesCallback(event *fsm.Event) {
 
 // 2. Drop partition table in target node.
 func dropPartitionTableCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[*callbackRequest](event)
+	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
-	table, dropTableRet, exists, err := dropTableMetaData(event, request.tableName())
+	table, dropTableRet, exists, err := dropTableMetaData(event, req.tableName())
 	if err != nil {
-		procedure.CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", request.tableName()))
+		procedure.CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", req.tableName()))
 		return
 	}
 	if !exists {
-		procedure.CancelEventWithLog(event, procedure.ErrTableNotExists, fmt.Sprintf("table:%s", request.tableName()))
+		procedure.CancelEventWithLog(event, procedure.ErrTableNotExists, fmt.Sprintf("table:%s", req.tableName()))
 		return
 	}
 
@@ -305,8 +305,8 @@ func dropPartitionTableCallback(event *fsm.Event) {
 		return
 	}
 
-	request.versions = dropTableRet.ShardVersionUpdate
-	request.table = table
+	req.versions = dropTableRet.ShardVersionUpdate
+	req.table = table
 
 	// Drop table in the first shard.
 	if err := dispatchDropTable(event, table, dropTableRet.ShardVersionUpdate[0]); err != nil {
@@ -327,7 +327,7 @@ func closePartitionTableCallback(event *fsm.Event) {
 		ID:         request.table.ID,
 		Name:       request.table.Name,
 		SchemaID:   request.table.SchemaID,
-		SchemaName: request.request.GetSchemaName(),
+		SchemaName: request.req.GetSchemaName(),
 	}
 
 	for _, version := range request.versions[1:] {
@@ -365,7 +365,7 @@ func finishCallback(event *fsm.Event) {
 		ID:         request.table.ID,
 		Name:       request.table.Name,
 		SchemaID:   request.table.SchemaID,
-		SchemaName: request.request.GetSchemaName(),
+		SchemaName: request.req.GetSchemaName(),
 	}
 
 	if err = request.onSucceeded(tableInfo); err != nil {
@@ -412,7 +412,7 @@ func dispatchDropTable(event *fsm.Event, table storage.Table, version cluster.Sh
 		ID:         table.ID,
 		Name:       table.Name,
 		SchemaID:   table.SchemaID,
-		SchemaName: request.request.GetSchemaName(),
+		SchemaName: request.req.GetSchemaName(),
 	}
 
 	for _, shardNode := range shardNodes {

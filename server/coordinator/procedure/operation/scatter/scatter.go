@@ -49,14 +49,14 @@ var (
 )
 
 func prepareCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[*callbackRequest](event)
+	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
-	c := request.cluster
-	ctx := request.ctx
+	c := req.cluster
+	ctx := req.ctx
 
 	waitForNodesReady(c)
 
@@ -68,7 +68,7 @@ func prepareCallback(event *fsm.Event) {
 	shardTotal := c.GetTotalShardNum()
 	minNodeCount := c.GetClusterMinNodeCount()
 
-	shardNodes, err := AllocNodeShards(shardTotal, minNodeCount, registeredNodes, request.shardIDs)
+	shardNodes, err := AllocNodeShards(shardTotal, minNodeCount, registeredNodes, req.shardIDs)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "alloc node shardNodes failed")
 		return
@@ -100,7 +100,7 @@ func prepareCallback(event *fsm.Event) {
 				Version: 0,
 			},
 		}
-		if err := request.dispatch.OpenShard(ctx, shard.NodeName, openShardRequest); err != nil {
+		if err := req.dispatch.OpenShard(ctx, shard.NodeName, openShardRequest); err != nil {
 			procedure.CancelEventWithLog(event, err, "open shard failed")
 			return
 		}

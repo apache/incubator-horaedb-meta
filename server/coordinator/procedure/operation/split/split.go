@@ -200,35 +200,35 @@ func (p *Procedure) updateStateWithLock(state procedure.State) {
 
 // openNewShardMetadataCallback create new shard and update metadata, table mapping will be updated in splitCloseTableCallback & splitOpenTableCallback callbacks.
 func openNewShardMetadataCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
+	req, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
-	ctx := request.ctx
+	ctx := req.ctx
 
 	// Validate cluster state.
-	curState := request.cluster.GetClusterState()
+	curState := req.cluster.GetClusterState()
 	if curState != storage.ClusterStateStable {
 		procedure.CancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable")
 		return
 	}
 
 	// Validate tables.
-	shardTables := request.cluster.GetShardTables([]storage.ShardID{request.shardID}, request.targetNodeName)[request.shardID]
+	shardTables := req.cluster.GetShardTables([]storage.ShardID{req.shardID}, req.targetNodeName)[req.shardID]
 	var tableNames []string
 	for _, table := range shardTables.Tables {
-		if request.schemaName == table.SchemaName {
+		if req.schemaName == table.SchemaName {
 			tableNames = append(tableNames, table.Name)
 		}
 	}
 
-	if !procedure.IsSubSlice(request.tableNames, tableNames) {
-		procedure.CancelEventWithLog(event, cluster.ErrTableNotFound, "split tables not found in shard", zap.String("requestTableNames", strings.Join(request.tableNames, ",")), zap.String("tableNames", strings.Join(tableNames, ",")))
+	if !procedure.IsSubSlice(req.tableNames, tableNames) {
+		procedure.CancelEventWithLog(event, cluster.ErrTableNotFound, "split tables not found in shard", zap.String("requestTableNames", strings.Join(req.tableNames, ",")), zap.String("tableNames", strings.Join(tableNames, ",")))
 		return
 	}
 
-	shardNodes, err := request.cluster.GetShardNodesByShardID(request.shardID)
+	shardNodes, err := req.cluster.GetShardNodesByShardID(req.shardID)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "cluster get shardNode by id")
 		return
@@ -248,7 +248,7 @@ func openNewShardMetadataCallback(event *fsm.Event) {
 	}
 
 	// Create a new shard on origin node.
-	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
+	getNodeShardResult, err := req.cluster.GetNodeShards(ctx)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get node shards failed")
 		return
@@ -259,13 +259,13 @@ func openNewShardMetadataCallback(event *fsm.Event) {
 		updateShardNodes = append(updateShardNodes, shardNodeWithVersion.ShardNode)
 	}
 	updateShardNodes = append(updateShardNodes, storage.ShardNode{
-		ID:        request.newShardID,
+		ID:        req.newShardID,
 		ShardRole: storage.ShardRoleLeader,
 		NodeName:  leaderShardNode.NodeName,
 	})
 
 	// Update cluster view metadata.
-	if err = request.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, updateShardNodes); err != nil {
+	if err = req.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, updateShardNodes); err != nil {
 		procedure.CancelEventWithLog(event, err, "update cluster view failed")
 		return
 	}

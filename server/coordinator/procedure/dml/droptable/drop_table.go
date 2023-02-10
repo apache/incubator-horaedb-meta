@@ -43,29 +43,29 @@ var (
 )
 
 func prepareCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[*callbackRequest](event)
+	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
 
-	table, exists, err := request.cluster.GetTable(request.rawReq.GetSchemaName(), request.rawReq.GetName())
+	table, exists, err := req.cluster.GetTable(req.rawReq.GetSchemaName(), req.rawReq.GetName())
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "cluster get table")
 		return
 	}
 	if !exists {
-		log.Warn("drop non-existing table", zap.String("schema", request.rawReq.GetSchemaName()), zap.String("table", request.rawReq.GetName()))
+		log.Warn("drop non-existing table", zap.String("schema", req.rawReq.GetSchemaName()), zap.String("table", req.rawReq.GetName()))
 		return
 	}
 
-	shardNodesResult, err := request.cluster.GetShardNodeByTableIDs([]storage.TableID{table.ID})
+	shardNodesResult, err := req.cluster.GetShardNodeByTableIDs([]storage.TableID{table.ID})
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "cluster get shard by table id")
 		return
 	}
 
-	result, err := request.cluster.DropTable(request.ctx, request.rawReq.GetSchemaName(), request.rawReq.GetName())
+	result, err := req.cluster.DropTable(req.ctx, req.rawReq.GetSchemaName(), req.rawReq.GetName())
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "cluster drop table")
 		return
@@ -102,9 +102,9 @@ func prepareCallback(event *fsm.Event) {
 		ID:         table.ID,
 		Name:       table.Name,
 		SchemaID:   table.SchemaID,
-		SchemaName: request.rawReq.GetSchemaName(),
+		SchemaName: req.rawReq.GetSchemaName(),
 	}
-	err = request.dispatch.DropTableOnShard(request.ctx, leader.NodeName, eventdispatch.DropTableOnShardRequest{
+	err = req.dispatch.DropTableOnShard(req.ctx, leader.NodeName, eventdispatch.DropTableOnShardRequest{
 		UpdateShardInfo: eventdispatch.UpdateShardInfo{
 			CurrShardInfo: cluster.ShardInfo{
 				ID:      result.ShardVersionUpdate[0].ShardID,
@@ -120,7 +120,7 @@ func prepareCallback(event *fsm.Event) {
 		return
 	}
 
-	request.ret = tableInfo
+	req.ret = tableInfo
 }
 
 func successCallback(event *fsm.Event) {
