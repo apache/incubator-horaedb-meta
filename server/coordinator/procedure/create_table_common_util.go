@@ -22,7 +22,8 @@ func CreateTableMetadata(ctx context.Context, c *cluster.Cluster, schemaName str
 		return cluster.CreateTableResult{}, errors.WithMessagef(ErrTableAlreadyExists, "create an existing table, schemaName:%s, tableName:%s", schemaName, tableName)
 	}
 
-	createTableResult, err := c.CreateTable(ctx, cluster.CreateTableRequest{
+	// TODO: Now we can't tell whether the table has been created or there is an error, openTableOnShard should return a specific error to indicate whether the table already exists.
+	createTableResult, _, err := c.CreateTable(ctx, cluster.CreateTableRequest{
 		ShardID:       shardID,
 		SchemaName:    schemaName,
 		TableName:     tableName,

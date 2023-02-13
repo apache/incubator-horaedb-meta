@@ -26,7 +26,7 @@ type TopologyManager interface {
 	// GetTableIDs get shardNode and tablesIDs with shardID and nodeName.
 	GetTableIDs(shardIDs []storage.ShardID, nodeName string) map[storage.ShardID]ShardTableIDs
 	// AddTable add table to cluster topology.
-	AddTable(ctx context.Context, shardID storage.ShardID, tables []storage.Table) (ShardVersionUpdate, error)
+	AddTable(ctx context.Context, shardID storage.ShardID, tables []storage.Table) (ShardVersionUpdate, bool, error)
 	// RemoveTable remove table on target shards from cluster topology.
 	RemoveTable(ctx context.Context, shardID storage.ShardID, tableIDs []storage.TableID) (ShardVersionUpdate, error)
 	// EvictTable evict table from cluster topology.
@@ -150,7 +150,7 @@ func (m *TopologyManagerImpl) GetTableIDs(shardIDs []storage.ShardID, nodeName s
 	return shardTableIDs
 }
 
-func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.ShardID, tables []storage.Table) (ShardVersionUpdate, error) {
+func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.ShardID, tables []storage.Table) (ShardVersionUpdate, bool, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -160,6 +160,27 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 	tableIDsToAdd := make([]storage.TableID, 0, len(tables))
 	for _, table := range tables {
 		tableIDsToAdd = append(tableIDsToAdd, table.ID)
+	}
+
+	// If all tables had been added in shard table mapping, version will not be updated.
+
+	containsAll := true
+	if len(m.shardTablesMapping[shardID].TableIDs) == 0 {
+		containsAll = false
+	}
+	for tableID := range m.shardTablesMapping[shardID].TableIDs {
+		c := contains(tableIDsToAdd, tableID)
+		if !c {
+			containsAll = false
+			break
+		}
+	}
+	if containsAll {
+		return ShardVersionUpdate{
+			ShardID:     shardID,
+			CurrVersion: prevVersion,
+			PrevVersion: prevVersion - 1,
+		}, true, nil
 	}
 
 	tableIDs := make([]storage.TableID, 0, len(shardView.TableIDs)+1)
@@ -180,7 +201,7 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 		LatestVersion: prevVersion,
 	})
 	if err != nil {
-		return ShardVersionUpdate{}, errors.WithMessage(err, "storage update shard view")
+		return ShardVersionUpdate{}, false, errors.WithMessage(err, "storage update shard view")
 	}
 
 	// Update shard view in memory.
@@ -198,7 +219,16 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 		ShardID:     shardID,
 		CurrVersion: prevVersion + 1,
 		PrevVersion: prevVersion,
-	}, nil
+	}, false, nil
+}
+
+func contains(tableIDsToAdd []storage.TableID, tableID int) bool {
+	for _, tableIDToAdd := range tableIDsToAdd {
+		if storage.TableID(tableID) == tableIDToAdd {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.ShardID, tableIDs []storage.TableID) (ShardVersionUpdate, error) {

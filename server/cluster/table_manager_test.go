@@ -191,7 +191,7 @@ func testCreateTable(ctx context.Context, re *require.Assertions, manager Manage
 ) {
 	c, err := manager.GetCluster(ctx, clusterName)
 	re.NoError(err)
-	table, err := c.CreateTable(ctx, CreateTableRequest{
+	table, _, err := c.CreateTable(ctx, CreateTableRequest{
 		ShardID:       shardID,
 		SchemaName:    schema,
 		TableName:     tableName,

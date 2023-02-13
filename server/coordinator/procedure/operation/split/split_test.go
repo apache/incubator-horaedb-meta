@@ -27,13 +27,13 @@ func TestSplit(t *testing.T) {
 	createTableNodeShard := getNodeShardsResult.NodeShards[0].ShardNode
 
 	// Create some tables in this shard.
-	createTableResult, err := c.CreateTable(ctx, cluster.CreateTableRequest{
+	createTableResult, _, err := c.CreateTable(ctx, cluster.CreateTableRequest{
 		ShardID:    createTableNodeShard.ID,
 		SchemaName: test.TestSchemaName,
 		TableName:  test.TestTableName0,
 	})
 	re.NoError(err)
-	_, err = c.CreateTable(ctx, cluster.CreateTableRequest{
+	_, _, err = c.CreateTable(ctx, cluster.CreateTableRequest{
 		ShardID:    createTableNodeShard.ID,
 		SchemaName: test.TestSchemaName,
 		TableName:  test.TestTableName1,

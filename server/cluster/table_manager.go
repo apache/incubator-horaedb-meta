@@ -24,7 +24,7 @@ type TableManager interface {
 	// GetTablesByIDs get tables with tableIDs.
 	GetTablesByIDs(tableIDs []storage.TableID) []storage.Table
 	// CreateTable create table with schemaName and tableName.
-	CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo storage.PartitionInfo) (storage.Table, error)
+	CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo storage.PartitionInfo) (storage.Table, bool, error)
 	// DropTable drop table with schemaName and tableName.
 	DropTable(ctx context.Context, schemaName string, tableName string) error
 	// GetSchemaByName get schema with schemaName.
@@ -102,27 +102,27 @@ func (m *TableManagerImpl) GetTablesByIDs(tableIDs []storage.TableID) []storage.
 	return result
 }
 
-func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo storage.PartitionInfo) (storage.Table, error) {
+func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo storage.PartitionInfo) (storage.Table, bool, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	_, exists, err := m.getTable(schemaName, tableName)
+	t, exists, err := m.getTable(schemaName, tableName)
 	if err != nil {
-		return storage.Table{}, errors.WithMessage(err, "get table")
+		return storage.Table{}, false, errors.WithMessage(err, "get table")
 	}
 
 	if exists {
-		return storage.Table{}, ErrTableAlreadyExists
+		return t, true, nil
 	}
 
 	// Create table in storage.
 	schema, ok := m.schemas[schemaName]
 	if !ok {
-		return storage.Table{}, ErrSchemaNotFound.WithCausef("schema name:%s", schemaName)
+		return storage.Table{}, false, ErrSchemaNotFound.WithCausef("schema name:%s", schemaName)
 	}
 
 	id, err := m.tableIDAlloc.Alloc(ctx)
 	if err != nil {
-		return storage.Table{}, errors.WithMessagef(err, "alloc table id, table name:%s", tableName)
+		return storage.Table{}, false, errors.WithMessagef(err, "alloc table id, table name:%s", tableName)
 	}
 
 	table := storage.Table{
@@ -139,7 +139,7 @@ func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, t
 	})
 
 	if err != nil {
-		return storage.Table{}, errors.WithMessage(err, "storage create table")
+		return storage.Table{}, false, errors.WithMessage(err, "storage create table")
 	}
 
 	// Update table in memory.
@@ -154,7 +154,7 @@ func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, t
 	tables.tables[tableName] = table
 	tables.tablesByID[table.ID] = table
 
-	return table, nil
+	return table, false, nil
 }
 
 func (m *TableManagerImpl) DropTable(ctx context.Context, schemaName string, tableName string) error {

@@ -166,7 +166,7 @@ func (c *Cluster) OpenTable(ctx context.Context, request OpenTableRequest) (Shar
 		return ShardVersionUpdate{}, errors.WithMessagef(ErrOpenTable, "normal table cannot be opened on multiple shards, schemaName:%s, tableName:%s", request.SchemaName, request.TableName)
 	}
 
-	shardVersionUpdate, err := c.topologyManager.AddTable(ctx, request.ShardID, []storage.Table{table})
+	shardVersionUpdate, _, err := c.topologyManager.AddTable(ctx, request.ShardID, []storage.Table{table})
 	if err != nil {
 		return ShardVersionUpdate{}, errors.WithMessage(err, "add table to topology")
 	}
@@ -227,7 +227,7 @@ func (c *Cluster) MigrateTable(ctx context.Context, request MigrateTableRequest)
 		return err
 	}
 
-	if _, err := c.topologyManager.AddTable(ctx, request.NewShardID, tables); err != nil {
+	if _, _, err := c.topologyManager.AddTable(ctx, request.NewShardID, tables); err != nil {
 		log.Error("add table from topology")
 		return err
 	}
@@ -246,28 +246,19 @@ func (c *Cluster) GetTable(schemaName, tableName string) (storage.Table, bool, e
 	return c.tableManager.GetTable(schemaName, tableName)
 }
 
-func (c *Cluster) CreateTable(ctx context.Context, request CreateTableRequest) (CreateTableResult, error) {
+func (c *Cluster) CreateTable(ctx context.Context, request CreateTableRequest) (CreateTableResult, bool, error) {
 	log.Info("create table start", zap.String("cluster", c.Name()), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
 
-	_, exists, err := c.tableManager.GetTable(request.SchemaName, request.TableName)
-	if err != nil {
-		return CreateTableResult{}, err
-	}
-
-	if exists {
-		return CreateTableResult{}, ErrTableAlreadyExists
-	}
-
 	// Create table in table manager.
-	table, err := c.tableManager.CreateTable(ctx, request.SchemaName, request.TableName, request.PartitionInfo)
+	table, existsMetadata, err := c.tableManager.CreateTable(ctx, request.SchemaName, request.TableName, request.PartitionInfo)
 	if err != nil {
-		return CreateTableResult{}, errors.WithMessage(err, "table manager create table")
+		return CreateTableResult{}, false, errors.WithMessage(err, "table manager create table")
 	}
 
 	// Add table to topology manager.
-	result, err := c.topologyManager.AddTable(ctx, request.ShardID, []storage.Table{table})
+	result, existsTopology, err := c.topologyManager.AddTable(ctx, request.ShardID, []storage.Table{table})
 	if err != nil {
-		return CreateTableResult{}, errors.WithMessage(err, "topology manager add table")
+		return CreateTableResult{}, false, errors.WithMessage(err, "topology manager add table")
 	}
 
 	ret := CreateTableResult{
@@ -275,7 +266,7 @@ func (c *Cluster) CreateTable(ctx context.Context, request CreateTableRequest) (
 		ShardVersionUpdate: result,
 	}
 	log.Info("create table succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", ret)))
-	return ret, nil
+	return ret, existsTopology && existsMetadata, nil
 }
 
 func (c *Cluster) GetShardNodesByShardID(id storage.ShardID) ([]storage.ShardNode, error) {
