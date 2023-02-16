@@ -270,7 +270,7 @@ func (a *API) getNodeShards(writer http.ResponseWriter, req *http.Request) {
 	result, err := a.clusterManager.GetNodeShards(context.Background(), nodeShardsRequest.ClusterName)
 	if err != nil {
 		log.Error("get node shards failed", zap.Error(err))
-		a.respondError(writer, ErrGetShardNodes, "get node shards failed")
+		a.respondError(writer, ErrGetNodeShards, "get node shards failed")
 		return
 	}
 

@@ -156,13 +156,8 @@ func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, rea
 		}
 
 		// 3. Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.
+		// TODO: In the current implementation mode, the scheduler will close and reopen Shard during the table creation process, which will cause Shard to be unavailable for a short time, temporarily close the detection of version inconsistency, and then open it after repair.
 		log.Info("Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.", zap.String("node", node), zap.Uint32("shardID", uint32(expectShard.ID)))
-		if err := s.dispatch.CloseShard(ctx, node, eventdispatch.CloseShardRequest{ShardID: uint32(expectShard.ID)}); err != nil {
-			return errors.WithMessagef(err, "close shard failed, shardInfo:%d", expectShard.ID)
-		}
-		if err := s.dispatch.OpenShard(ctx, node, eventdispatch.OpenShardRequest{Shard: expectShard}); err != nil {
-			return errors.WithMessagef(err, "reopen shard failed, shardInfo:%d", expectShard.ID)
-		}
 	}
 
 	// 4. Shard exists in node and not exists in metadata, close extra shard on node.
