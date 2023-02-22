@@ -157,6 +157,7 @@ func (s *Scheduler) applyMetadataShardInfo(ctx context.Context, node string, rea
 
 		// 3. Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.
 		// TODO: In the current implementation mode, the scheduler will close and reopen Shard during the table creation process, which will cause Shard to be unavailable for a short time, temporarily close the detection of version inconsistency, and then open it after repair.
+		// Related issue: https://github.com/CeresDB/ceresmeta/issues/140
 		log.Info("Shard exists in both metadata and node, versions are inconsistent, close and reopen invalid shard on node.", zap.String("node", node), zap.Uint32("shardID", uint32(expectShard.ID)))
 	}
 
