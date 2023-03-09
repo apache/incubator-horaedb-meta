@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"math/big"
 	"path"
 	"sync"
@@ -408,6 +409,45 @@ func (c *Cluster) GetNodeShards(_ context.Context) (GetNodeShardsResult, error) 
 		ClusterTopologyVersion: c.topologyManager.GetVersion(),
 		NodeShards:             shardNodesWithVersion,
 	}, nil
+}
+
+func (c *Cluster) UpdateTopologyByNodeInfo(ctx context.Context, nodeInfo *metaservicepb.NodeInfo) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.GetClusterState() != storage.ClusterStateStable {
+		return errors.WithMessage(ErrClusterStateInvalid, "only stable cluster cloud update by node info")
+	}
+
+	shardNodes := make([]storage.ShardNode, 0, len(nodeInfo.ShardInfos))
+	for _, info := range nodeInfo.ShardInfos {
+		shardNodes = append(shardNodes, storage.ShardNode{
+			ID:        storage.ShardID(info.Id),
+			ShardRole: storage.ConvertShardRolePB(info.Role),
+			NodeName:  nodeInfo.Endpoint,
+		})
+	}
+
+	originShardNodes := c.topologyManager.GetShardNodes().shardNodes
+	var newShardNodes []storage.ShardNode
+	for _, originShardNode := range originShardNodes {
+		if contains, newShardNode := containsShardNode(shardNodes, originShardNode); contains {
+			newShardNodes = append(newShardNodes, newShardNode)
+		} else {
+			newShardNodes = append(newShardNodes, originShardNode)
+		}
+	}
+
+	return c.topologyManager.UpdateClusterView(ctx, c.GetClusterState(), newShardNodes)
+}
+
+func containsShardNode(shardNodes []storage.ShardNode, target storage.ShardNode) (bool, storage.ShardNode) {
+	for _, shardNode := range shardNodes {
+		if shardNode.ID == target.ID {
+			return true, shardNode
+		}
+	}
+	return false, storage.ShardNode{}
 }
 
 func (c *Cluster) GetClusterViewVersion() uint64 {

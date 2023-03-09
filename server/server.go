@@ -183,7 +183,7 @@ func (srv *Server) startServer(_ context.Context) error {
 	dispatch := eventdispatch.NewDispatchImpl()
 	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(srv.etcdCli, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage, manager, srv.cfg.DefaultPartitionTableProportionOfNodes)
 	srv.procedureFactory = procedureFactory
-	srv.scheduler = coordinator.NewScheduler(manager, procedureManager, procedureFactory, dispatch)
+	srv.scheduler = coordinator.NewScheduler(manager, procedureManager, procedureFactory, dispatch, srv.cfg.StorageRootPath, srv.etcdCli)
 
 	api := http.NewAPI(procedureManager, procedureFactory, manager, http.NewForwardClient(srv.member, srv.cfg.HTTPPort))
 	httpService := http.NewHTTPService(srv.cfg.HTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())
@@ -307,6 +307,10 @@ func (srv *Server) GetProcedureFactory() *coordinator.Factory {
 
 func (srv *Server) GetProcedureManager() procedure.Manager {
 	return srv.procedureManager
+}
+
+func (srv *Server) GetScheduler() *coordinator.Scheduler {
+	return srv.scheduler
 }
 
 type leadershipEventCallbacks struct {

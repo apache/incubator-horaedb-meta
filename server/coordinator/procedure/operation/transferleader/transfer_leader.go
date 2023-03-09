@@ -21,13 +21,11 @@ import (
 // fsm state change: Begin -> UpdateMetadata -> CloseOldLeader -> OpenNewLeader -> Finish
 // TODO: add more detailed comments.
 const (
-	eventUpdateMetadata = "EventUpdateMetadata"
 	eventCloseOldLeader = "EventCloseOldLeader"
 	eventOpenNewLeader  = "EventOpenNewLeader"
 	eventFinish         = "EventFinish"
 
 	stateBegin          = "StateBegin"
-	stateUpdateMetadata = "StateUpdateMetadata"
 	stateCloseOldLeader = "StateCloseOldLeader"
 	stateOpenNewLeader  = "StateOpenNewLeader"
 	stateFinish         = "StateFinish"
@@ -35,13 +33,11 @@ const (
 
 var (
 	transferLeaderEvents = fsm.Events{
-		{Name: eventUpdateMetadata, Src: []string{stateBegin}, Dst: stateUpdateMetadata},
-		{Name: eventCloseOldLeader, Src: []string{stateUpdateMetadata}, Dst: stateCloseOldLeader},
+		{Name: eventCloseOldLeader, Src: []string{stateBegin}, Dst: stateCloseOldLeader},
 		{Name: eventOpenNewLeader, Src: []string{stateCloseOldLeader}, Dst: stateOpenNewLeader},
 		{Name: eventFinish, Src: []string{stateOpenNewLeader}, Dst: stateFinish},
 	}
 	transferLeaderCallbacks = fsm.Callbacks{
-		eventUpdateMetadata: updateMetadataCallback,
 		eventCloseOldLeader: closeOldLeaderCallback,
 		eventOpenNewLeader:  openNewShardCallback,
 		eventFinish:         finishCallback,
@@ -151,17 +147,9 @@ func (p *Procedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
-			if err := p.fsm.Event(eventUpdateMetadata, transferLeaderRequest); err != nil {
-				p.updateStateWithLock(procedure.StateFailed)
-				return errors.WithMessage(err, "transferLeader procedure update metadata")
-			}
-		case stateUpdateMetadata:
-			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "transferLeader procedure persist")
-			}
 			if err := p.fsm.Event(eventCloseOldLeader, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(procedure.StateFailed)
-				return errors.WithMessage(err, "transferLeader procedure close old leader")
+				return errors.WithMessage(err, "transferLeader procedure update metadata")
 			}
 		case stateCloseOldLeader:
 			if err := p.persist(ctx); err != nil {
@@ -213,50 +201,7 @@ func (p *Procedure) State() procedure.State {
 	return p.state
 }
 
-func updateMetadataCallback(event *fsm.Event) {
-	req, err := procedure.GetRequestFromEvent[callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-	ctx := req.ctx
-
-	if req.cluster.GetClusterState() != storage.ClusterStateStable {
-		procedure.CancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable", zap.Int("currentState", int(req.cluster.GetClusterState())))
-		return
-	}
-
-	getNodeShardResult, err := req.cluster.GetNodeShards(ctx)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get shardNodes by shardID failed")
-		return
-	}
-
-	found := false
-	shardNodes := make([]storage.ShardNode, 0, len(getNodeShardResult.NodeShards))
-	var leaderShardNode storage.ShardNode
-	for _, shardNodeWithVersion := range getNodeShardResult.NodeShards {
-		if shardNodeWithVersion.ShardNode.ShardRole == storage.ShardRoleLeader {
-			leaderShardNode = shardNodeWithVersion.ShardNode
-			if leaderShardNode.ID == req.shardID {
-				found = true
-				leaderShardNode.NodeName = req.newLeaderNodeName
-			}
-			shardNodes = append(shardNodes, leaderShardNode)
-		}
-	}
-	if !found {
-		procedure.CancelEventWithLog(event, procedure.ErrShardLeaderNotFound, "shard leader not found", zap.Uint32("shardID", uint32(req.shardID)))
-		return
-	}
-
-	err = req.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes)
-	if err != nil {
-		procedure.CancelEventWithLog(event, storage.ErrUpdateClusterViewConflict, "update cluster view")
-		return
-	}
-}
-
+// No need to close old shard, CeresDB must ensure old shard is closed when failover.
 func closeOldLeaderCallback(event *fsm.Event) {
 	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
@@ -265,7 +210,7 @@ func closeOldLeaderCallback(event *fsm.Event) {
 	}
 	ctx := request.ctx
 
-	// If the node is expired, skip close old leader shard.
+	//If the node is expired, skip close old leader shard.
 	oldLeaderNode, exists := request.cluster.GetRegisteredNodeByName(request.oldLeaderNodeName)
 	if !exists || oldLeaderNode.IsExpired(uint64(time.Now().Unix()), cluster.HeartbeatKeepAliveIntervalSec) {
 		return
@@ -274,8 +219,9 @@ func closeOldLeaderCallback(event *fsm.Event) {
 	closeShardRequest := eventdispatch.CloseShardRequest{
 		ShardID: uint32(request.shardID),
 	}
+	// Try to close old leader shard, if closed failed, just skip this step.
 	if err := request.dispatch.CloseShard(ctx, request.oldLeaderNodeName, closeShardRequest); err != nil {
-		procedure.CancelEventWithLog(event, err, "close shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("oldLeaderName", request.oldLeaderNodeName))
+		log.Warn("try to close shard failed", zap.Uint64("shardID", uint64(request.shardID)), zap.String("nodeName", request.oldLeaderNodeName), zap.Error(err))
 		return
 	}
 }

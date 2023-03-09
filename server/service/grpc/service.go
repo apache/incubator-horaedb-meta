@@ -45,6 +45,7 @@ type Handler interface {
 	GetLeader(ctx context.Context) (*member.GetLeaderResp, error)
 	GetProcedureFactory() *coordinator.Factory
 	GetProcedureManager() procedure.Manager
+	GetScheduler() *coordinator.Scheduler
 
 	// TODO: define the methods for handling other grpc requests.
 }

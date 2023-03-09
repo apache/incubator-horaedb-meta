@@ -271,39 +271,40 @@ func openNewShardMetadataCallback(event *fsm.Event) {
 	}
 }
 
+// Does shardView need to be retained?
 func createShardViewCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-	ctx := request.ctx
-
-	if err := request.cluster.CreateShardViews(ctx, []cluster.CreateShardView{{
-		ShardID: request.newShardID,
-		Tables:  []storage.TableID{},
-	}}); err != nil {
-		procedure.CancelEventWithLog(event, err, "create shard views")
-		return
-	}
+	//request, err := procedure.GetRequestFromEvent[callbackRequest](event)
+	//if err != nil {
+	//	procedure.CancelEventWithLog(event, err, "get request from event")
+	//	return
+	//}
+	//ctx := request.ctx
+	//
+	//if err := request.cluster.CreateShardViews(ctx, []cluster.CreateShardView{{
+	//	ShardID: request.newShardID,
+	//	Tables:  []storage.TableID{},
+	//}}); err != nil {
+	//	procedure.CancelEventWithLog(event, err, "create shard views")
+	//	return
+	//}
 }
 
-func updateShardTablesCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-
-	if err := request.cluster.MigrateTable(request.ctx, cluster.MigrateTableRequest{
-		SchemaName: request.schemaName,
-		TableNames: request.tableNames,
-		OldShardID: request.shardID,
-		NewShardID: request.newShardID,
-	}); err != nil {
-		procedure.CancelEventWithLog(event, err, "update shard tables")
-		return
-	}
+func updateShardTablesCallback(_ *fsm.Event) {
+	//request, err := procedure.GetRequestFromEvent[callbackRequest](event)
+	//if err != nil {
+	//	procedure.CancelEventWithLog(event, err, "get request from event")
+	//	return
+	//}
+	//
+	//if err := request.cluster.MigrateTable(request.ctx, cluster.MigrateTableRequest{
+	//	SchemaName: request.schemaName,
+	//	TableNames: request.tableNames,
+	//	OldShardID: request.shardID,
+	//	NewShardID: request.newShardID,
+	//}); err != nil {
+	//	procedure.CancelEventWithLog(event, err, "update shard tables")
+	//	return
+	//}
 }
 
 func openShardCallback(event *fsm.Event) {

@@ -134,16 +134,14 @@ func (m *TopologyManagerImpl) GetTableIDs(shardIDs []storage.ShardID, nodeName s
 	shardTableIDs := make(map[storage.ShardID]ShardTableIDs, len(shardIDs))
 	for _, shardID := range shardIDs {
 		for _, shardNode := range m.shardNodesMapping[shardID] {
-			if shardNode.NodeName == nodeName {
-				shardView := m.shardTablesMapping[shardID]
+			shardView := m.shardTablesMapping[shardID]
 
-				shardTableIDs[shardID] = ShardTableIDs{
-					ShardNode: shardNode,
-					TableIDs:  shardView.TableIDs,
-					Version:   shardView.Version,
-				}
-				break
+			shardTableIDs[shardID] = ShardTableIDs{
+				ShardNode: shardNode,
+				TableIDs:  shardView.TableIDs,
+				Version:   shardView.Version,
 			}
+			break
 		}
 	}
 

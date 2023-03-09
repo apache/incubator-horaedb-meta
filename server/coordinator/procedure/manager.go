@@ -17,5 +17,6 @@ type Manager interface {
 	Submit(ctx context.Context, procedure Procedure) error
 	// Cancel procedure that has been submitted.
 	Cancel(ctx context.Context, procedureID uint64) error
+	// ListRunningProcedure return immutable procedures info.
 	ListRunningProcedure(ctx context.Context) ([]*Info, error)
 }
