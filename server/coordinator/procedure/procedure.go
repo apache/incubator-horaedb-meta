@@ -48,6 +48,12 @@ type Procedure interface {
 
 	// State of the procedure. Retrieve the state of this procedure.
 	State() State
+
+	// GetShardID return the shardID associated with this procedure.
+	// It may be multiple shardIDs.
+	GetShardID() []uint64
+
+	GetShardVersion() uint64
 }
 
 // Info is used to provide immutable description procedure information.

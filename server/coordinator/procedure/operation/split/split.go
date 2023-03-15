@@ -289,22 +289,22 @@ func createShardViewCallback(event *fsm.Event) {
 	//}
 }
 
-func updateShardTablesCallback(_ *fsm.Event) {
-	//request, err := procedure.GetRequestFromEvent[callbackRequest](event)
-	//if err != nil {
-	//	procedure.CancelEventWithLog(event, err, "get request from event")
-	//	return
-	//}
-	//
-	//if err := request.cluster.MigrateTable(request.ctx, cluster.MigrateTableRequest{
-	//	SchemaName: request.schemaName,
-	//	TableNames: request.tableNames,
-	//	OldShardID: request.shardID,
-	//	NewShardID: request.newShardID,
-	//}); err != nil {
-	//	procedure.CancelEventWithLog(event, err, "update shard tables")
-	//	return
-	//}
+func updateShardTablesCallback(event *fsm.Event) {
+	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
+	if err != nil {
+		procedure.CancelEventWithLog(event, err, "get request from event")
+		return
+	}
+
+	if err := request.cluster.MigrateTable(request.ctx, cluster.MigrateTableRequest{
+		SchemaName: request.schemaName,
+		TableNames: request.tableNames,
+		OldShardID: request.shardID,
+		NewShardID: request.newShardID,
+	}); err != nil {
+		procedure.CancelEventWithLog(event, err, "update shard tables")
+		return
+	}
 }
 
 func openShardCallback(event *fsm.Event) {

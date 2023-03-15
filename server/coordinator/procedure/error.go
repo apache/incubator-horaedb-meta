@@ -18,4 +18,5 @@ var (
 	ErrEmptyPartitionNames   = coderr.NewCodeError(coderr.Internal, "partition names is empty")
 	ErrDropTableResult       = coderr.NewCodeError(coderr.Internal, "length of shard not correct")
 	ErrPickShard             = coderr.NewCodeError(coderr.Internal, "pick shard failed")
+	ErrSubmitProcedure       = coderr.NewCodeError(coderr.Internal, "submit new procedure")
 )
