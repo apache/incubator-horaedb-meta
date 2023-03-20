@@ -19,6 +19,7 @@ const (
 type Typ uint
 
 const (
+	// Cluster Operation
 	Create Typ = iota
 	Delete
 	TransferLeader
@@ -26,6 +27,8 @@ const (
 	Split
 	Merge
 	Scatter
+
+	// DDL
 	CreateTable
 	DropTable
 	CreatePartitionTable
@@ -50,10 +53,14 @@ type Procedure interface {
 	State() State
 
 	// GetShardID return the shardID associated with this procedure.
-	// It may be multiple shardIDs.
-	GetShardID() []uint64
+	// TODO: Some procedure may be associated with multi shards, it should be supported.
+	GetShardID() uint64
 
 	GetShardVersion() uint64
+
+	// GetClusterVersion return the cluster version when the procedure is created.
+	// When performing cluster operation, it is necessary to ensure cluster version consistency.
+	GetClusterVersion() uint64
 }
 
 // Info is used to provide immutable description procedure information.
@@ -61,4 +68,14 @@ type Info struct {
 	ID    uint64
 	Typ   Typ
 	State State
+}
+
+// IsDDL used to check procedure operation type.
+// Procedure only has two operation type: 1. DDL  2. Cluster Operation
+// We need ensure shardVersion consist when it is DDL and cluster version is consist when it is cluster operation.
+func IsDDL(p Procedure) bool {
+	if p.Typ() == CreateTable || p.Typ() == DropTable || p.Typ() == CreatePartitionTable || p.Typ() == DropPartitionTable {
+		return true
+	}
+	return false
 }

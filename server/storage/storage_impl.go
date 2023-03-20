@@ -6,6 +6,7 @@ import (
 	"context"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
@@ -381,25 +382,40 @@ func (s *metaStorageImpl) CreateShardViews(ctx context.Context, req CreateShardV
 func (s *metaStorageImpl) ListShardViews(ctx context.Context, req ListShardViewsRequest) (ListShardViewsResult, error) {
 	var shardViews []ShardView
 
-	for _, shardID := range req.ShardIDs {
-		key := makeShardViewLatestVersionKey(s.rootPath, uint32(req.ClusterID), uint32(shardID))
+	startKey := makeShardViewLatestVersionKey(s.rootPath, uint32(req.ClusterID), uint32(0))
+	endKey := makeShardViewLatestVersionKey(s.rootPath, uint32(req.ClusterID), math.MaxUint32)
+	rangeLimit := s.opts.MaxScanLimit
+
+	do := func(key string, value []byte) error {
+		//key := makeShardViewLatestVersionKey(s.rootPath, uint32(req.ClusterID), uint32(shardID))
+		subStr := strings.Split(key, "/")
+		shardIDRaw := subStr[len(subStr)-2]
+		shardID, err := strconv.ParseUint(shardIDRaw, 10, 32)
+		if err != nil {
+			return errors.WithMessage(err, "convert shardIDRaw to shardID")
+		}
+
 		version, err := etcdutil.Get(ctx, s.client, key)
 		if err != nil {
-			return ListShardViewsResult{}, errors.WithMessagef(err, "list shard view latest version, clusterID:%d, shardID:%d, key:%s", req.ClusterID, shardID, key)
+			return errors.WithMessagef(err, "list shard view latest version, clusterID:%d, shardID:%d, key:%s", req.ClusterID, key, version)
 		}
 
 		key = makeShardViewKey(s.rootPath, uint32(req.ClusterID), uint32(shardID), version)
-		value, err := etcdutil.Get(ctx, s.client, key)
+		v, err := etcdutil.Get(ctx, s.client, key)
 		if err != nil {
-			return ListShardViewsResult{}, errors.WithMessagef(err, "list shard view, clusterID:%d, shardID:%d, key:%s", req.ClusterID, shardID, key)
+			return errors.WithMessagef(err, "list shard view, clusterID:%d, shardID:%d, key:%s", req.ClusterID, shardID, key)
 		}
 
 		shardViewPB := &clusterpb.ShardView{}
-		if err = proto.Unmarshal([]byte(value), shardViewPB); err != nil {
-			return ListShardViewsResult{}, ErrDecode.WithCausef("decode shard view, clusterID:%d, shardID:%d, err:%v", req.ClusterID, shardID, err)
+		if err = proto.Unmarshal([]byte(v), shardViewPB); err != nil {
+			return ErrDecode.WithCausef("decode shard view, clusterID:%d, shardID:%d, err:%v", req.ClusterID, shardID, err)
 		}
 		shardView := convertShardViewPB(shardViewPB)
 		shardViews = append(shardViews, shardView)
+		return nil
+	}
+	if err := etcdutil.Scan(ctx, s.client, startKey, endKey, rangeLimit, do); err != nil {
+		return ListShardViewsResult{}, err
 	}
 	return ListShardViewsResult{
 		ShardViews: shardViews,

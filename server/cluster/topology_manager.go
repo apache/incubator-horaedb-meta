@@ -41,8 +41,12 @@ type TopologyManager interface {
 	InitClusterView(ctx context.Context) error
 	// UpdateClusterView update cluster view with shardNodes.
 	UpdateClusterView(ctx context.Context, state storage.ClusterState, shardNodes []storage.ShardNode) error
+	// GetClusterView return current cluster view.
+	GetClusterView() storage.ClusterView
 	// CreateShardViews create shardViews.
 	CreateShardViews(ctx context.Context, shardViews []CreateShardView) error
+	// GetShardViews return shardViews in current topology.
+	GetShardViews() []storage.ShardView
 }
 
 type ShardTableIDs struct {
@@ -81,6 +85,7 @@ type TopologyManagerImpl struct {
 	shardNodesMapping map[storage.ShardID][]storage.ShardNode // ShardID -> nodes of the shard
 	nodeShardsMapping map[string][]storage.ShardNode          // nodeName -> shards of the NodeName
 	// ShardView in memory.
+	shardViews         []storage.ShardView
 	shardTablesMapping map[storage.ShardID]*storage.ShardView // ShardID -> shardTopology
 	tableShardMapping  map[storage.TableID][]storage.ShardID  // tableID -> ShardID
 
@@ -421,6 +426,13 @@ func (m *TopologyManagerImpl) UpdateClusterView(ctx context.Context, state stora
 	return nil
 }
 
+func (m *TopologyManagerImpl) GetClusterView() storage.ClusterView {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.clusterView
+}
+
 func (m *TopologyManagerImpl) CreateShardViews(ctx context.Context, createShardViews []CreateShardView) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -449,6 +461,13 @@ func (m *TopologyManagerImpl) CreateShardViews(ctx context.Context, createShardV
 	return nil
 }
 
+func (m *TopologyManagerImpl) GetShardViews() []storage.ShardView {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.shardViews
+}
+
 func (m *TopologyManagerImpl) loadClusterView(ctx context.Context) error {
 	clusterViewResult, err := m.storage.GetClusterView(ctx, storage.GetClusterViewRequest{
 		ClusterID: m.clusterID,
@@ -470,14 +489,8 @@ func (m *TopologyManagerImpl) loadClusterView(ctx context.Context) error {
 }
 
 func (m *TopologyManagerImpl) loadShardViews(ctx context.Context) error {
-	shardIDs := make([]storage.ShardID, 0, len(m.shardNodesMapping))
-	for id := range m.shardNodesMapping {
-		shardIDs = append(shardIDs, id)
-	}
-
 	shardViewsResult, err := m.storage.ListShardViews(ctx, storage.ListShardViewsRequest{
 		ClusterID: m.clusterID,
-		ShardIDs:  shardIDs,
 	})
 	if err != nil {
 		return errors.WithMessage(err, "storage list shard views")
@@ -485,6 +498,7 @@ func (m *TopologyManagerImpl) loadShardViews(ctx context.Context) error {
 	log.Debug("load shard views", zap.Int32("clusterID", int32(m.clusterID)), zap.String("shardViews", fmt.Sprintf("%+v", shardViewsResult)))
 
 	// Reset data in memory.
+	m.shardViews = shardViewsResult.ShardViews
 	m.shardTablesMapping = make(map[storage.ShardID]*storage.ShardView, len(shardViewsResult.ShardViews))
 	m.tableShardMapping = make(map[storage.TableID][]storage.ShardID, 0)
 	for _, shardView := range shardViewsResult.ShardViews {

@@ -185,6 +185,21 @@ type Procedure struct {
 	state procedure.State
 }
 
+func (p *Procedure) GetShardID() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (p *Procedure) GetShardVersion() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (p *Procedure) GetClusterVersion() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (p *Procedure) ID() uint64 {
 	return p.id
 }

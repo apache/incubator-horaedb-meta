@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,6 +51,8 @@ type Server struct {
 	procedureManager procedure.Manager
 	// scheduler schedule procedure for all cluster.
 	scheduler *coordinator.Scheduler
+	// schedulerManager manager schedulers for all cluster.
+	schedulerManager scheduler.Manager
 
 	// member describes membership in ceresmeta cluster.
 	member  *member.Member
@@ -184,6 +187,7 @@ func (srv *Server) startServer(_ context.Context) error {
 	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(srv.etcdCli, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage, manager, srv.cfg.DefaultPartitionTableProportionOfNodes)
 	srv.procedureFactory = procedureFactory
 	srv.scheduler = coordinator.NewScheduler(manager, procedureManager, procedureFactory, dispatch, srv.cfg.StorageRootPath, srv.etcdCli)
+	srv.schedulerManager = scheduler.NewManager(procedureManager, srv.clusterManager)
 
 	api := http.NewAPI(procedureManager, procedureFactory, manager, http.NewForwardClient(srv.member, srv.cfg.HTTPPort))
 	httpService := http.NewHTTPService(srv.cfg.HTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())
@@ -260,22 +264,26 @@ func (srv *Server) createDefaultCluster(ctx context.Context) error {
 		} else {
 			log.Info("create default cluster succeed", zap.String("cluster", defaultCluster.Name()))
 		}
-		// Create and submit scatter procedure for default cluster.
-		shardIDs := make([]storage.ShardID, 0, defaultCluster.GetTotalShardNum())
-		for i := uint32(0); i < defaultCluster.GetTotalShardNum(); i++ {
-			shardID, err := defaultCluster.AllocShardID(ctx)
-			if err != nil {
-				return errors.WithMessage(err, "alloc shard id failed")
+		// Create ShardView
+		if defaultCluster.GetClusterState() == storage.ClusterStateEmpty {
+			var createShardViews []cluster.CreateShardView
+			for i := uint32(0); i < defaultCluster.GetTotalShardNum(); i++ {
+				shardID, err := defaultCluster.AllocShardID(ctx)
+				if err != nil {
+					return errors.WithMessage(err, "alloc shard id failed")
+				}
+				createShardViews = append(createShardViews, cluster.CreateShardView{
+					ShardID: storage.ShardID(shardID),
+					Tables:  []storage.TableID{},
+				})
 			}
-			shardIDs = append(shardIDs, storage.ShardID(shardID))
-		}
-		scatterRequest := coordinator.ScatterRequest{Cluster: defaultCluster, ShardIDs: shardIDs}
-		scatterProcedure, err := srv.procedureFactory.CreateScatterProcedure(ctx, scatterRequest)
-		if err != nil {
-			return errors.WithMessage(err, "create scatter procedure failed")
-		}
-		if err := srv.procedureManager.Submit(ctx, scatterProcedure); err != nil {
-			return errors.WithMessage(err, "submit scatter procedure failed")
+			if err := defaultCluster.CreateShardViews(ctx, createShardViews); err != nil {
+				log.Error("create default shard views failed", zap.Error(err))
+			}
+			if err := defaultCluster.UpdateClusterView(ctx, storage.ClusterStateStable, []storage.ShardNode{}); err != nil {
+				log.Error("update cluster view failed", zap.Error(err))
+			}
+			log.Info("create shard view finish")
 		}
 	}
 	return nil
@@ -330,6 +338,9 @@ func (c *leadershipEventCallbacks) AfterElected(ctx context.Context) {
 	if err := c.srv.scheduler.Start(ctx); err != nil {
 		panic(fmt.Sprintf("procedure scheduler fail to start, err:%v", err))
 	}
+	if err := c.srv.schedulerManager.Start(ctx); err != nil {
+		panic(fmt.Sprintf("scheduler manager fail to start, err:%v", err))
+	}
 }
 
 func (c *leadershipEventCallbacks) BeforeTransfer(ctx context.Context) {
@@ -342,5 +353,8 @@ func (c *leadershipEventCallbacks) BeforeTransfer(ctx context.Context) {
 	}
 	if err := c.srv.scheduler.Stop(ctx); err != nil {
 		panic(fmt.Sprintf("procedure scheduler fail to stop, err:%v", err))
+	}
+	if err := c.srv.schedulerManager.Stop(ctx); err != nil {
+		panic(fmt.Sprintf("scheduler manager fail to stop, err:%v", err))
 	}
 }

@@ -21,14 +21,10 @@ const (
 
 type ManagerImpl struct {
 	// This lock is used to protect the field `procedures` and `running`.
-	lock       sync.RWMutex
-	procedures []Procedure
-	running    bool
-
+	lock     sync.RWMutex
+	running  bool
 	storage  Storage
 	dispatch eventdispatch.Dispatch
-
-	procedureQueue chan Procedure
 
 	// There is only one procedure running for every shard.
 	// It will be removed when the procedure is finished or failed.
@@ -45,7 +41,6 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 		log.Warn("cluster manager has already been started")
 		return nil
 	}
-	m.procedureQueue = make(chan Procedure, queueSize)
 	go m.startProcedurePromote(ctx)
 	go m.startProcedureWorker(ctx)
 	err := m.retryAll(ctx)
@@ -58,8 +53,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 func (m *ManagerImpl) Stop(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	close(m.procedureQueue)
-	for _, procedure := range m.procedures {
+	for _, procedure := range m.runningProcedures {
 		if procedure.State() == StateRunning {
 			err := procedure.Cancel(ctx)
 			log.Error("cancel procedure failed", zap.Error(err), zap.Uint64("procedureID", procedure.ID()))
@@ -94,7 +88,7 @@ func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	var procedureInfos []*Info
-	for _, procedure := range m.procedures {
+	for _, procedure := range m.runningProcedures {
 		if procedure.State() == StateRunning {
 			procedureInfos = append(procedureInfos, &Info{
 				ID:    procedure.ID(),
@@ -160,18 +154,6 @@ func (m *ManagerImpl) removeProcedure(id uint64) Procedure {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	index := -1
-	for i, p := range m.procedures {
-		if p.ID() == id {
-			index = i
-			break
-		}
-	}
-	if index != -1 {
-		result := m.procedures[index]
-		m.procedures = append(m.procedures[:index], m.procedures[index+1:]...)
-		return result
-	}
 	return nil
 }
 
@@ -185,6 +167,7 @@ func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
 
 // Whether a waiting procedure could be running procedure.
 func (m *ManagerImpl) checkValid(procedure Procedure) bool {
+	// ClusterVersion and ShardVersion int procedure must be same with current.
 	return true
 }
 
@@ -205,8 +188,7 @@ func (m *ManagerImpl) promoteProcedure(ctx context.Context, shardID uint64) Proc
 		}
 
 		if !m.checkValid(p) {
-			// This procedure is invalid, just cancel it.
-			p.Cancel(ctx)
+			// This procedure is invalid, just remove it.
 			continue
 		}
 

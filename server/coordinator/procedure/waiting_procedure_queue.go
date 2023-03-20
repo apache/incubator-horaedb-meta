@@ -5,7 +5,7 @@ import "time"
 type WaitingProcedureQueue interface {
 	Add(procedure Procedure) error
 
-	Deque() (error, Procedure)
+	Deque() Procedure
 }
 
 // WaitingProcedureQueueImpl is used to manager procedures on specify shard.

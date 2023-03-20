@@ -2,12 +2,18 @@ package scheduler
 
 import (
 	"context"
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"fmt"
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"go.uber.org/zap"
 	"sync"
+	"time"
+)
+
+const (
+	schedulerInterval = time.Second * 5
 )
 
 // Manager used to manage schedulers.
@@ -17,27 +23,53 @@ type Manager interface {
 
 	ListScheduler() []Scheduler
 
+	Start(ctx context.Context) error
+
+	Stop(ctx context.Context) error
+
 	// Scheduler will be called when received new heartbeat, every scheduler register in schedulerManager will be
 	// Scheduler cloud be schedule with fix time interval or heartbeat.
-	Scheduler(clusterView storage.ClusterView) []procedure.Procedure
+	Scheduler(ctx context.Context, clusterView storage.ClusterView, shardViews []storage.ShardView) []procedure.Procedure
 }
 
 type ManagerImpl struct {
 	lock               sync.RWMutex
 	registerSchedulers []Scheduler
+	procedureManager   procedure.Manager
 
-	procedureManager procedure.Manager
+	clusterManager cluster.Manager
+}
 
-	heartbeatChan chan *metaservicepb.NodeInfo
+func NewManager(procedureManager procedure.Manager, clusterManager cluster.Manager) Manager {
+	return &ManagerImpl{
+		procedureManager: procedureManager,
+		clusterManager:   clusterManager,
+	}
+}
+
+func (m *ManagerImpl) Stop(ctx context.Context) error {
+	return nil
 }
 
 func (m *ManagerImpl) Start(ctx context.Context) error {
-	go func() {
-		// Get latest clusterView from heartbeat.
-
-		// Get lateset shardViews from metadata
-		m.Scheduler(ctx, nil, nil)
-	}()
+	clusters, err := m.clusterManager.ListClusters(ctx)
+	if err != nil {
+		return err
+	}
+	for _, cluster := range clusters {
+		cluster := cluster
+		go func() {
+			for {
+				time.Sleep(schedulerInterval)
+				// Get latest clusterView from heartbeat.
+				clusterView := cluster.GetClusterView()
+				// Get latest shardViews from metadata
+				shardViews := cluster.GetShardViews()
+				log.Info("scheduler manager invoke", zap.String("clusterView", fmt.Sprintf("%v", clusterView)), zap.String("shardViews", fmt.Sprintf("%v", shardViews)))
+				m.Scheduler(ctx, clusterView, shardViews)
+			}
+		}()
+	}
 
 	return nil
 }

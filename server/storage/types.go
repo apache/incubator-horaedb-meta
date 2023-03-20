@@ -107,7 +107,6 @@ type CreateShardViewsRequest struct {
 
 type ListShardViewsRequest struct {
 	ClusterID ClusterID
-	ShardIDs  []ShardID
 }
 
 type ListShardViewsResult struct {

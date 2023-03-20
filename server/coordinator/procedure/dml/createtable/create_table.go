@@ -155,6 +155,21 @@ func (p *Procedure) Typ() procedure.Typ {
 	return procedure.CreateTable
 }
 
+func (p *Procedure) GetShardID() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (p *Procedure) GetShardVersion() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (p *Procedure) GetClusterVersion() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (p *Procedure) Start(ctx context.Context) error {
 	p.updateState(procedure.StateRunning)
 
