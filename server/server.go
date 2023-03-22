@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/CeresDB/ceresmeta/server/coordinator/watch"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -51,6 +52,8 @@ type Server struct {
 	procedureManager procedure.Manager
 	// schedulerManager manages schedulers for all cluster.
 	schedulerManager scheduler.Manager
+	// shardWatch used to watch shard lock event.
+	shardWatch *watch.ShardWatch
 
 	// member describes membership in ceresmeta cluster.
 	member  *member.Member
@@ -176,7 +179,7 @@ func (srv *Server) startServer(_ context.Context) error {
 	srv.clusterManager = manager
 
 	procedureStorage := procedure.NewEtcdStorageImpl(srv.etcdCli, srv.cfg.StorageRootPath)
-	procedureManager, err := procedure.NewManagerImpl(procedureStorage)
+	procedureManager, err := procedure.NewManagerImpl(procedureStorage, manager)
 	if err != nil {
 		return errors.WithMessage(err, "start server")
 	}
@@ -184,7 +187,7 @@ func (srv *Server) startServer(_ context.Context) error {
 	dispatch := eventdispatch.NewDispatchImpl()
 	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(srv.etcdCli, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage, manager, srv.cfg.DefaultPartitionTableProportionOfNodes)
 	srv.procedureFactory = procedureFactory
-	srv.schedulerManager = scheduler.NewManager(procedureManager, srv.clusterManager, procedureFactory)
+	srv.schedulerManager = scheduler.NewManager(procedureManager, srv.clusterManager, procedureFactory, srv.etcdCli, srv.cfg.StorageRootPath)
 
 	api := http.NewAPI(procedureManager, procedureFactory, manager, http.NewForwardClient(srv.member, srv.cfg.HTTPPort))
 	httpService := http.NewHTTPService(srv.cfg.HTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())
@@ -261,7 +264,7 @@ func (srv *Server) createDefaultCluster(ctx context.Context) error {
 		} else {
 			log.Info("create default cluster succeed", zap.String("cluster", defaultCluster.Name()))
 		}
-		// Create ShardView
+		// Create ShardView, shardViews will be assigned to nodes by scheduler.
 		if defaultCluster.GetClusterState() == storage.ClusterStateEmpty {
 			var createShardViews []cluster.CreateShardView
 			for i := uint32(0); i < defaultCluster.GetTotalShardNum(); i++ {
@@ -276,9 +279,6 @@ func (srv *Server) createDefaultCluster(ctx context.Context) error {
 			}
 			if err := defaultCluster.CreateShardViews(ctx, createShardViews); err != nil {
 				log.Error("create default shard views failed", zap.Error(err))
-			}
-			if err := defaultCluster.UpdateClusterView(ctx, storage.ClusterStateStable, []storage.ShardNode{}); err != nil {
-				log.Error("update cluster view failed", zap.Error(err))
 			}
 			log.Info("create shard view finish")
 		}
@@ -322,11 +322,11 @@ func (c *leadershipEventCallbacks) AfterElected(ctx context.Context) {
 	if err := c.srv.clusterManager.Start(ctx); err != nil {
 		panic(fmt.Sprintf("cluster manager fail to start, err:%v", err))
 	}
-	if err := c.srv.procedureManager.Start(ctx); err != nil {
-		panic(fmt.Sprintf("procedure manager fail to start, err:%v", err))
-	}
 	if err := c.srv.createDefaultCluster(ctx); err != nil {
 		panic(fmt.Sprintf("create default cluster failed, err:%v", err))
+	}
+	if err := c.srv.procedureManager.Start(ctx); err != nil {
+		panic(fmt.Sprintf("procedure manager fail to start, err:%v", err))
 	}
 	if err := c.srv.schedulerManager.Start(ctx); err != nil {
 		panic(fmt.Sprintf("scheduler manager fail to start, err:%v", err))

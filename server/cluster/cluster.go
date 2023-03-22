@@ -301,6 +301,26 @@ func (c *Cluster) RegisterNode(ctx context.Context, registeredNode RegisteredNod
 
 	c.registeredNodesCache[registeredNode.Node.Name] = registeredNode
 
+	// When the number of nodes in the cluster reaches the threshold, modify the cluster status to stable.
+	if uint32(len(c.registeredNodesCache)) >= c.metaData.MinNodeCount && c.topologyManager.GetClusterState() == storage.ClusterStateEmpty {
+		if err := c.UpdateClusterView(ctx, storage.ClusterStateStable, []storage.ShardNode{}); err != nil {
+			log.Error("update cluster view failed", zap.Error(err))
+		}
+	}
+
+	// Update shard node mapping.
+	var shardNodes []storage.ShardNode
+	for _, shardInfo := range registeredNode.ShardInfos {
+		shardNodes = append(shardNodes, storage.ShardNode{
+			ID:        shardInfo.ID,
+			ShardRole: shardInfo.Role,
+			NodeName:  registeredNode.Node.Name,
+		})
+	}
+	if err := c.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
+		return errors.WithMessage(err, "update cluster view failed")
+	}
+
 	return nil
 }
 
@@ -444,6 +464,13 @@ func (c *Cluster) GetClusterView() storage.ClusterView {
 
 func (c *Cluster) UpdateClusterView(ctx context.Context, state storage.ClusterState, shardNodes []storage.ShardNode) error {
 	if err := c.topologyManager.UpdateClusterView(ctx, state, shardNodes); err != nil {
+		return errors.WithMessage(err, "update cluster view")
+	}
+	return nil
+}
+
+func (c *Cluster) UpdateClusterViewByNode(ctx context.Context, shardNodes []storage.ShardNode) error {
+	if err := c.topologyManager.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view")
 	}
 	return nil

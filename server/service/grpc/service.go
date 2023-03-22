@@ -189,7 +189,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
 	}
 
-	err = manager.Submit(ctx, p)
+	err = manager.Submit(ctx, c.GetClusterID(), p)
 	if err != nil {
 		log.Error("fail to create table, manager submit procedure", zap.Error(err))
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
@@ -261,7 +261,7 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 		log.Error("fail to drop table", zap.Error(err))
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "drop table")}, nil
 	}
-	err = manager.Submit(ctx, procedure)
+	err = manager.Submit(ctx, c.GetClusterID(), procedure)
 	if err != nil {
 		log.Error("fail to drop table, manager submit procedure", zap.Error(err))
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "drop table")}, nil

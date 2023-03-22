@@ -5,6 +5,9 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"github.com/CeresDB/ceresmeta/server/coordinator/watch"
+	"github.com/pkg/errors"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"reflect"
 	"sync"
 	"time"
@@ -32,7 +35,7 @@ type Manager interface {
 
 	// Scheduler will be called when received new heartbeat, every scheduler registered in schedulerManager will be called to generate procedures.
 	// Scheduler cloud be schedule with fix time interval or heartbeat.
-	Scheduler(ctx context.Context, clusterSnapshot cluster.Snapshot) []procedure.Procedure
+	Scheduler(ctx context.Context, clusterSnapshot cluster.Snapshot) []*ScheduleResult
 }
 
 type ManagerImpl struct {
@@ -40,15 +43,18 @@ type ManagerImpl struct {
 	clusterManager   cluster.Manager
 	factory          *coordinator.Factory
 	nodePicker       coordinator.NodePicker
+	client           *clientv3.Client
+	rootPath         string
 
 	// This lock is used to protect the following field.
 	lock               sync.RWMutex
 	registerSchedulers []Scheduler
+	shardWatches       map[string]*watch.ShardWatch
 	isRunning          bool
 	cancel             context.CancelFunc
 }
 
-func NewManager(procedureManager procedure.Manager, clusterManager cluster.Manager, factory *coordinator.Factory) Manager {
+func NewManager(procedureManager procedure.Manager, clusterManager cluster.Manager, factory *coordinator.Factory, client *clientv3.Client, rootPath string) Manager {
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
 		clusterManager:     clusterManager,
@@ -59,7 +65,7 @@ func NewManager(procedureManager procedure.Manager, clusterManager cluster.Manag
 	}
 }
 
-func (m *ManagerImpl) Stop(_ context.Context) error {
+func (m *ManagerImpl) Stop(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -67,6 +73,11 @@ func (m *ManagerImpl) Stop(_ context.Context) error {
 		m.cancel()
 		m.registerSchedulers = m.registerSchedulers[:0]
 		m.isRunning = false
+		for _, shardWatch := range m.shardWatches {
+			if err := shardWatch.Stop(ctx); err != nil {
+				return errors.WithMessage(err, "stop shard watch failed")
+			}
+		}
 	}
 
 	return nil
@@ -89,6 +100,12 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	for _, c := range clusters {
 		c := c
+		watch := watch.NewWatch(c.Name(), m.rootPath, m.client)
+		watch.RegisteringEventCallback(&schedulerWatchCallback{c: c})
+		m.shardWatches[c.Name()] = watch
+		if err := watch.Start(ctx); err != nil {
+			return errors.WithMessage(err, "start shard watch failed")
+		}
 		go func() {
 			for {
 				select {
@@ -99,11 +116,12 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 					time.Sleep(schedulerInterval)
 					// Get latest cluster snapshot.
 					clusterSnapshot := c.GetClusterSnapshot()
-					log.Info("scheduler manager invoke", zap.String("clusterTopology", fmt.Sprintf("%v", clusterSnapshot)))
-					procedures := m.Scheduler(ctxWithCancel, clusterSnapshot)
-					for _, p := range procedures {
-						if err := m.procedureManager.Submit(ctx, p); err != nil {
-							log.Error("scheduler submit new procedure", zap.Uint64("ProcedureID", p.ID()), zap.Error(err))
+					log.Debug("scheduler manager invoke", zap.String("clusterSnapshot", fmt.Sprintf("%v", clusterSnapshot)))
+					results := m.Scheduler(ctxWithCancel, clusterSnapshot)
+					for _, result := range results {
+						log.Info("scheduler submit new procedure", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.String("Reason", result.Reason))
+						if err := m.procedureManager.Submit(ctx, c.GetClusterID(), result.Procedure); err != nil {
+							log.Error("scheduler submit new procedure failed", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.Error(err))
 						}
 					}
 				}
@@ -114,6 +132,18 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 	m.isRunning = true
 	m.cancel = cancel
 
+	return nil
+}
+
+type schedulerWatchCallback struct {
+	c *cluster.Cluster
+}
+
+func (callback *schedulerWatchCallback) OnShardRegistered(event watch.ShardRegisterEvent) error {
+	return nil
+}
+
+func (callback *schedulerWatchCallback) OnShardExpired(event watch.ShardExpireEvent) error {
 	return nil
 }
 
@@ -135,13 +165,18 @@ func (m *ManagerImpl) ListScheduler() []Scheduler {
 	return m.registerSchedulers
 }
 
-func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot cluster.Snapshot) []procedure.Procedure {
+func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot cluster.Snapshot) []*ScheduleResult {
 	// TODO: Every scheduler should run in an independent goroutine.
+	var results []*ScheduleResult
 	for _, scheduler := range m.registerSchedulers {
 		result, err := scheduler.Schedule(ctx, clusterSnapshot)
 		if err != nil {
-			log.Info("scheduler new procedure", zap.String("desc", result.Reason))
+			log.Error("scheduler failed", zap.Error(err))
+			continue
+		}
+		if result != nil {
+			results = append(results, result)
 		}
 	}
-	return nil
+	return results
 }

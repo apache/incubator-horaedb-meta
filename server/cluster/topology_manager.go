@@ -41,6 +41,8 @@ type TopologyManager interface {
 	InitClusterView(ctx context.Context) error
 	// UpdateClusterView update cluster view with shardNodes.
 	UpdateClusterView(ctx context.Context, state storage.ClusterState, shardNodes []storage.ShardNode) error
+	// UpdateClusterViewByNode update cluster view with target shardNodes, it will only update shardNodes corresponding the node name.
+	UpdateClusterViewByNode(ctx context.Context, shardNodes []storage.ShardNode) error
 	// GetClusterView return current cluster view.
 	GetClusterView() storage.ClusterView
 	// CreateShardViews create shardViews.
@@ -416,6 +418,50 @@ func (m *TopologyManagerImpl) UpdateClusterView(ctx context.Context, state stora
 		ShardNodes: shardNodes,
 		CreatedAt:  uint64(time.Now().UnixMilli()),
 	}
+	if err := m.storage.UpdateClusterView(ctx, storage.UpdateClusterViewRequest{
+		ClusterID:     m.clusterID,
+		ClusterView:   newClusterView,
+		LatestVersion: m.clusterView.Version,
+	}); err != nil {
+		return errors.WithMessage(err, "storage update cluster view")
+	}
+
+	// Load cluster view into memory.
+	if err := m.loadClusterView(ctx); err != nil {
+		return errors.WithMessage(err, "load cluster view")
+	}
+	return nil
+}
+
+func (m *TopologyManagerImpl) UpdateClusterViewByNode(ctx context.Context, shardNodes []storage.ShardNode) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	var mapping = map[string]storage.ShardNode{}
+	for _, shardNode := range shardNodes {
+		mapping[shardNode.NodeName] = shardNode
+	}
+
+	originShardNodes := m.clusterView.ShardNodes
+	for i, shardNode := range originShardNodes {
+		if _, exists := mapping[shardNode.NodeName]; exists {
+			originShardNodes = append(originShardNodes[:i], originShardNodes[i+1:]...)
+		}
+	}
+
+	var newShardNodes []storage.ShardNode
+	newShardNodes = append(newShardNodes, originShardNodes...)
+	newShardNodes = append(newShardNodes, shardNodes...)
+
+	// Update cluster view in storage.
+	newClusterView := storage.ClusterView{
+		ClusterID:  m.clusterID,
+		Version:    m.clusterView.Version + 1,
+		State:      m.clusterView.State,
+		ShardNodes: newShardNodes,
+		CreatedAt:  uint64(time.Now().UnixMilli()),
+	}
+
 	if err := m.storage.UpdateClusterView(ctx, storage.UpdateClusterViewRequest{
 		ClusterID:     m.clusterID,
 		ClusterView:   newClusterView,
