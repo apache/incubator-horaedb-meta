@@ -65,8 +65,8 @@ func (c *Cluster) Name() string {
 	return c.metaData.Name
 }
 
-func (c *Cluster) GetShardTables(shardIDs []storage.ShardID, nodeName string) map[storage.ShardID]ShardTables {
-	shardTableIDs := c.topologyManager.GetTableIDs(shardIDs, nodeName)
+func (c *Cluster) GetShardTables(shardIDs []storage.ShardID) map[storage.ShardID]ShardTables {
+	shardTableIDs := c.topologyManager.GetTableIDs(shardIDs)
 
 	result := make(map[storage.ShardID]ShardTables, len(shardIDs))
 
@@ -438,11 +438,19 @@ func (c *Cluster) GetClusterState() storage.ClusterState {
 	return c.topologyManager.GetClusterState()
 }
 
+func (c *Cluster) GetClusterView() storage.ClusterView {
+	return c.topologyManager.GetClusterView()
+}
+
 func (c *Cluster) UpdateClusterView(ctx context.Context, state storage.ClusterState, shardNodes []storage.ShardNode) error {
 	if err := c.topologyManager.UpdateClusterView(ctx, state, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view")
 	}
 	return nil
+}
+
+func (c *Cluster) GetShardViews() []storage.ShardView {
+	return c.topologyManager.GetShardViews()
 }
 
 func (c *Cluster) CreateShardViews(ctx context.Context, views []CreateShardView) error {

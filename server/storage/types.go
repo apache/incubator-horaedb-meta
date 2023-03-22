@@ -149,11 +149,12 @@ type ShardNode struct {
 }
 
 type ClusterView struct {
-	ClusterID  ClusterID
-	Version    uint64
-	State      ClusterState
-	ShardNodes []ShardNode
-	CreatedAt  uint64
+	ClusterID   ClusterID
+	ClusterName string
+	Version     uint64
+	State       ClusterState
+	ShardNodes  []ShardNode
+	CreatedAt   uint64
 }
 
 type Schema struct {
@@ -295,12 +296,13 @@ func convertClusterViewToPB(view ClusterView) clusterpb.ClusterView {
 	}
 
 	return clusterpb.ClusterView{
-		ClusterId:  uint32(view.ClusterID),
-		Version:    view.Version,
-		State:      convertClusterStateToPB(view.State),
-		ShardNodes: shardViews,
-		Cause:      "",
-		CreatedAt:  view.CreatedAt,
+		ClusterId:   uint32(view.ClusterID),
+		Version:     view.Version,
+		State:       convertClusterStateToPB(view.State),
+		ShardNodes:  shardViews,
+		Cause:       "",
+		CreatedAt:   view.CreatedAt,
+		ClusterName: view.ClusterName,
 	}
 }
 
