@@ -5,6 +5,6 @@ package queue
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
 var (
-	ErrQueueFull                = coderr.NewCodeError(coderr.Internal, "queue is full, unable to offer more data")
-	ErrOfferDuplicatedProcedure = coderr.NewCodeError(coderr.Internal, "try to offer duplicated procedure")
+	ErrQueueFull               = coderr.NewCodeError(coderr.Internal, "queue is full, unable to offer more data")
+	ErrPushDuplicatedProcedure = coderr.NewCodeError(coderr.Internal, "try to push duplicated procedure")
 )
