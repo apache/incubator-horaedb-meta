@@ -12,59 +12,71 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ProcedureScheduleEntry struct {
+type procedureScheduleEntry struct {
 	procedure procedure.Procedure
 	runAfter  time.Time
 }
 
 type ProcedureDelayQueue struct {
+	maxLen int
+
+	// This lock is used to protect the following fields.
 	lock      sync.RWMutex
-	heapQueue *HeapPriorityQueue
-	index     map[uint64]procedure.Procedure
-	maxLen    int
+	heapQueue *heapPriorityQueue
+	// existingProcs is used to record procedures has been pushed into the queue,
+	// and they will be used to verify the addition of duplicate elements.
+	existingProcs map[uint64]struct{}
 }
 
-type HeapPriorityQueue struct {
-	lock sync.RWMutex
-
-	procedures []*ProcedureScheduleEntry
+// heapPriorityQueue is no internal lock,
+// and its thread safety is guaranteed by the external caller.
+type heapPriorityQueue struct {
+	procedures []*procedureScheduleEntry
 }
 
-func (q *HeapPriorityQueue) Len() int {
+func (q *heapPriorityQueue) Len() int {
 	return len(q.procedures)
 }
 
-func (q *HeapPriorityQueue) Less(i, j int) bool {
-	if q.procedures[i].runAfter.Before(q.procedures[j].runAfter) {
-		return true
-	}
-	return false
+// The dequeue order of elements is determined by the less method.
+// When return procedures[i].runAfter < procedures[j].runAfter, the element with smallest will be pop first.
+func (q *heapPriorityQueue) Less(i, j int) bool {
+	return q.procedures[i].runAfter.Before(q.procedures[j].runAfter)
 }
 
-func (q *HeapPriorityQueue) Swap(i, j int) {
+func (q *heapPriorityQueue) Swap(i, j int) {
 	q.procedures[i], q.procedures[j] = q.procedures[j], q.procedures[i]
 }
 
-func (q *HeapPriorityQueue) Push(x any) {
-	item := x.(*ProcedureScheduleEntry)
+func (q *heapPriorityQueue) Push(x any) {
+	item := x.(*procedureScheduleEntry)
 	q.procedures = append(q.procedures, item)
 }
 
-func (q *HeapPriorityQueue) Pop() any {
+func (q *heapPriorityQueue) Pop() any {
 	length := len(q.procedures)
 	if length == 0 {
 		return nil
 	}
 	item := q.procedures[length-1]
-	q.procedures = append(q.procedures[:length-1], q.procedures[length:]...)
+	q.procedures = q.procedures[:length-1]
+	return item
+}
+
+func (q *heapPriorityQueue) Peek() any {
+	length := len(q.procedures)
+	if length == 0 {
+		return nil
+	}
+	item := q.procedures[0]
 	return item
 }
 
 func NewProcedureDelayQueue(maxLen int) *ProcedureDelayQueue {
 	return &ProcedureDelayQueue{
-		heapQueue: &HeapPriorityQueue{procedures: []*ProcedureScheduleEntry{}},
-		maxLen:    maxLen,
-		index:     map[uint64]procedure.Procedure{},
+		heapQueue:     &heapPriorityQueue{procedures: []*procedureScheduleEntry{}},
+		existingProcs: map[uint64]struct{}{},
+		maxLen:        maxLen,
 	}
 }
 
@@ -83,17 +95,15 @@ func (q *ProcedureDelayQueue) Push(p procedure.Procedure, delay time.Duration) e
 		return errors.WithMessage(ErrQueueFull, fmt.Sprintf("queue max length is %d", q.maxLen))
 	}
 
-	for _, procedureWithTime := range q.heapQueue.procedures {
-		if procedureWithTime.procedure.ID() == p.ID() {
-			return errors.WithMessage(ErrPushDuplicatedProcedure, fmt.Sprintf("procedure has been pushed, %v", p))
-		}
+	if _, exists := q.existingProcs[p.ID()]; exists {
+		return errors.WithMessage(ErrPushDuplicatedProcedure, fmt.Sprintf("procedure has been pushed, %v", p))
 	}
 
-	heap.Push(q.heapQueue, &ProcedureScheduleEntry{
+	heap.Push(q.heapQueue, &procedureScheduleEntry{
 		procedure: p,
 		runAfter:  time.Now().Add(delay),
 	})
-	q.index[p.ID()] = p
+	q.existingProcs[p.ID()] = struct{}{}
 
 	return nil
 }
@@ -106,12 +116,13 @@ func (q *ProcedureDelayQueue) Pop() procedure.Procedure {
 		return nil
 	}
 
-	entry := heap.Pop(q.heapQueue).(*ProcedureScheduleEntry)
+	entry := q.heapQueue.Peek().(*procedureScheduleEntry)
 	if time.Now().Before(entry.runAfter) {
-		heap.Push(q.heapQueue, entry)
 		return nil
 	}
 
-	delete(q.index, entry.procedure.ID())
+	heap.Pop(q.heapQueue)
+	delete(q.existingProcs, entry.procedure.ID())
+
 	return entry.procedure
 }

@@ -42,40 +42,40 @@ func TestDelayQueue(t *testing.T) {
 	testProcedure3 := TestProcedure{3}
 
 	queue := NewProcedureDelayQueue(3)
-	err := queue.Push(testProcedure0, time.Second)
+	err := queue.Push(testProcedure0, time.Millisecond*40)
 	re.NoError(err)
-	err = queue.Push(testProcedure0, time.Second)
+	err = queue.Push(testProcedure0, time.Millisecond*30)
 	re.Error(err)
-	err = queue.Push(testProcedure1, time.Second)
+	err = queue.Push(testProcedure1, time.Millisecond*10)
 	re.NoError(err)
-	err = queue.Push(testProcedure2, time.Second)
+	err = queue.Push(testProcedure2, time.Millisecond*20)
 	re.NoError(err)
-	err = queue.Push(testProcedure3, time.Second)
+	err = queue.Push(testProcedure3, time.Millisecond*20)
 	re.Error(err)
 	re.Equal(3, queue.Len())
 
 	po := queue.Pop()
 	re.Nil(po)
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond * 100)
 
 	p0 := queue.Pop()
-	re.Equal(uint64(0), p0.ID())
+	re.Equal(uint64(1), p0.ID())
 	p1 := queue.Pop()
-	re.Equal(uint64(1), p1.ID())
+	re.Equal(uint64(2), p1.ID())
 	p2 := queue.Pop()
-	re.Equal(uint64(2), p2.ID())
+	re.Equal(uint64(0), p2.ID())
 	p := queue.Pop()
 	re.Nil(p)
 
-	err = queue.Push(testProcedure0, time.Second*2)
+	err = queue.Push(testProcedure0, time.Millisecond*20)
 	re.NoError(err)
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond * 10)
 	p0 = queue.Pop()
 	re.Nil(p0)
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond * 10)
 	p0 = queue.Pop()
 	re.Equal(uint64(0), p0.ID())
 }
