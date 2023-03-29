@@ -4,8 +4,8 @@ package coordinator
 
 import (
 	"context"
-	"strconv"
-	"strings"
+	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
+	"google.golang.org/protobuf/proto"
 	"testing"
 	"time"
 
@@ -31,31 +31,44 @@ func TestWatch(t *testing.T) {
 	err := watch.Start(ctx)
 	re.NoError(err)
 
-	callbackResult := 0
-	testCallback := func(shardID storage.ShardID, nodeName string, eventType ShardEventType) error {
-		switch eventType {
-		case EventDelete:
-			callbackResult = 1
-			re.Equal(storage.ShardID(TestShardID), shardID)
-			re.Equal(TestNodeName, nodeName)
-		case EventPut:
-			callbackResult = 2
-			re.Equal(storage.ShardID(TestShardID), shardID)
-			re.Equal(TestNodeName, nodeName)
-		}
-		return nil
+	testCallback := testShardEventCallback{
+		result: 0,
+		re:     re,
 	}
-	watch.RegisteringEventCallback(testCallback)
+
+	watch.RegisteringEventCallback(&testCallback)
 
 	// Valid that callback function is executed and the params are as expected.
-	keyPath := strings.Join([]string{TestRootPath, TestShardPath, strconv.Itoa(TestShardID)}, "/")
-	_, err = client.Put(ctx, keyPath, TestNodeName)
+	b, err := proto.Marshal(&metaeventpb.ShardLockValue{NodeName: TestNodeName})
+	re.NoError(err)
+
+	keyPath := encodeShardKey(TestRootPath, TestShardPath, TestShardID)
+	_, err = client.Put(ctx, keyPath, string(b))
 	re.NoError(err)
 	time.Sleep(time.Millisecond * 10)
-	re.Equal(callbackResult, 2)
+	re.Equal(2, testCallback.result)
 
 	_, err = client.Delete(ctx, keyPath, clientv3.WithPrevKV())
 	re.NoError(err)
 	time.Sleep(time.Millisecond * 10)
-	re.Equal(callbackResult, 1)
+	re.Equal(1, testCallback.result)
+}
+
+type testShardEventCallback struct {
+	result int
+	re     *require.Assertions
+}
+
+func (c *testShardEventCallback) OnShardRegistered(event ShardRegisterEvent) error {
+	c.result = 2
+	c.re.Equal(storage.ShardID(TestShardID), event.ShardID)
+	c.re.Equal(TestNodeName, event.NewLeaderNode)
+	return nil
+}
+
+func (c *testShardEventCallback) OnShardExpired(event ShardExpireEvent) error {
+	c.result = 1
+	c.re.Equal(storage.ShardID(TestShardID), event.ShardID)
+	c.re.Equal(TestNodeName, event.OldLeaderNode)
+	return nil
 }
