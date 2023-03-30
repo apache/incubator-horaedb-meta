@@ -4,15 +4,15 @@ package coordinator
 
 import (
 	"context"
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
-	"google.golang.org/protobuf/proto"
 	"testing"
 	"time"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/protobuf/proto"
 )
 
 const (

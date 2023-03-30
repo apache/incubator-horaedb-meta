@@ -5,18 +5,18 @@ package coordinator
 import (
 	"context"
 	"fmt"
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
-	"google.golang.org/protobuf/proto"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -75,7 +75,7 @@ func (w *ShardWatch) Start(ctx context.Context) error {
 	return nil
 }
 
-func (w *ShardWatch) Stop(ctx context.Context) error {
+func (w *ShardWatch) Stop(_ context.Context) error {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -165,9 +165,9 @@ func encodeShardKey(rootPath string, shardPath string, shardID uint64) string {
 	return strings.Join([]string{shardKeyPrefix, strconv.FormatUint(shardID, 10)}, keySep)
 }
 
-func convertShardLockValueToPB(value []byte) (metaeventpb.ShardLockValue, error) {
-	shardLockValue := metaeventpb.ShardLockValue{}
-	if err := proto.Unmarshal(value, &shardLockValue); err != nil {
+func convertShardLockValueToPB(value []byte) (*metaeventpb.ShardLockValue, error) {
+	shardLockValue := &metaeventpb.ShardLockValue{}
+	if err := proto.Unmarshal(value, shardLockValue); err != nil {
 		return shardLockValue, errors.WithMessage(err, "unmarshal shardLockValue failed")
 	}
 	return shardLockValue, nil
