@@ -74,6 +74,12 @@ type CreateShardView struct {
 	Tables  []storage.TableID
 }
 
+type Topology struct {
+	RegisterNodes []RegisteredNode
+	ShardViews    []storage.ShardView
+	ClusterView   storage.ClusterView
+}
+
 type TopologyManagerImpl struct {
 	storage      storage.Storage
 	clusterID    storage.ClusterID

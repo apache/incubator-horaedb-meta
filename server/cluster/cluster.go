@@ -461,6 +461,17 @@ func (c *Cluster) CreateShardViews(ctx context.Context, views []CreateShardView)
 	return nil
 }
 
+func (c *Cluster) GetClusterTopology() Topology {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return Topology{
+		RegisterNodes: c.GetRegisteredNodes(),
+		ShardViews:    c.GetShardViews(),
+		ClusterView:   c.GetClusterView(),
+	}
+}
+
 // Initialize the cluster view and shard view of the cluster.
 // It will be used when we create the cluster.
 func (c *Cluster) init(ctx context.Context) error {

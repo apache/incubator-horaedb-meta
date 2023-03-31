@@ -16,46 +16,46 @@ const (
 
 // AssignShardScheduler used to assigning shards without nodes.
 type AssignShardScheduler struct {
-	factory    coordinator.Factory
+	factory    *coordinator.Factory
 	nodePicker coordinator.NodePicker
 }
 
-func NewAssignShardScheduler(factory coordinator.Factory, nodePicker coordinator.NodePicker) Scheduler {
+func NewAssignShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker) Scheduler {
 	return &AssignShardScheduler{
 		factory:    factory,
 		nodePicker: nodePicker,
 	}
 }
 
-func (a AssignShardScheduler) Schedule(ctx context.Context, clusterView storage.ClusterView, shardViews []storage.ShardView) (Result, error) {
-	if clusterView.State != storage.ClusterStateStable {
+func (a AssignShardScheduler) Schedule(ctx context.Context, topology cluster.Topology) (Result, error) {
+	if topology.ClusterView.State != storage.ClusterStateStable {
 		return Result{}, cluster.ErrClusterStateInvalid
 	}
 
 	// Check if there is a shard without node mapping.
-	for _, shardView := range shardViews {
-		exists, _ := contains(shardView.ShardID, clusterView.ShardNodes)
+	for _, shardView := range topology.ShardViews {
+		exists, _ := contains(shardView.ShardID, topology.ClusterView.ShardNodes)
 		if exists {
 			continue
 		}
-		newLeaderNode, err := a.nodePicker.PickNode(ctx, clusterView.ClusterName)
+		newLeaderNode, err := a.nodePicker.PickNode(ctx, topology.RegisterNodes)
 		if err != nil {
 			return Result{}, err
 		}
 		// Shard exists and ShardNode not exists.
 		p, err := a.factory.CreateTransferLeaderProcedure(ctx, coordinator.TransferLeaderRequest{
-			ClusterName:       clusterView.ClusterName,
+			ClusterName:       topology.ClusterView.ClusterName,
 			ShardID:           shardView.ShardID,
 			OldLeaderNodeName: "",
 			NewLeaderNodeName: newLeaderNode.Node.Name,
-			ClusterVersion:    clusterView.Version,
+			ClusterVersion:    topology.ClusterView.Version,
 		})
 		if err != nil {
 			return Result{}, err
 		}
 		return Result{
-			p:               p,
-			schedulerReason: AssignReason,
+			p:      p,
+			Reason: AssignReason,
 		}, nil
 	}
 	return Result{}, nil

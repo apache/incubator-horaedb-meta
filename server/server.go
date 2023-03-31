@@ -49,7 +49,7 @@ type Server struct {
 	procedureFactory *coordinator.Factory
 	// procedureManager process procedure for all cluster.
 	procedureManager procedure.Manager
-	// schedulerManager manager schedulers for all cluster.
+	// schedulerManager manages schedulers for all cluster.
 	schedulerManager scheduler.Manager
 
 	// member describes membership in ceresmeta cluster.
@@ -184,7 +184,7 @@ func (srv *Server) startServer(_ context.Context) error {
 	dispatch := eventdispatch.NewDispatchImpl()
 	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(srv.etcdCli, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage, manager, srv.cfg.DefaultPartitionTableProportionOfNodes)
 	srv.procedureFactory = procedureFactory
-	srv.schedulerManager = scheduler.NewManager(procedureManager, srv.clusterManager)
+	srv.schedulerManager = scheduler.NewManager(procedureManager, srv.clusterManager, procedureFactory)
 
 	api := http.NewAPI(procedureManager, procedureFactory, manager, http.NewForwardClient(srv.member, srv.cfg.HTTPPort))
 	httpService := http.NewHTTPService(srv.cfg.HTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())

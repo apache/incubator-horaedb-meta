@@ -13,7 +13,6 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
-	"github.com/CeresDB/ceresmeta/server/storage"
 	"go.uber.org/zap"
 )
 
@@ -21,26 +20,25 @@ const (
 	schedulerInterval = time.Second * 5
 )
 
-// Manager used to manage schedulers.
-// Each registered scheduler will generate a procedure if the cluster s
+// Manager used to manage schedulers, it will register all schedulers when it starts.
+//
+// Each registered scheduler will generate procedures if the cluster topology matches the scheduling condition.
 type Manager interface {
-	RegisterScheduler(scheduler Scheduler)
-
 	ListScheduler() []Scheduler
 
 	Start(ctx context.Context) error
 
 	Stop(ctx context.Context) error
 
-	// Scheduler will be called when received new heartbeat, every scheduler register in schedulerManager will be
+	// Scheduler will be called when received new heartbeat, every scheduler registered in schedulerManager will be called to generate procedures.
 	// Scheduler cloud be schedule with fix time interval or heartbeat.
-	Scheduler(ctx context.Context, clusterView storage.ClusterView, shardViews []storage.ShardView) []procedure.Procedure
+	Scheduler(ctx context.Context, topology cluster.Topology) []procedure.Procedure
 }
 
 type ManagerImpl struct {
 	procedureManager procedure.Manager
 	clusterManager   cluster.Manager
-	factory          coordinator.Factory
+	factory          *coordinator.Factory
 	nodePicker       coordinator.NodePicker
 
 	// This lock is used to protect the following field.
@@ -50,12 +48,14 @@ type ManagerImpl struct {
 	cancel             context.CancelFunc
 }
 
-func NewManager(procedureManager procedure.Manager, clusterManager cluster.Manager) Manager {
+func NewManager(procedureManager procedure.Manager, clusterManager cluster.Manager, factory *coordinator.Factory) Manager {
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
 		clusterManager:     clusterManager,
 		registerSchedulers: []Scheduler{},
 		isRunning:          false,
+		factory:            factory,
+		nodePicker:         coordinator.NewRandomNodePicker(),
 	}
 }
 
@@ -91,13 +91,21 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 		c := c
 		go func() {
 			for {
-				time.Sleep(schedulerInterval)
-				// Get latest clusterView from heartbeat.
-				clusterView := c.GetClusterView()
-				// Get latest shardViews from metadata
-				shardViews := c.GetShardViews()
-				log.Info("scheduler manager invoke", zap.String("clusterView", fmt.Sprintf("%v", clusterView)), zap.String("shardViews", fmt.Sprintf("%v", shardViews)))
-				m.Scheduler(ctxWithCancel, clusterView, shardViews)
+				select {
+				case <-ctxWithCancel.Done():
+					return
+				default:
+					time.Sleep(schedulerInterval)
+					// Get latest clusterTopology.
+					clusterTopology := c.GetClusterTopology()
+					log.Info("scheduler manager invoke", zap.String("clusterTopology", fmt.Sprintf("%v", clusterTopology)))
+					procedures := m.Scheduler(ctxWithCancel, clusterTopology)
+					for _, p := range procedures {
+						if err := m.procedureManager.Submit(ctx, p); err != nil {
+							log.Error("scheduler submit new procedure", zap.Uint64("ProcedureID", p.ID()), zap.Error(err))
+						}
+					}
+				}
 			}
 		}()
 	}
@@ -108,15 +116,13 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 	return nil
 }
 
+// Schedulers should to be initialized and registered here.
 func (m *ManagerImpl) initRegister() {
 	assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker)
-	m.RegisterScheduler(assignShardScheduler)
+	m.registerScheduler(assignShardScheduler)
 }
 
-func (m *ManagerImpl) RegisterScheduler(scheduler Scheduler) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
+func (m *ManagerImpl) registerScheduler(scheduler Scheduler) {
 	log.Info("register new scheduler", zap.String("schedulerName", reflect.TypeOf(scheduler).String()), zap.Int("totalSchedulerLen", len(m.registerSchedulers)))
 	m.registerSchedulers = append(m.registerSchedulers, scheduler)
 }
@@ -128,24 +134,13 @@ func (m *ManagerImpl) ListScheduler() []Scheduler {
 	return m.registerSchedulers
 }
 
-func (m *ManagerImpl) Scheduler(ctx context.Context, clusterView storage.ClusterView, shardViews []storage.ShardView) []procedure.Procedure {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			// TODO: Every scheduler should run in an independent goroutine.
-			for _, scheduler := range m.registerSchedulers {
-				log.Info("scheduler start")
-				result, err := scheduler.Schedule(ctx, clusterView, shardViews)
-				if err != nil {
-					log.Info("scheduler new procedure", zap.String("desc", result.schedulerReason))
-					err := m.procedureManager.Submit(ctx, result.p)
-					if err != nil {
-						log.Error("scheduler submit new procedure", zap.Uint64("ProcedureID", result.p.ID()), zap.Error(err))
-					}
-				}
-			}
+func (m *ManagerImpl) Scheduler(ctx context.Context, topology cluster.Topology) []procedure.Procedure {
+	// TODO: Every scheduler should run in an independent goroutine.
+	for _, scheduler := range m.registerSchedulers {
+		result, err := scheduler.Schedule(ctx, topology)
+		if err != nil {
+			log.Info("scheduler new procedure", zap.String("desc", result.Reason))
 		}
 	}
+	return nil
 }

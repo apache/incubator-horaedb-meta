@@ -12,31 +12,45 @@ import (
 )
 
 type NodePicker interface {
-	PickNode(ctx context.Context, clusterName string) (cluster.RegisteredNode, error)
+	PickNode(ctx context.Context, registerNodes []cluster.RegisteredNode) (cluster.RegisteredNode, error)
 }
 
-type RandomNodePicker struct {
-	clusterManager cluster.Manager
+type RandomNodePicker struct{}
+
+func NewRandomNodePicker() NodePicker {
+	return &RandomNodePicker{}
 }
 
-func (p *RandomNodePicker) PickNode(ctx context.Context, clusterName string) (cluster.RegisteredNode, error) {
-	nodes, err := p.clusterManager.ListRegisterNodes(ctx, clusterName)
-	if err != nil {
-		return cluster.RegisteredNode{}, err
-	}
-
-	var onlineNodes []cluster.RegisteredNode
+func (p *RandomNodePicker) PickNode(_ context.Context, registerNodes []cluster.RegisteredNode) (cluster.RegisteredNode, error) {
 	// Filter invalid nodes.
-	for _, node := range nodes {
-		if !node.IsOnline() {
-			onlineNodes = append(onlineNodes, node)
+	numOnlineNodes := int64(0)
+	for idx := range registerNodes {
+		if registerNodes[idx].IsOnline() {
+			numOnlineNodes++
 		}
 	}
+	if numOnlineNodes < 0 {
+		return cluster.RegisteredNode{}, ErrNodeNumberNotEnough
+	}
 
-	selectNodeIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(onlineNodes))))
+	randSelectedIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(registerNodes))))
 	if err != nil {
 		return cluster.RegisteredNode{}, errors.WithMessage(err, "generate random node index")
 	}
+	selectedIdx := randSelectedIdx.Int64()
+	for {
+		if selectedIdx >= int64(len(registerNodes)) {
+			// No valid node is found.
+			return cluster.RegisteredNode{}, nil
+		}
 
-	return onlineNodes[selectNodeIndex.Int64()], nil
+		if registerNodes[selectedIdx].IsOnline() {
+			return registerNodes[selectedIdx], nil
+		}
+		selectedIdx++
+
+		if selectedIdx >= int64(len(registerNodes)) {
+			selectedIdx = 0
+		}
+	}
 }
