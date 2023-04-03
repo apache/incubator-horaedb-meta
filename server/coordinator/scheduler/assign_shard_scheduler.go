@@ -27,29 +27,30 @@ func NewAssignShardScheduler(factory *coordinator.Factory, nodePicker coordinato
 	}
 }
 
-func (a AssignShardScheduler) Schedule(ctx context.Context, topology cluster.Topology) (ScheduleResult, error) {
-	if topology.ClusterView.State != storage.ClusterStateStable {
+func (a AssignShardScheduler) Schedule(ctx context.Context, clusterSnapshot cluster.Snapshot) (ScheduleResult, error) {
+	if clusterSnapshot.Topology.ClusterView.State != storage.ClusterStateStable {
 		return ScheduleResult{}, cluster.ErrClusterStateInvalid
 	}
 
 	// Check whether there is a shard without node mapping.
-	for i := 0; i < len(topology.ShardViews); i++ {
-		shardView := topology.ShardViews[i]
-		_, exists := findNodeByShard(shardView.ShardID, topology.ClusterView.ShardNodes)
+	for i := 0; i < len(clusterSnapshot.Topology.ShardViews); i++ {
+		shardView := clusterSnapshot.Topology.ShardViews[i]
+		_, exists := findNodeByShard(shardView.ShardID, clusterSnapshot.Topology.ClusterView.ShardNodes)
 		if exists {
 			continue
 		}
-		newLeaderNode, err := a.nodePicker.PickNode(ctx, topology.RegisterNodes)
+		newLeaderNode, err := a.nodePicker.PickNode(ctx, clusterSnapshot.RegisteredNodes)
 		if err != nil {
 			return ScheduleResult{}, err
 		}
 		// Shard exists and ShardNode not exists.
+		// TODO: ClusterName is no longer need in procedure, replace it with shardNodes.
 		p, err := a.factory.CreateTransferLeaderProcedure(ctx, coordinator.TransferLeaderRequest{
-			ClusterName:       topology.ClusterView.ClusterName,
+			ClusterName:       "",
 			ShardID:           shardView.ShardID,
 			OldLeaderNodeName: "",
 			NewLeaderNodeName: newLeaderNode.Node.Name,
-			ClusterVersion:    topology.ClusterView.Version,
+			ClusterVersion:    clusterSnapshot.Topology.ClusterView.Version,
 		})
 		if err != nil {
 			return ScheduleResult{}, err

@@ -22,7 +22,6 @@ func NewRandomNodePicker() NodePicker {
 }
 
 func (p *RandomNodePicker) PickNode(_ context.Context, registeredNodes []cluster.RegisteredNode) (cluster.RegisteredNode, error) {
-	// Filter invalid nodes.
 	onlineNodeLength := 0
 	for _, registeredNode := range registeredNodes {
 		if registeredNode.IsOnline() {

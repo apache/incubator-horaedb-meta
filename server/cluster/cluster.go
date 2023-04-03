@@ -449,14 +449,6 @@ func (c *Cluster) UpdateClusterView(ctx context.Context, state storage.ClusterSt
 	return nil
 }
 
-func (c *Cluster) GetShardViews() []storage.ShardView {
-	var shardViews []storage.ShardView
-	c.topologyManager.RangeShardViews(func(shardView storage.ShardView) {
-		shardViews = append(shardViews, shardView)
-	})
-	return shardViews
-}
-
 func (c *Cluster) CreateShardViews(ctx context.Context, views []CreateShardView) error {
 	if err := c.topologyManager.CreateShardViews(ctx, views); err != nil {
 		return errors.WithMessage(err, "topology manager create shard views")
@@ -465,14 +457,13 @@ func (c *Cluster) CreateShardViews(ctx context.Context, views []CreateShardView)
 	return nil
 }
 
-func (c *Cluster) GetClusterTopology() Topology {
+func (c *Cluster) GetClusterSnapshot() Snapshot {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	return Topology{
-		RegisterNodes: c.GetRegisteredNodes(),
-		ShardViews:    c.GetShardViews(),
-		ClusterView:   c.GetClusterView(),
+	return Snapshot{
+		Topology:        c.topologyManager.GetTopology(),
+		RegisteredNodes: c.GetRegisteredNodes(),
 	}
 }
 

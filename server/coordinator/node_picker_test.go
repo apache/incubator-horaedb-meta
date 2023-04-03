@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	NodeLength = 3
+	nodeLength            = 3
+	selectOnlineNodeIndex = 1
 )
 
 func TestRandomNodePicker(t *testing.T) {
@@ -26,7 +27,7 @@ func TestRandomNodePicker(t *testing.T) {
 	_, err := nodePicker.PickNode(ctx, nodes)
 	re.Error(err)
 
-	for i := 0; i < NodeLength; i++ {
+	for i := 0; i < nodeLength; i++ {
 		nodes = append(nodes, cluster.RegisteredNode{
 			Node:       storage.Node{Name: strconv.Itoa(i), State: storage.NodeStateOffline},
 			ShardInfos: nil,
@@ -35,7 +36,8 @@ func TestRandomNodePicker(t *testing.T) {
 	_, err = nodePicker.PickNode(ctx, nodes)
 	re.Error(err)
 
-	for i := 0; i < NodeLength; i++ {
+	nodes = nodes[:0]
+	for i := 0; i < nodeLength; i++ {
 		nodes = append(nodes, cluster.RegisteredNode{
 			Node:       storage.Node{Name: strconv.Itoa(i), State: storage.NodeStateOnline},
 			ShardInfos: nil,
@@ -43,4 +45,16 @@ func TestRandomNodePicker(t *testing.T) {
 	}
 	_, err = nodePicker.PickNode(ctx, nodes)
 	re.NoError(err)
+
+	nodes = nodes[:0]
+	for i := 0; i < nodeLength; i++ {
+		nodes = append(nodes, cluster.RegisteredNode{
+			Node:       storage.Node{Name: strconv.Itoa(i), State: storage.NodeStateOffline},
+			ShardInfos: nil,
+		})
+	}
+	nodes[selectOnlineNodeIndex].Node.State = storage.NodeStateOnline
+	node, err := nodePicker.PickNode(ctx, nodes)
+	re.NoError(err)
+	re.Equal(strconv.Itoa(selectOnlineNodeIndex), node.Node.Name)
 }

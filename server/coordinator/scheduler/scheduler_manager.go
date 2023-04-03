@@ -32,7 +32,7 @@ type Manager interface {
 
 	// Scheduler will be called when received new heartbeat, every scheduler registered in schedulerManager will be called to generate procedures.
 	// Scheduler cloud be schedule with fix time interval or heartbeat.
-	Scheduler(ctx context.Context, topology cluster.Topology) []procedure.Procedure
+	Scheduler(ctx context.Context, clusterSnapshot cluster.Snapshot) []procedure.Procedure
 }
 
 type ManagerImpl struct {
@@ -97,10 +97,10 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 					return
 				default:
 					time.Sleep(schedulerInterval)
-					// Get latest clusterTopology.
-					clusterTopology := c.GetClusterTopology()
-					log.Info("scheduler manager invoke", zap.String("clusterTopology", fmt.Sprintf("%v", clusterTopology)))
-					procedures := m.Scheduler(ctxWithCancel, clusterTopology)
+					// Get latest cluster snapshot.
+					clusterSnapshot := c.GetClusterSnapshot()
+					log.Info("scheduler manager invoke", zap.String("clusterTopology", fmt.Sprintf("%v", clusterSnapshot)))
+					procedures := m.Scheduler(ctxWithCancel, clusterSnapshot)
 					for _, p := range procedures {
 						if err := m.procedureManager.Submit(ctx, p); err != nil {
 							log.Error("scheduler submit new procedure", zap.Uint64("ProcedureID", p.ID()), zap.Error(err))
@@ -135,10 +135,10 @@ func (m *ManagerImpl) ListScheduler() []Scheduler {
 	return m.registerSchedulers
 }
 
-func (m *ManagerImpl) Scheduler(ctx context.Context, topology cluster.Topology) []procedure.Procedure {
+func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot cluster.Snapshot) []procedure.Procedure {
 	// TODO: Every scheduler should run in an independent goroutine.
 	for _, scheduler := range m.registerSchedulers {
-		result, err := scheduler.Schedule(ctx, topology)
+		result, err := scheduler.Schedule(ctx, clusterSnapshot)
 		if err != nil {
 			log.Info("scheduler new procedure", zap.String("desc", result.Reason))
 		}
