@@ -9,7 +9,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 )
 
-type Result struct {
+type ScheduleResult struct {
 	p procedure.Procedure
 	// Scheduler will give the reason than why the procedure is generated.
 	Reason string
@@ -17,5 +17,5 @@ type Result struct {
 
 type Scheduler interface {
 	// Schedule will generate procedure based on current cluster topology, which will be submitted to ProcedureManager, and whether it is actually executed depends on the current state of ProcedureManager.
-	Schedule(ctx context.Context, topology cluster.Topology) (Result, error)
+	Schedule(ctx context.Context, topology cluster.Topology) (ScheduleResult, error)
 }

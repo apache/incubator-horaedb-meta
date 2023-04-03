@@ -450,7 +450,11 @@ func (c *Cluster) UpdateClusterView(ctx context.Context, state storage.ClusterSt
 }
 
 func (c *Cluster) GetShardViews() []storage.ShardView {
-	return c.topologyManager.GetShardViews()
+	var shardViews []storage.ShardView
+	c.topologyManager.RangeShardViews(func(shardView storage.ShardView) {
+		shardViews = append(shardViews, shardView)
+	})
+	return shardViews
 }
 
 func (c *Cluster) CreateShardViews(ctx context.Context, views []CreateShardView) error {

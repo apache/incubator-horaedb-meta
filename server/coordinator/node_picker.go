@@ -21,36 +21,33 @@ func NewRandomNodePicker() NodePicker {
 	return &RandomNodePicker{}
 }
 
-func (p *RandomNodePicker) PickNode(_ context.Context, registerNodes []cluster.RegisteredNode) (cluster.RegisteredNode, error) {
+func (p *RandomNodePicker) PickNode(_ context.Context, registeredNodes []cluster.RegisteredNode) (cluster.RegisteredNode, error) {
 	// Filter invalid nodes.
-	numOnlineNodes := int64(0)
-	for idx := range registerNodes {
-		if registerNodes[idx].IsOnline() {
-			numOnlineNodes++
+	onlineNodeLength := 0
+	for _, registeredNode := range registeredNodes {
+		if registeredNode.IsOnline() {
+			onlineNodeLength++
 		}
 	}
-	if numOnlineNodes < 0 {
-		return cluster.RegisteredNode{}, ErrNodeNumberNotEnough
+
+	if onlineNodeLength == 0 {
+		return cluster.RegisteredNode{}, errors.WithMessage(ErrNodeNumberNotEnough, "online node length must bigger than 0")
 	}
 
-	randSelectedIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(registerNodes))))
+	randSelectedIdx, err := rand.Int(rand.Reader, big.NewInt(int64(onlineNodeLength)))
 	if err != nil {
 		return cluster.RegisteredNode{}, errors.WithMessage(err, "generate random node index")
 	}
-	selectedIdx := randSelectedIdx.Int64()
-	for {
-		if selectedIdx >= int64(len(registerNodes)) {
-			// No valid node is found.
-			return cluster.RegisteredNode{}, nil
+	selectIdx := randSelectedIdx.Int64()
+	curOnlineIdx := int64(-1)
+	for idx := int64(0); idx < int64(len(registeredNodes)); idx++ {
+		if registeredNodes[idx].IsOnline() {
+			curOnlineIdx++
 		}
-
-		if registerNodes[selectedIdx].IsOnline() {
-			return registerNodes[selectedIdx], nil
-		}
-		selectedIdx++
-
-		if selectedIdx >= int64(len(registerNodes)) {
-			selectedIdx = 0
+		if curOnlineIdx == selectIdx {
+			return registeredNodes[idx], nil
 		}
 	}
+
+	return cluster.RegisteredNode{}, errors.WithMessage(ErrPickNode, "pick node failed")
 }

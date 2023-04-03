@@ -4,4 +4,7 @@ package coordinator
 
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
-var ErrNodeNumberNotEnough = coderr.NewCodeError(coderr.Internal, "node number not enough")
+var (
+	ErrNodeNumberNotEnough = coderr.NewCodeError(coderr.Internal, "node number not enough")
+	ErrPickNode            = coderr.NewCodeError(coderr.Internal, "no node is picked")
+)

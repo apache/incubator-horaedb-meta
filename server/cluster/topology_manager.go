@@ -45,8 +45,8 @@ type TopologyManager interface {
 	GetClusterView() storage.ClusterView
 	// CreateShardViews create shardViews.
 	CreateShardViews(ctx context.Context, shardViews []CreateShardView) error
-	// GetShardViews return shardViews in current topology.
-	GetShardViews() []storage.ShardView
+	// RangeShardViews range for shardViews in current topology.
+	RangeShardViews(rangeFunc func(shardView storage.ShardView))
 }
 
 type ShardTableIDs struct {
@@ -467,11 +467,13 @@ func (m *TopologyManagerImpl) CreateShardViews(ctx context.Context, createShardV
 	return nil
 }
 
-func (m *TopologyManagerImpl) GetShardViews() []storage.ShardView {
+func (m *TopologyManagerImpl) RangeShardViews(rangeFunc func(shardView storage.ShardView)) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return m.shardViews
+	for _, view := range m.shardViews {
+		rangeFunc(view)
+	}
 }
 
 func (m *TopologyManagerImpl) loadClusterView(ctx context.Context) error {

@@ -93,6 +93,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 			for {
 				select {
 				case <-ctxWithCancel.Done():
+					log.Info("scheduler manager is canceled")
 					return
 				default:
 					time.Sleep(schedulerInterval)

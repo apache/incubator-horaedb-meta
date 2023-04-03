@@ -27,20 +27,21 @@ func NewAssignShardScheduler(factory *coordinator.Factory, nodePicker coordinato
 	}
 }
 
-func (a AssignShardScheduler) Schedule(ctx context.Context, topology cluster.Topology) (Result, error) {
+func (a AssignShardScheduler) Schedule(ctx context.Context, topology cluster.Topology) (ScheduleResult, error) {
 	if topology.ClusterView.State != storage.ClusterStateStable {
-		return Result{}, cluster.ErrClusterStateInvalid
+		return ScheduleResult{}, cluster.ErrClusterStateInvalid
 	}
 
-	// Check if there is a shard without node mapping.
-	for _, shardView := range topology.ShardViews {
-		exists, _ := contains(shardView.ShardID, topology.ClusterView.ShardNodes)
+	// Check whether there is a shard without node mapping.
+	for i := 0; i < len(topology.ShardViews); i++ {
+		shardView := topology.ShardViews[i]
+		exists, _ := findNodeByShard(shardView.ShardID, topology.ClusterView.ShardNodes)
 		if exists {
 			continue
 		}
 		newLeaderNode, err := a.nodePicker.PickNode(ctx, topology.RegisterNodes)
 		if err != nil {
-			return Result{}, err
+			return ScheduleResult{}, err
 		}
 		// Shard exists and ShardNode not exists.
 		p, err := a.factory.CreateTransferLeaderProcedure(ctx, coordinator.TransferLeaderRequest{
@@ -51,20 +52,21 @@ func (a AssignShardScheduler) Schedule(ctx context.Context, topology cluster.Top
 			ClusterVersion:    topology.ClusterView.Version,
 		})
 		if err != nil {
-			return Result{}, err
+			return ScheduleResult{}, err
 		}
-		return Result{
+		return ScheduleResult{
 			p:      p,
 			Reason: AssignReason,
 		}, nil
+
 	}
-	return Result{}, nil
+	return ScheduleResult{}, nil
 }
 
-func contains(shardID storage.ShardID, shardNodes []storage.ShardNode) (bool, storage.ShardNode) {
-	for _, shardNode := range shardNodes {
-		if shardID == shardNode.ID {
-			return true, shardNode
+func findNodeByShard(shardID storage.ShardID, shardNodes []storage.ShardNode) (bool, storage.ShardNode) {
+	for i := 0; i < len(shardNodes); i++ {
+		if shardID == shardNodes[i].ID {
+			return true, shardNodes[i]
 		}
 	}
 	return false, storage.ShardNode{}
