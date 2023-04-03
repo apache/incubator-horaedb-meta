@@ -35,7 +35,7 @@ func (a AssignShardScheduler) Schedule(ctx context.Context, topology cluster.Top
 	// Check whether there is a shard without node mapping.
 	for i := 0; i < len(topology.ShardViews); i++ {
 		shardView := topology.ShardViews[i]
-		exists, _ := findNodeByShard(shardView.ShardID, topology.ClusterView.ShardNodes)
+		_, exists := findNodeByShard(shardView.ShardID, topology.ClusterView.ShardNodes)
 		if exists {
 			continue
 		}
@@ -55,19 +55,18 @@ func (a AssignShardScheduler) Schedule(ctx context.Context, topology cluster.Top
 			return ScheduleResult{}, err
 		}
 		return ScheduleResult{
-			p:      p,
-			Reason: AssignReason,
+			Procedure: p,
+			Reason:    AssignReason,
 		}, nil
-
 	}
 	return ScheduleResult{}, nil
 }
 
-func findNodeByShard(shardID storage.ShardID, shardNodes []storage.ShardNode) (bool, storage.ShardNode) {
+func findNodeByShard(shardID storage.ShardID, shardNodes []storage.ShardNode) (storage.ShardNode, bool) {
 	for i := 0; i < len(shardNodes); i++ {
 		if shardID == shardNodes[i].ID {
-			return true, shardNodes[i]
+			return shardNodes[i], true
 		}
 	}
-	return false, storage.ShardNode{}
+	return storage.ShardNode{}, false
 }

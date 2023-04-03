@@ -23,14 +23,24 @@ func TestRandomNodePicker(t *testing.T) {
 	nodePicker := NewRandomNodePicker()
 
 	var nodes []cluster.RegisteredNode
+	_, err := nodePicker.PickNode(ctx, nodes)
+	re.Error(err)
+
+	for i := 0; i < NodeLength; i++ {
+		nodes = append(nodes, cluster.RegisteredNode{
+			Node:       storage.Node{Name: strconv.Itoa(i), State: storage.NodeStateOffline},
+			ShardInfos: nil,
+		})
+	}
+	_, err = nodePicker.PickNode(ctx, nodes)
+	re.Error(err)
+
 	for i := 0; i < NodeLength; i++ {
 		nodes = append(nodes, cluster.RegisteredNode{
 			Node:       storage.Node{Name: strconv.Itoa(i), State: storage.NodeStateOnline},
 			ShardInfos: nil,
 		})
 	}
-
-	// Test random pick, we only guarantee that it will not throw an error here.
-	_, err := nodePicker.PickNode(ctx, nodes)
+	_, err = nodePicker.PickNode(ctx, nodes)
 	re.NoError(err)
 }

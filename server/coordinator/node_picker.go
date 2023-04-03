@@ -38,9 +38,9 @@ func (p *RandomNodePicker) PickNode(_ context.Context, registeredNodes []cluster
 	if err != nil {
 		return cluster.RegisteredNode{}, errors.WithMessage(err, "generate random node index")
 	}
-	selectIdx := randSelectedIdx.Int64()
-	curOnlineIdx := int64(-1)
-	for idx := int64(0); idx < int64(len(registeredNodes)); idx++ {
+	selectIdx := int(randSelectedIdx.Int64())
+	curOnlineIdx := -1
+	for idx := 0; idx < len(registeredNodes); idx++ {
 		if registeredNodes[idx].IsOnline() {
 			curOnlineIdx++
 		}

@@ -65,7 +65,7 @@ func (m *ManagerImpl) Stop(_ context.Context) error {
 
 	if m.isRunning {
 		m.cancel()
-		m.registerSchedulers = []Scheduler{}
+		m.registerSchedulers = m.registerSchedulers[:0]
 		m.isRunning = false
 	}
 
