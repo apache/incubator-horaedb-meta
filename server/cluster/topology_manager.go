@@ -437,21 +437,20 @@ func (m *TopologyManagerImpl) UpdateClusterViewByNode(ctx context.Context, shard
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	var mapping = map[string]storage.ShardNode{}
+	var mapping = make(map[string]storage.ShardNode, len(m.nodeShardsMapping))
 	for _, shardNode := range shardNodes {
 		mapping[shardNode.NodeName] = shardNode
 	}
 
+	newShardNodes := make([]storage.ShardNode, 0, len(m.clusterView.ShardNodes))
+	newShardNodes = append(newShardNodes, shardNodes...)
+
 	originShardNodes := m.clusterView.ShardNodes
-	for i, shardNode := range originShardNodes {
-		if _, exists := mapping[shardNode.NodeName]; exists {
-			originShardNodes = append(originShardNodes[:i], originShardNodes[i+1:]...)
+	for _, shardNode := range originShardNodes {
+		if _, exists := mapping[shardNode.NodeName]; !exists {
+			newShardNodes = append(newShardNodes, shardNode)
 		}
 	}
-
-	var newShardNodes []storage.ShardNode
-	newShardNodes = append(newShardNodes, originShardNodes...)
-	newShardNodes = append(newShardNodes, shardNodes...)
 
 	// Update cluster view in storage.
 	newClusterView := storage.ClusterView{

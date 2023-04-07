@@ -302,6 +302,7 @@ func (c *Cluster) RegisterNode(ctx context.Context, registeredNode RegisteredNod
 	c.registeredNodesCache[registeredNode.Node.Name] = registeredNode
 
 	// When the number of nodes in the cluster reaches the threshold, modify the cluster status to stable.
+	// TODO: Consider the design of the entire cluster state, which may require refactoring.
 	if uint32(len(c.registeredNodesCache)) >= c.metaData.MinNodeCount && c.topologyManager.GetClusterState() == storage.ClusterStateEmpty {
 		if err := c.UpdateClusterView(ctx, storage.ClusterStateStable, []storage.ShardNode{}); err != nil {
 			log.Error("update cluster view failed", zap.Error(err))
@@ -317,7 +318,7 @@ func (c *Cluster) RegisterNode(ctx context.Context, registeredNode RegisteredNod
 			NodeName:  registeredNode.Node.Name,
 		})
 	}
-	if err := c.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
+	if err := c.updateClusterViewByNode(ctx, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view failed")
 	}
 
@@ -469,7 +470,7 @@ func (c *Cluster) UpdateClusterView(ctx context.Context, state storage.ClusterSt
 	return nil
 }
 
-func (c *Cluster) UpdateClusterViewByNode(ctx context.Context, shardNodes []storage.ShardNode) error {
+func (c *Cluster) updateClusterViewByNode(ctx context.Context, shardNodes []storage.ShardNode) error {
 	if err := c.topologyManager.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view")
 	}

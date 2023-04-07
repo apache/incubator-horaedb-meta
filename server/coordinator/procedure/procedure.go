@@ -38,10 +38,11 @@ const (
 
 type Priority uint32
 
+// Lower value means higher priority.
 const (
-	PriorityHigh Priority = 10
+	PriorityHigh Priority = 3
 	PriorityMed  Priority = 5
-	PriorityLow  Priority = 3
+	PriorityLow  Priority = 10
 )
 
 // Procedure is used to describe how to execute a set of operations from the scheduler, e.g. SwitchLeaderProcedure, MergeShardProcedure.
@@ -65,7 +66,6 @@ type Procedure interface {
 	RelatedVersionInfo() RelatedVersionInfo
 
 	// Priority present the priority of this procedure, the procedure with high level priority will be executed first.
-	// Lower value means higher priority.
 	Priority() Priority
 }
 

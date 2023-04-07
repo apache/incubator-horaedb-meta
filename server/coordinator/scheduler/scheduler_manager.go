@@ -5,8 +5,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"github.com/CeresDB/ceresmeta/server/coordinator/watch"
-	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"reflect"
 	"sync"
@@ -16,6 +14,8 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/coordinator/watch"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -62,6 +62,9 @@ func NewManager(procedureManager procedure.Manager, clusterManager cluster.Manag
 		isRunning:          false,
 		factory:            factory,
 		nodePicker:         coordinator.NewRandomNodePicker(),
+		client:             client,
+		rootPath:           rootPath,
+		shardWatches:       map[string]*watch.ShardWatch{},
 	}
 }
 
