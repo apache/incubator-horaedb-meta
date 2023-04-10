@@ -5,7 +5,7 @@ package scheduler
 import (
 	"context"
 
-	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/storage"
 )
@@ -27,7 +27,7 @@ func NewAssignShardScheduler(factory *coordinator.Factory, nodePicker coordinato
 	}
 }
 
-func (a AssignShardScheduler) Schedule(ctx context.Context, clusterSnapshot cluster.Snapshot) (*ScheduleResult, error) {
+func (a AssignShardScheduler) Schedule(ctx context.Context, clusterSnapshot metadata.Snapshot) (*ScheduleResult, error) {
 	if clusterSnapshot.Topology.ClusterView.State != storage.ClusterStateStable {
 		return nil, nil
 	}

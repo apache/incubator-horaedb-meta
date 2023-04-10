@@ -4,12 +4,11 @@ package procedure
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
-	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/lock"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -24,18 +23,14 @@ const (
 )
 
 type ManagerImpl struct {
-	storage        Storage
-	dispatch       eventdispatch.Dispatch
-	clusterManager cluster.Manager
+	storage  Storage
+	dispatch eventdispatch.Dispatch
+	metadata *metadata.ClusterMetadata
 
 	// This lock is used to protect the following fields.
-	lock     sync.RWMutex
-	running  bool
-	clusters map[storage.ClusterID]*ClusterProcedures
-}
+	lock    sync.RWMutex
+	running bool
 
-type ClusterProcedures struct {
-	c *cluster.Cluster
 	// There is only one procedure running for every shard.
 	// It will be removed when the procedure is finished or failed.
 	runningProcedures map[storage.ShardID]Procedure
@@ -54,25 +49,8 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 		return nil
 	}
 
-	clusters, err := m.clusterManager.ListClusters(ctx)
-	if err != nil {
-		log.Error("list cluster failed")
-	}
-	for _, c := range clusters {
-		if _, exists := m.clusters[c.GetClusterID()]; exists {
-			continue
-		}
-		procedures := &ClusterProcedures{
-			c:                  c,
-			procedureShardLock: lock.NewEntryLock(10),
-			runningProcedures:  map[storage.ShardID]Procedure{},
-			waitingProcedures:  NewProcedureDelayQueue(defaultWaitingQueueSize),
-		}
-		m.clusters[c.GetClusterID()] = procedures
-		log.Info("start cluster worker", zap.String("clusterName", c.Name()))
-		go m.startProcedurePromote(ctx, procedures)
-		go m.startProcedureWorker(ctx, procedures)
-	}
+	go m.startProcedurePromote(ctx)
+	go m.startProcedureWorker(ctx)
 
 	return nil
 }
@@ -81,40 +59,30 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for _, clusterProcedures := range m.clusters {
-		for _, procedure := range clusterProcedures.runningProcedures {
-			if procedure.State() == StateRunning {
-				err := procedure.Cancel(ctx)
-				log.Error("cancel procedure failed", zap.Error(err), zap.Uint64("procedureID", procedure.ID()))
-				// TODO: consider whether a single procedure cancel failed should return directly.
-				return err
-			}
+	for _, procedure := range m.runningProcedures {
+		if procedure.State() == StateRunning {
+			err := procedure.Cancel(ctx)
+			log.Error("cancel procedure failed", zap.Error(err), zap.Uint64("procedureID", procedure.ID()))
+			// TODO: consider whether a single procedure cancel failed should return directly.
+			return err
 		}
 	}
 	return nil
 }
 
-func (m *ManagerImpl) Submit(_ context.Context, clusterID storage.ClusterID, procedure Procedure) error {
+func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if _, exists := m.clusters[clusterID]; !exists {
-		return errors.WithMessage(cluster.ErrClusterNotFound, fmt.Sprintf("cluster not found, clusterID = %d", clusterID))
-	}
-
-	return m.clusters[clusterID].waitingProcedures.Push(procedure, 0)
+	return m.waitingProcedures.Push(procedure, 0)
 }
 
-func (m *ManagerImpl) ListRunningProcedure(_ context.Context, clusterID storage.ClusterID) ([]*Info, error) {
+func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	if _, exists := m.clusters[clusterID]; !exists {
-		return nil, errors.WithMessage(cluster.ErrClusterNotFound, fmt.Sprintf("cluster not found, clusterID = %d", clusterID))
-	}
-
 	var procedureInfos []*Info
-	for _, procedure := range m.clusters[clusterID].runningProcedures {
+	for _, procedure := range m.runningProcedures {
 		if procedure.State() == StateRunning {
 			procedureInfos = append(procedureInfos, &Info{
 				ID:    procedure.ID(),
@@ -126,12 +94,11 @@ func (m *ManagerImpl) ListRunningProcedure(_ context.Context, clusterID storage.
 	return procedureInfos, nil
 }
 
-func NewManagerImpl(s Storage, clusterManager cluster.Manager) (Manager, error) {
+func NewManagerImpl(s Storage, metadata *metadata.ClusterMetadata) (Manager, error) {
 	manager := &ManagerImpl{
-		storage:        s,
-		clusterManager: clusterManager,
-		dispatch:       eventdispatch.NewDispatchImpl(),
-		clusters:       map[storage.ClusterID]*ClusterProcedures{},
+		storage:  s,
+		dispatch: eventdispatch.NewDispatchImpl(),
+		metadata: metadata,
 	}
 	return manager, nil
 }
@@ -154,9 +121,9 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 	return nil
 }
 
-func (m *ManagerImpl) startProcedurePromote(ctx context.Context, procedures *ClusterProcedures) {
+func (m *ManagerImpl) startProcedurePromote(ctx context.Context) {
 	for {
-		err, newProcedures := m.promoteProcedure(ctx, procedures)
+		err, newProcedures := m.promoteProcedure(ctx)
 		if err != nil {
 			log.Error("promote procedure failed", zap.Error(err))
 			continue
@@ -165,7 +132,7 @@ func (m *ManagerImpl) startProcedurePromote(ctx context.Context, procedures *Clu
 			for _, newProcedure := range newProcedures {
 				log.Info("promote procedure", zap.Uint64("procedureID", newProcedure.ID()))
 				for shardID := range newProcedure.RelatedVersionInfo().ShardWithVersion {
-					procedures.runningProcedures[shardID] = newProcedure
+					m.runningProcedures[shardID] = newProcedure
 				}
 
 				newProcedure := newProcedure
@@ -181,15 +148,15 @@ func (m *ManagerImpl) startProcedurePromote(ctx context.Context, procedures *Clu
 	}
 }
 
-func (m *ManagerImpl) startProcedureWorker(ctx context.Context, procedures *ClusterProcedures) {
+func (m *ManagerImpl) startProcedureWorker(ctx context.Context) {
 	for {
-		for _, procedure := range procedures.runningProcedures {
+		for _, procedure := range m.runningProcedures {
 			p := procedure
 			if p.State() == StateFailed || p.State() == StateCancelled || p.State() == StateFinished {
 				log.Info("procedure finish", zap.Uint64("procedureID", p.ID()))
 				for shardID := range p.RelatedVersionInfo().ShardWithVersion {
-					delete(procedures.runningProcedures, shardID)
-					procedures.procedureShardLock.UnLock([]uint64{uint64(shardID)})
+					delete(m.runningProcedures, shardID)
+					m.procedureShardLock.UnLock([]uint64{uint64(shardID)})
 				}
 			}
 		}
@@ -205,16 +172,16 @@ func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
 }
 
 // Whether a waiting procedure could be running procedure.
-func (m *ManagerImpl) checkValid(ctx context.Context, procedure Procedure, cluster *cluster.Cluster) bool {
+func (m *ManagerImpl) checkValid(ctx context.Context, procedure Procedure, cluster *metadata.ClusterMetadata) bool {
 	// ClusterVersion and ShardVersion in this procedure must be same with current cluster topology.
 	return true
 }
 
 // Promote a waiting procedure to be a running procedure.
 // Some procedure may be related with multi shards.
-func (m *ManagerImpl) promoteProcedure(ctx context.Context, procedures *ClusterProcedures) (error, []Procedure) {
+func (m *ManagerImpl) promoteProcedure(ctx context.Context) (error, []Procedure) {
 	// Get waiting procedures, it has been sorted in queue.
-	queue := procedures.waitingProcedures
+	queue := m.waitingProcedures
 
 	var result []Procedure
 	// Find next valid procedure.
@@ -224,7 +191,7 @@ func (m *ManagerImpl) promoteProcedure(ctx context.Context, procedures *ClusterP
 			return nil, result
 		}
 
-		if !m.checkValid(ctx, p, procedures.c) {
+		if !m.checkValid(ctx, p, m.metadata) {
 			// This procedure is invalid, just remove it.
 			continue
 		}
@@ -234,7 +201,7 @@ func (m *ManagerImpl) promoteProcedure(ctx context.Context, procedures *ClusterP
 		for shardID := range p.RelatedVersionInfo().ShardWithVersion {
 			shardIDs = append(shardIDs, uint64(shardID))
 		}
-		lockResult := procedures.procedureShardLock.TryLock(shardIDs)
+		lockResult := m.procedureShardLock.TryLock(shardIDs)
 		if lockResult {
 			// Get lock success, procedure will be executed.
 			result = append(result, p)

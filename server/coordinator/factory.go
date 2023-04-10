@@ -8,6 +8,7 @@ import (
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/ddl/createpartitiontable"
@@ -36,15 +37,15 @@ type Factory struct {
 }
 
 type ScatterRequest struct {
-	Cluster  *cluster.Cluster
+	Cluster  *metadata.ClusterMetadata
 	ShardIDs []storage.ShardID
 }
 
 type CreateTableRequest struct {
-	Cluster   *cluster.Cluster
+	Cluster   *metadata.ClusterMetadata
 	SourceReq *metaservicepb.CreateTableRequest
 
-	OnSucceeded func(cluster.CreateTableResult) error
+	OnSucceeded func(metadata.CreateTableResult) error
 	OnFailed    func(error) error
 }
 
@@ -53,10 +54,10 @@ func (request *CreateTableRequest) isPartitionTable() bool {
 }
 
 type DropTableRequest struct {
-	Cluster   *cluster.Cluster
+	Cluster   *metadata.ClusterMetadata
 	SourceReq *metaservicepb.DropTableRequest
 
-	OnSucceeded func(cluster.TableInfo) error
+	OnSucceeded func(metadata.TableInfo) error
 	OnFailed    func(error) error
 }
 
@@ -83,21 +84,20 @@ type SplitRequest struct {
 }
 
 type CreatePartitionTableRequest struct {
-	Cluster   *cluster.Cluster
+	Cluster   *metadata.ClusterMetadata
 	SourceReq *metaservicepb.CreateTableRequest
 
 	PartitionTableRatioOfNodes float32
 
-	OnSucceeded func(cluster.CreateTableResult) error
+	OnSucceeded func(metadata.CreateTableResult) error
 	OnFailed    func(error) error
 }
 
-func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage procedure.Storage, manager cluster.Manager, partitionTableProportionOfNodes float32) *Factory {
+func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage procedure.Storage, partitionTableProportionOfNodes float32) *Factory {
 	return &Factory{
 		idAllocator:                     allocator,
 		dispatch:                        dispatch,
 		storage:                         storage,
-		clusterManager:                  manager,
 		shardPicker:                     NewRandomBalancedShardPicker(manager),
 		partitionTableProportionOfNodes: partitionTableProportionOfNodes,
 	}
@@ -236,7 +236,7 @@ func (f *Factory) CreateSplitProcedure(ctx context.Context, request SplitRequest
 	c, err := f.clusterManager.GetCluster(ctx, request.ClusterName)
 	if err != nil {
 		log.Error("cluster not found", zap.String("clusterName", request.ClusterName))
-		return nil, cluster.ErrClusterNotFound
+		return nil, metadata.ErrClusterNotFound
 	}
 
 	procedure := split.NewProcedure(id, f.dispatch, f.storage, c, request.SchemaName, request.ShardID, request.NewShardID, request.TableNames, request.TargetNodeName)

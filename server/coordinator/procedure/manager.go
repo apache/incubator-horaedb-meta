@@ -4,7 +4,6 @@ package procedure
 
 import (
 	"context"
-	"github.com/CeresDB/ceresmeta/server/storage"
 )
 
 type Manager interface {
@@ -15,7 +14,7 @@ type Manager interface {
 
 	// Submit procedure to be executed asynchronously.
 	// TODO: change result type, add channel to get whether the procedure executed successfully
-	Submit(ctx context.Context, clusterID storage.ClusterID, procedure Procedure) error
+	Submit(ctx context.Context, procedure Procedure) error
 	// ListRunningProcedure return immutable procedures info.
-	ListRunningProcedure(ctx context.Context, clusterID storage.ClusterID) ([]*Info, error)
+	ListRunningProcedure(ctx context.Context) ([]*Info, error)
 }
