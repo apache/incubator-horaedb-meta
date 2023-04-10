@@ -66,11 +66,10 @@ func (d DropTableRequest) IsPartitionTable() bool {
 }
 
 type TransferLeaderRequest struct {
+	Snapshot          metadata.Snapshot
 	ShardID           storage.ShardID
 	OldLeaderNodeName string
 	NewLeaderNodeName string
-	ShardVersion      uint64
-	ClusterVersion    uint64
 }
 
 type SplitRequest struct {
@@ -222,9 +221,8 @@ func (f *Factory) CreateTransferLeaderProcedure(ctx context.Context, request Tra
 		return nil, err
 	}
 
-	return transferleader.NewProcedure(f.dispatch, f.storage,
-		request.ShardID, request.OldLeaderNodeName, request.NewLeaderNodeName,
-		request.ShardVersion, request.ClusterVersion, id)
+	return transferleader.NewProcedure(f.dispatch, request.Snapshot, f.storage,
+		request.ShardID, request.OldLeaderNodeName, request.NewLeaderNodeName, id)
 }
 
 func (f *Factory) CreateSplitProcedure(ctx context.Context, request SplitRequest) (procedure.Procedure, error) {

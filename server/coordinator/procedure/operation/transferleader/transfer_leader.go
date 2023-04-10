@@ -6,10 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
-	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
-	"github.com/CeresDB/ceresmeta/server/cluster"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -21,13 +20,11 @@ import (
 // fsm state change: Begin -> UpdateMetadata -> CloseOldLeader -> OpenNewLeader -> Finish
 // TODO: add more detailed comments.
 const (
-	eventUpdateMetadata = "EventUpdateMetadata"
 	eventCloseOldLeader = "EventCloseOldLeader"
 	eventOpenNewLeader  = "EventOpenNewLeader"
 	eventFinish         = "EventFinish"
 
 	stateBegin          = "StateBegin"
-	stateUpdateMetadata = "StateUpdateMetadata"
 	stateCloseOldLeader = "StateCloseOldLeader"
 	stateOpenNewLeader  = "StateOpenNewLeader"
 	stateFinish         = "StateFinish"
@@ -35,13 +32,11 @@ const (
 
 var (
 	transferLeaderEvents = fsm.Events{
-		{Name: eventUpdateMetadata, Src: []string{stateBegin}, Dst: stateUpdateMetadata},
-		{Name: eventCloseOldLeader, Src: []string{stateUpdateMetadata}, Dst: stateCloseOldLeader},
+		{Name: eventCloseOldLeader, Src: []string{stateBegin}, Dst: stateCloseOldLeader},
 		{Name: eventOpenNewLeader, Src: []string{stateCloseOldLeader}, Dst: stateOpenNewLeader},
 		{Name: eventFinish, Src: []string{stateOpenNewLeader}, Dst: stateFinish},
 	}
 	transferLeaderCallbacks = fsm.Callbacks{
-		eventUpdateMetadata: updateMetadataCallback,
 		eventCloseOldLeader: closeOldLeaderCallback,
 		eventOpenNewLeader:  openNewShardCallback,
 		eventFinish:         finishCallback,
@@ -52,10 +47,10 @@ type Procedure struct {
 	id  uint64
 	fsm *fsm.FSM
 
-	cluster  *cluster.Cluster
 	dispatch eventdispatch.Dispatch
 	storage  procedure.Storage
 
+	snapShot          metadata.Snapshot
 	shardID           storage.ShardID
 	oldLeaderNodeName string
 	newLeaderNodeName string
@@ -78,34 +73,41 @@ type rawData struct {
 
 // callbackRequest is fsm callbacks param.
 type callbackRequest struct {
-	cluster  *cluster.Cluster
 	ctx      context.Context
 	dispatch eventdispatch.Dispatch
 
+	snapshot          metadata.Snapshot
 	shardID           storage.ShardID
 	oldLeaderNodeName string
 	newLeaderNodeName string
 }
 
-func NewProcedure(dispatch eventdispatch.Dispatch, c *cluster.Cluster, s procedure.Storage, shardID storage.ShardID, oldLeaderNodeName string, newLeaderNodeName string, id uint64) (procedure.Procedure, error) {
-	shardNodes, err := c.GetShardNodesByShardID(shardID)
-	if err != nil {
-		log.Error("get shard failed", zap.Error(err))
-		return nil, cluster.ErrShardNotFound
-	}
+func NewProcedure(dispatch eventdispatch.Dispatch, snapShot metadata.Snapshot, s procedure.Storage, shardID storage.ShardID, oldLeaderNodeName string, newLeaderNodeName string, id uint64) (procedure.Procedure, error) {
+	shardNodes := snapShot.Topology.ClusterView.ShardNodes
 	if len(shardNodes) == 0 {
 		log.Error("shard not exist in any node", zap.Uint32("shardID", uint32(shardID)))
-		return nil, cluster.ErrNodeNotFound
+		return nil, metadata.ErrShardNotFound
 	}
 	for _, shardNode := range shardNodes {
 		if shardNode.ShardRole == storage.ShardRoleLeader {
 			leaderNodeName := shardNode.NodeName
 			if leaderNodeName != oldLeaderNodeName {
 				log.Error("shard leader node not match", zap.String("requestOldLeaderNodeName", oldLeaderNodeName), zap.String("actualOldLeaderNodeName", leaderNodeName))
-				return nil, cluster.ErrNodeNotFound
+				return nil, metadata.ErrNodeNotFound
 			}
 		}
 	}
+	found := false
+	for _, shardView := range snapShot.Topology.ShardViews {
+		if shardView.ShardID == shardID {
+			found = true
+		}
+	}
+	if !found {
+		log.Error("shard not found", zap.Uint64("shardID", uint64(shardID)))
+		return nil, metadata.ErrShardNotFound
+	}
+
 	transferLeaderOperationFsm := fsm.NewFSM(
 		stateBegin,
 		transferLeaderEvents,
@@ -116,7 +118,7 @@ func NewProcedure(dispatch eventdispatch.Dispatch, c *cluster.Cluster, s procedu
 		id:                id,
 		fsm:               transferLeaderOperationFsm,
 		dispatch:          dispatch,
-		cluster:           c,
+		snapShot:          snapShot,
 		storage:           s,
 		shardID:           shardID,
 		oldLeaderNodeName: oldLeaderNodeName,
@@ -133,13 +135,31 @@ func (p *Procedure) Typ() procedure.Typ {
 	return procedure.TransferLeader
 }
 
+func (p *Procedure) RelatedVersionInfo() procedure.RelatedVersionInfo {
+	shardViewWithVersion := make(map[storage.ShardID]uint64, 0)
+	for _, shardView := range p.snapShot.Topology.ShardViews {
+		if shardView.ShardID == p.shardID {
+			shardViewWithVersion[p.shardID] = shardView.Version
+		}
+	}
+	return procedure.RelatedVersionInfo{
+		ClusterID:        p.snapShot.Topology.ClusterView.ClusterID,
+		ShardWithVersion: shardViewWithVersion,
+		ClusterVersion:   p.snapShot.Topology.ClusterView.Version,
+	}
+}
+
+func (p *Procedure) Priority() procedure.Priority {
+	return procedure.PriorityHigh
+}
+
 func (p *Procedure) Start(ctx context.Context) error {
 	p.updateStateWithLock(procedure.StateRunning)
 
 	transferLeaderRequest := callbackRequest{
-		cluster:           p.cluster,
 		ctx:               ctx,
 		dispatch:          p.dispatch,
+		snapshot:          p.snapShot,
 		shardID:           p.shardID,
 		oldLeaderNodeName: p.oldLeaderNodeName,
 		newLeaderNodeName: p.newLeaderNodeName,
@@ -148,14 +168,6 @@ func (p *Procedure) Start(ctx context.Context) error {
 	for {
 		switch p.fsm.Current() {
 		case stateBegin:
-			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "transferLeader procedure persist")
-			}
-			if err := p.fsm.Event(eventUpdateMetadata, transferLeaderRequest); err != nil {
-				p.updateStateWithLock(procedure.StateFailed)
-				return errors.WithMessage(err, "transferLeader procedure update metadata")
-			}
-		case stateUpdateMetadata:
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
@@ -213,7 +225,7 @@ func (p *Procedure) State() procedure.State {
 	return p.state
 }
 
-func updateMetadataCallback(event *fsm.Event) {
+func closeOldLeaderCallback(event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -221,91 +233,36 @@ func updateMetadataCallback(event *fsm.Event) {
 	}
 	ctx := req.ctx
 
-	if req.cluster.GetClusterState() != storage.ClusterStateStable {
-		procedure.CancelEventWithLog(event, cluster.ErrClusterStateInvalid, "cluster state must be stable", zap.Int("currentState", int(req.cluster.GetClusterState())))
-		return
-	}
-
-	getNodeShardResult, err := req.cluster.GetNodeShards(ctx)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get shardNodes by shardID failed")
-		return
-	}
-
-	found := false
-	shardNodes := make([]storage.ShardNode, 0, len(getNodeShardResult.NodeShards))
-	var leaderShardNode storage.ShardNode
-	for _, shardNodeWithVersion := range getNodeShardResult.NodeShards {
-		if shardNodeWithVersion.ShardNode.ShardRole == storage.ShardRoleLeader {
-			leaderShardNode = shardNodeWithVersion.ShardNode
-			if leaderShardNode.ID == req.shardID {
-				found = true
-				leaderShardNode.NodeName = req.newLeaderNodeName
-			}
-			shardNodes = append(shardNodes, leaderShardNode)
-		}
-	}
-	if !found {
-		procedure.CancelEventWithLog(event, procedure.ErrShardLeaderNotFound, "shard leader not found", zap.Uint32("shardID", uint32(req.shardID)))
-		return
-	}
-
-	err = req.cluster.UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes)
-	if err != nil {
-		procedure.CancelEventWithLog(event, storage.ErrUpdateClusterViewConflict, "update cluster view")
-		return
-	}
-}
-
-func closeOldLeaderCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-	ctx := request.ctx
-
-	// If the node is expired, skip close old leader shard.
-	oldLeaderNode, exists := request.cluster.GetRegisteredNodeByName(request.oldLeaderNodeName)
-	if !exists || oldLeaderNode.IsExpired(uint64(time.Now().Unix()), cluster.HeartbeatKeepAliveIntervalSec) {
-		return
-	}
-
 	closeShardRequest := eventdispatch.CloseShardRequest{
-		ShardID: uint32(request.shardID),
+		ShardID: uint32(req.shardID),
 	}
-	if err := request.dispatch.CloseShard(ctx, request.oldLeaderNodeName, closeShardRequest); err != nil {
-		procedure.CancelEventWithLog(event, err, "close shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("oldLeaderName", request.oldLeaderNodeName))
+	if err := req.dispatch.CloseShard(ctx, req.oldLeaderNodeName, closeShardRequest); err != nil {
+		procedure.CancelEventWithLog(event, err, "close shard", zap.Uint32("shardID", uint32(req.shardID)), zap.String("oldLeaderName", req.oldLeaderNodeName))
 		return
 	}
 }
 
 func openNewShardCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
+	req, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
-	ctx := request.ctx
+	ctx := req.ctx
 
-	getNodeShardResult, err := request.cluster.GetNodeShards(ctx)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get node shards")
-		return
-	}
 	var preVersion uint64
-	for _, shardNodeWithVersion := range getNodeShardResult.NodeShards {
-		if request.shardID == shardNodeWithVersion.ShardNode.ID {
-			preVersion = shardNodeWithVersion.ShardInfo.Version
+	for _, shardView := range req.snapshot.Topology.ShardViews {
+		if req.shardID == shardView.ShardID {
+			preVersion = shardView.Version
 		}
 	}
 
 	openShardRequest := eventdispatch.OpenShardRequest{
-		Shard: cluster.ShardInfo{ID: request.shardID, Role: storage.ShardRoleLeader, Version: preVersion + 1},
+		Shard: metadata.ShardInfo{ID: req.shardID, Role: storage.ShardRoleLeader, Version: preVersion + 1},
 	}
 
-	if err := request.dispatch.OpenShard(ctx, request.newLeaderNodeName, openShardRequest); err != nil {
-		procedure.CancelEventWithLog(event, err, "open shard", zap.Uint32("shardID", uint32(request.shardID)), zap.String("newLeaderNode", request.newLeaderNodeName))
+	if err := req.dispatch.OpenShard(ctx, req.newLeaderNodeName, openShardRequest); err != nil {
+		procedure.CancelEventWithLog(event, err, "open shard", zap.Uint32("shardID", uint32(req.shardID)), zap.String("newLeaderNode", req.newLeaderNodeName))
 		return
 	}
 }
