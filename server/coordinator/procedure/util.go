@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -42,7 +43,7 @@ func IsContains(slice []string, target string) bool {
 	return false
 }
 
-func IsSubSlice(subSlice []string, slice []string) bool {
+func IsSubSlice(subSlice []storage.TableID, slice []string) bool {
 	if len(subSlice) > len(slice) {
 		return false
 	}

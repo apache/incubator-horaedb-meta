@@ -76,6 +76,7 @@ type SplitRequest struct {
 	ClusterName    string
 	SchemaName     string
 	TableNames     []string
+	Snapshot       metadata.Snapshot
 	ShardID        storage.ShardID
 	NewShardID     storage.ShardID
 	TargetNodeName string
@@ -237,8 +238,18 @@ func (f *Factory) CreateSplitProcedure(ctx context.Context, request SplitRequest
 		return nil, metadata.ErrClusterNotFound
 	}
 
-	procedure := split.NewProcedure(id, f.dispatch, f.storage, c, request.SchemaName, request.ShardID, request.NewShardID, request.TableNames, request.TargetNodeName)
-	return procedure, nil
+	p, err := split.NewProcedure(id,
+		f.dispatch,
+		f.storage,
+		c.GetMetadata(),
+		request.Snapshot,
+		request.SchemaName,
+		request.ShardID,
+		request.NewShardID,
+		request.TableNames,
+		request.TargetNodeName,
+	)
+	return p, nil
 }
 
 func (f *Factory) allocProcedureID(ctx context.Context) (uint64, error) {
