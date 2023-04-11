@@ -4,10 +4,10 @@ package coordinator
 
 import (
 	"context"
-	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"strconv"
 	"testing"
 
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )

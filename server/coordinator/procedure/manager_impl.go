@@ -18,7 +18,6 @@ import (
 
 const (
 	metaListBatchSize        = 100
-	defaultWaitingQueueSize  = 100
 	defaultWaitingQueueDelay = time.Millisecond * 500
 )
 
@@ -27,17 +26,17 @@ type ManagerImpl struct {
 	dispatch eventdispatch.Dispatch
 	metadata *metadata.ClusterMetadata
 
+	// ProcedureShardLock used to manager procedure related with multi shard, which need to grant all shard locks to be running procedure.
+	procedureShardLock *lock.EntryLock
+	// All procedure will be put into waiting queue first, when runningProcedure is empty, try to promote some waiting procedures to new running procedures.
+	waitingProcedures *ProcedureDelayQueue
+
 	// This lock is used to protect the following fields.
 	lock    sync.RWMutex
 	running bool
-
 	// There is only one procedure running for every shard.
 	// It will be removed when the procedure is finished or failed.
 	runningProcedures map[storage.ShardID]Procedure
-	// ProcedureShardLock used to manager procedure related with multi shard, which need to grant all shard locks to be running procedure.
-	procedureShardLock lock.EntryLock
-	// All procedure will be put into waiting queue first, when runningProcedure is empty, try to promote some waiting procedures to new running procedures.
-	waitingProcedures *ProcedureDelayQueue
 }
 
 func (m *ManagerImpl) Start(ctx context.Context) error {
@@ -45,12 +44,13 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 	defer m.lock.Unlock()
 
 	if m.running {
-		log.Warn("cluster manager has already been started")
+		log.Warn("procedure manager has already been started")
 		return nil
 	}
 
 	go m.startProcedurePromote(ctx)
-	go m.startProcedureWorker(ctx)
+
+	m.running = true
 
 	return nil
 }
@@ -67,6 +67,9 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 			return err
 		}
 	}
+
+	m.running = false
+
 	return nil
 }
 
@@ -131,36 +134,34 @@ func (m *ManagerImpl) startProcedurePromote(ctx context.Context) {
 		if len(newProcedures) > 0 {
 			for _, newProcedure := range newProcedures {
 				log.Info("promote procedure", zap.Uint64("procedureID", newProcedure.ID()))
+				m.lock.Lock()
 				for shardID := range newProcedure.RelatedVersionInfo().ShardWithVersion {
 					m.runningProcedures[shardID] = newProcedure
 				}
+				m.lock.Unlock()
 
-				newProcedure := newProcedure
-				go func() {
-					log.Info("procedure start", zap.Uint64("procedureID", newProcedure.ID()))
-					err := newProcedure.Start(ctx)
-					if err != nil {
-						log.Error("procedure start failed", zap.Error(err))
-					}
-				}()
+				m.startProcedureWorker(ctx, newProcedure)
 			}
 		}
 	}
 }
 
-func (m *ManagerImpl) startProcedureWorker(ctx context.Context) {
-	for {
-		for _, procedure := range m.runningProcedures {
-			p := procedure
-			if p.State() == StateFailed || p.State() == StateCancelled || p.State() == StateFinished {
-				log.Info("procedure finish", zap.Uint64("procedureID", p.ID()))
-				for shardID := range p.RelatedVersionInfo().ShardWithVersion {
-					delete(m.runningProcedures, shardID)
-					m.procedureShardLock.UnLock([]uint64{uint64(shardID)})
-				}
-			}
+func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Procedure) {
+	go func() {
+		log.Info("procedure start", zap.Uint64("procedureID", newProcedure.ID()))
+		err := newProcedure.Start(ctx)
+		if err != nil {
+			log.Error("procedure start failed", zap.Error(err))
 		}
-	}
+		log.Info("procedure finish", zap.Uint64("procedureID", newProcedure.ID()))
+		for shardID := range newProcedure.RelatedVersionInfo().ShardWithVersion {
+			m.lock.Lock()
+			delete(m.runningProcedures, shardID)
+			m.lock.Unlock()
+
+			m.procedureShardLock.UnLock([]uint64{uint64(shardID)})
+		}
+	}()
 }
 
 func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
@@ -174,6 +175,7 @@ func (m *ManagerImpl) retry(ctx context.Context, procedure Procedure) error {
 // Whether a waiting procedure could be running procedure.
 func (m *ManagerImpl) checkValid(ctx context.Context, procedure Procedure, cluster *metadata.ClusterMetadata) bool {
 	// ClusterVersion and ShardVersion in this procedure must be same with current cluster topology.
+	// TODO: Version verification is an important issue, implement it in another pull request.
 	return true
 }
 

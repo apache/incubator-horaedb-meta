@@ -5,7 +5,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"reflect"
 	"sync"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/coordinator/watch"
 	"github.com/pkg/errors"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
 

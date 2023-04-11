@@ -475,7 +475,7 @@ func (c *ClusterMetadata) UpdateClusterView(ctx context.Context, state storage.C
 	return nil
 }
 
-func (c *ClusterMetadata) updateClusterViewByNode(ctx context.Context, shardNodes []storage.ShardNode) error {
+func (c *ClusterMetadata) updateClusterViewByNode(ctx context.Context, shardNodes map[string][]storage.ShardNode) error {
 	if err := c.topologyManager.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view")
 	}
