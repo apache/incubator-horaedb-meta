@@ -35,7 +35,7 @@ type Manager interface {
 
 	// Scheduler will be called when received new heartbeat, every scheduler registered in schedulerManager will be called to generate procedures.
 	// Scheduler cloud be schedule with fix time interval or heartbeat.
-	Scheduler(ctx context.Context, clusterSnapshot metadata.Snapshot) []*ScheduleResult
+	Scheduler(ctx context.Context, clusterSnapshot metadata.Snapshot) []ScheduleResult
 }
 
 type ManagerImpl struct {
@@ -113,9 +113,11 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 				log.Debug("scheduler manager invoke", zap.String("clusterSnapshot", fmt.Sprintf("%v", clusterSnapshot)))
 				results := m.Scheduler(ctxWithCancel, clusterSnapshot)
 				for _, result := range results {
-					log.Info("scheduler submit new procedure", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.String("Reason", result.Reason))
-					if err := m.procedureManager.Submit(ctx, m.clusterMetadata.GetClusterID(), result.Procedure); err != nil {
-						log.Error("scheduler submit new procedure failed", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.Error(err))
+					if result.Procedure != nil {
+						log.Info("scheduler submit new procedure", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.String("Reason", result.Reason))
+						if err := m.procedureManager.Submit(ctx, result.Procedure); err != nil {
+							log.Error("scheduler submit new procedure failed", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.Error(err))
+						}
 					}
 				}
 			}
@@ -158,18 +160,16 @@ func (m *ManagerImpl) ListScheduler() []Scheduler {
 	return m.registerSchedulers
 }
 
-func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot metadata.Snapshot) []*ScheduleResult {
+func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot metadata.Snapshot) []ScheduleResult {
 	// TODO: Every scheduler should run in an independent goroutine.
-	var results []*ScheduleResult
+	results := make([]ScheduleResult, 0, len(m.registerSchedulers))
 	for _, scheduler := range m.registerSchedulers {
 		result, err := scheduler.Schedule(ctx, clusterSnapshot)
 		if err != nil {
 			log.Error("scheduler failed", zap.Error(err))
 			continue
 		}
-		if result != nil {
-			results = append(results, result)
-		}
+		results = append(results, result)
 	}
 	return results
 }

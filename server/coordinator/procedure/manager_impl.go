@@ -137,6 +137,7 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 
 func (m *ManagerImpl) startProcedurePromote(ctx context.Context, procedureWorkerChan chan struct{}) {
 	ticker := time.NewTicker(defaultPromoteDelay)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
@@ -144,7 +145,6 @@ func (m *ManagerImpl) startProcedurePromote(ctx context.Context, procedureWorker
 		case <-procedureWorkerChan:
 			m.startProcedurePromoteInternal(ctx, procedureWorkerChan)
 		case <-ctx.Done():
-			ticker.Stop()
 			return
 		}
 	}
