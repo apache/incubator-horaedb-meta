@@ -26,7 +26,7 @@ type ManagerImpl struct {
 	dispatch eventdispatch.Dispatch
 	metadata *metadata.ClusterMetadata
 
-	// ProcedureShardLock used to manager procedure related with multi shard, which need to grant all shard locks to be running procedure.
+	// ProcedureShardLock is used to ensure the consistency of procedures' concurrent running on shard, that is to say, only one procedure is allowed to run on a specific shard.
 	procedureShardLock *lock.EntryLock
 	// All procedure will be put into waiting queue first, when runningProcedure is empty, try to promote some waiting procedures to new running procedures.
 	waitingProcedures *ProcedureDelayQueue
@@ -74,9 +74,6 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 }
 
 func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
 	return m.waitingProcedures.Push(procedure, 0)
 }
 
