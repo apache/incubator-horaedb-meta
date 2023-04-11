@@ -95,7 +95,7 @@ func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	var procedureInfos []*Info
+	procedureInfos := make([]*Info, 0, len(m.runningProcedures))
 	for _, procedure := range m.runningProcedures {
 		if procedure.State() == StateRunning {
 			procedureInfos = append(procedureInfos, &Info{
