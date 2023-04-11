@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	metaListBatchSize        = 100
-	defaultWaitingQueueDelay = time.Millisecond * 500
-	defaultPromoteDelay      = time.Millisecond * 100
+	metaListBatchSize                = 100
+	defaultWaitingQueueDelay         = time.Millisecond * 500
+	defaultPromoteDelay              = time.Millisecond * 100
+	defaultProcedureWorkerChanBufSiz = 10
 )
 
 type ManagerImpl struct {
@@ -31,6 +32,8 @@ type ManagerImpl struct {
 	procedureShardLock *lock.EntryLock
 	// All procedure will be put into waiting queue first, when runningProcedure is empty, try to promote some waiting procedures to new running procedures.
 	waitingProcedures *ProcedureDelayQueue
+	// ProcedureWorkerChan is used to notify that a procedure has been submitted or completed, and the manager will perform promote after receiving the signal.
+	procedureWorkerChan chan struct{}
 
 	// This lock is used to protect the following fields.
 	lock    sync.RWMutex
@@ -49,7 +52,8 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 		return nil
 	}
 
-	go m.startProcedurePromote(ctx)
+	m.procedureWorkerChan = make(chan struct{}, defaultProcedureWorkerChanBufSiz)
+	go m.startProcedurePromote(ctx, m.procedureWorkerChan)
 
 	m.running = true
 
@@ -75,7 +79,16 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 }
 
 func (m *ManagerImpl) Submit(_ context.Context, procedure Procedure) error {
-	return m.waitingProcedures.Push(procedure, 0)
+	if err := m.waitingProcedures.Push(procedure, 0); err != nil {
+		return err
+	}
+
+	select {
+	case m.procedureWorkerChan <- struct{}{}:
+	default:
+	}
+
+	return nil
 }
 
 func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
@@ -122,9 +135,8 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 	return nil
 }
 
-func (m *ManagerImpl) startProcedurePromote(ctx context.Context) {
+func (m *ManagerImpl) startProcedurePromote(ctx context.Context, procedureWorkerChan chan struct{}) {
 	ticker := time.NewTicker(defaultPromoteDelay)
-	procedureWorkerChan := make(chan bool)
 	for {
 		select {
 		case <-ticker.C:
@@ -132,12 +144,13 @@ func (m *ManagerImpl) startProcedurePromote(ctx context.Context) {
 		case <-procedureWorkerChan:
 			m.startProcedurePromoteInternal(ctx, procedureWorkerChan)
 		case <-ctx.Done():
+			ticker.Stop()
 			return
 		}
 	}
 }
 
-func (m *ManagerImpl) startProcedurePromoteInternal(ctx context.Context, procedureWorkerChan chan bool) {
+func (m *ManagerImpl) startProcedurePromoteInternal(ctx context.Context, procedureWorkerChan chan struct{}) {
 	newProcedures, err := m.promoteProcedure(ctx)
 	if err != nil {
 		log.Error("promote procedure failed", zap.Error(err))
@@ -145,18 +158,20 @@ func (m *ManagerImpl) startProcedurePromoteInternal(ctx context.Context, procedu
 	}
 
 	m.lock.Lock()
-	defer m.lock.Unlock()
 	for _, newProcedure := range newProcedures {
-		log.Info("promote procedure", zap.Uint64("procedureID", newProcedure.ID()))
 		for shardID := range newProcedure.RelatedVersionInfo().ShardWithVersion {
 			m.runningProcedures[shardID] = newProcedure
 		}
+	}
+	m.lock.Unlock()
 
+	for _, newProcedure := range newProcedures {
+		log.Info("promote procedure", zap.Uint64("procedureID", newProcedure.ID()))
 		m.startProcedureWorker(ctx, newProcedure, procedureWorkerChan)
 	}
 }
 
-func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Procedure, procedureWorkerChan chan bool) {
+func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Procedure, procedureWorkerChan chan struct{}) {
 	go func() {
 		log.Info("procedure start", zap.Uint64("procedureID", newProcedure.ID()))
 		err := newProcedure.Start(ctx)
@@ -172,11 +187,10 @@ func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Pro
 			m.procedureShardLock.UnLock([]uint64{uint64(shardID)})
 		}
 		select {
-		case procedureWorkerChan <- true:
-			return
+		case procedureWorkerChan <- struct{}{}:
 		default:
-			return
 		}
+		return
 	}()
 }
 
@@ -196,7 +210,7 @@ func (m *ManagerImpl) checkValid(ctx context.Context, procedure Procedure, clust
 }
 
 // Promote a waiting procedure to be a running procedure.
-// Some procedure may be related with multi shards.
+// One procedure may be related with multiple shards.
 func (m *ManagerImpl) promoteProcedure(ctx context.Context) ([]Procedure, error) {
 	// Get waiting procedures, it has been sorted in queue.
 	queue := m.waitingProcedures
