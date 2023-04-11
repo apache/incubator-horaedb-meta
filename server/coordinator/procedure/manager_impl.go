@@ -19,6 +19,7 @@ import (
 const (
 	metaListBatchSize        = 100
 	defaultWaitingQueueDelay = time.Millisecond * 500
+	defaultPromoteDelay      = time.Millisecond * 100
 )
 
 type ManagerImpl struct {
@@ -122,28 +123,40 @@ func (m *ManagerImpl) retryAll(ctx context.Context) error {
 }
 
 func (m *ManagerImpl) startProcedurePromote(ctx context.Context) {
+	ticker := time.NewTicker(defaultPromoteDelay)
+	procedureWorkerChan := make(chan bool)
 	for {
-		err, newProcedures := m.promoteProcedure(ctx)
-		if err != nil {
-			log.Error("promote procedure failed", zap.Error(err))
-			continue
-		}
-		if len(newProcedures) > 0 {
-			for _, newProcedure := range newProcedures {
-				log.Info("promote procedure", zap.Uint64("procedureID", newProcedure.ID()))
-				m.lock.Lock()
-				for shardID := range newProcedure.RelatedVersionInfo().ShardWithVersion {
-					m.runningProcedures[shardID] = newProcedure
-				}
-				m.lock.Unlock()
-
-				m.startProcedureWorker(ctx, newProcedure)
-			}
+		select {
+		case <-ticker.C:
+			m.startProcedurePromoteInternal(ctx, procedureWorkerChan)
+		case <-procedureWorkerChan:
+			m.startProcedurePromoteInternal(ctx, procedureWorkerChan)
+		case <-ctx.Done():
+			return
 		}
 	}
 }
 
-func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Procedure) {
+func (m *ManagerImpl) startProcedurePromoteInternal(ctx context.Context, procedureWorkerChan chan bool) {
+	newProcedures, err := m.promoteProcedure(ctx)
+	if err != nil {
+		log.Error("promote procedure failed", zap.Error(err))
+		return
+	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	for _, newProcedure := range newProcedures {
+		log.Info("promote procedure", zap.Uint64("procedureID", newProcedure.ID()))
+		for shardID := range newProcedure.RelatedVersionInfo().ShardWithVersion {
+			m.runningProcedures[shardID] = newProcedure
+		}
+
+		m.startProcedureWorker(ctx, newProcedure, procedureWorkerChan)
+	}
+}
+
+func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Procedure, procedureWorkerChan chan bool) {
 	go func() {
 		log.Info("procedure start", zap.Uint64("procedureID", newProcedure.ID()))
 		err := newProcedure.Start(ctx)
@@ -157,6 +170,12 @@ func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Pro
 			m.lock.Unlock()
 
 			m.procedureShardLock.UnLock([]uint64{uint64(shardID)})
+		}
+		select {
+		case procedureWorkerChan <- true:
+			return
+		default:
+			return
 		}
 	}()
 }
@@ -178,16 +197,16 @@ func (m *ManagerImpl) checkValid(ctx context.Context, procedure Procedure, clust
 
 // Promote a waiting procedure to be a running procedure.
 // Some procedure may be related with multi shards.
-func (m *ManagerImpl) promoteProcedure(ctx context.Context) (error, []Procedure) {
+func (m *ManagerImpl) promoteProcedure(ctx context.Context) ([]Procedure, error) {
 	// Get waiting procedures, it has been sorted in queue.
 	queue := m.waitingProcedures
 
-	var result []Procedure
+	var readyProcs []Procedure
 	// Find next valid procedure.
 	for {
 		p := queue.Pop()
 		if p == nil {
-			return nil, result
+			return readyProcs, nil
 		}
 
 		if !m.checkValid(ctx, p, m.metadata) {
@@ -196,18 +215,18 @@ func (m *ManagerImpl) promoteProcedure(ctx context.Context) (error, []Procedure)
 		}
 
 		// Try to get shard locks.
-		var shardIDs []uint64
+		shardIDs := make([]uint64, 0, len(p.RelatedVersionInfo().ShardWithVersion))
 		for shardID := range p.RelatedVersionInfo().ShardWithVersion {
 			shardIDs = append(shardIDs, uint64(shardID))
 		}
 		lockResult := m.procedureShardLock.TryLock(shardIDs)
 		if lockResult {
 			// Get lock success, procedure will be executed.
-			result = append(result, p)
+			readyProcs = append(readyProcs, p)
 		} else {
 			// Get lock failed, procedure will be put back into the queue.
 			if err := queue.Push(p, defaultWaitingQueueDelay); err != nil {
-				return err, nil
+				return nil, err
 			}
 		}
 	}

@@ -410,10 +410,10 @@ func (m *TopologyManagerImpl) UpdateClusterView(ctx context.Context, state stora
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	return m.updateClusterViewInternal(ctx, state, shardNodes)
+	return m.updateClusterViewWithLock(ctx, state, shardNodes)
 }
 
-func (m *TopologyManagerImpl) updateClusterViewInternal(ctx context.Context, state storage.ClusterState, shardNodes []storage.ShardNode) error {
+func (m *TopologyManagerImpl) updateClusterViewWithLock(ctx context.Context, state storage.ClusterState, shardNodes []storage.ShardNode) error {
 	// Update cluster view in storage.
 	newClusterView := storage.ClusterView{
 		ClusterID:  m.clusterID,
@@ -453,7 +453,7 @@ func (m *TopologyManagerImpl) UpdateClusterViewByNode(ctx context.Context, shard
 		}
 	}
 
-	return m.updateClusterViewInternal(ctx, m.clusterView.State, newShardNodes)
+	return m.updateClusterViewWithLock(ctx, m.clusterView.State, newShardNodes)
 }
 
 func (m *TopologyManagerImpl) GetClusterView() storage.ClusterView {
