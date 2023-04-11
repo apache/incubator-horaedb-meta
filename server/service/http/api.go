@@ -340,6 +340,7 @@ func (a *API) split(writer http.ResponseWriter, req *http.Request) {
 		ClusterName:    splitRequest.ClusterName,
 		SchemaName:     splitRequest.SchemaName,
 		TableNames:     splitRequest.SplitTables,
+		Snapshot:       metadata.Snapshot{},
 		ShardID:        storage.ShardID(splitRequest.ShardID),
 		NewShardID:     storage.ShardID(newShardID),
 		TargetNodeName: splitRequest.NodeName,

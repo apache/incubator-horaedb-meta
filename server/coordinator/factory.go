@@ -36,11 +36,6 @@ type Factory struct {
 	partitionTableProportionOfNodes float32
 }
 
-type ScatterRequest struct {
-	Cluster  *metadata.ClusterMetadata
-	ShardIDs []storage.ShardID
-}
-
 type CreateTableRequest struct {
 	Cluster   *metadata.ClusterMetadata
 	SourceReq *metaservicepb.CreateTableRequest
@@ -80,7 +75,6 @@ type SplitRequest struct {
 	ShardID        storage.ShardID
 	NewShardID     storage.ShardID
 	TargetNodeName string
-	ClusterVersion uint64
 }
 
 type CreatePartitionTableRequest struct {
@@ -222,8 +216,15 @@ func (f *Factory) CreateTransferLeaderProcedure(ctx context.Context, request Tra
 		return nil, err
 	}
 
-	return transferleader.NewProcedure(f.dispatch, request.Snapshot, f.storage,
-		request.ShardID, request.OldLeaderNodeName, request.NewLeaderNodeName, id)
+	return transferleader.NewProcedure(
+		f.dispatch,
+		request.Snapshot,
+		f.storage,
+		request.ShardID,
+		request.OldLeaderNodeName,
+		request.NewLeaderNodeName,
+		id,
+	)
 }
 
 func (f *Factory) CreateSplitProcedure(ctx context.Context, request SplitRequest) (procedure.Procedure, error) {
@@ -238,7 +239,8 @@ func (f *Factory) CreateSplitProcedure(ctx context.Context, request SplitRequest
 		return nil, metadata.ErrClusterNotFound
 	}
 
-	p, err := split.NewProcedure(id,
+	return split.NewProcedure(
+		id,
 		f.dispatch,
 		f.storage,
 		c.GetMetadata(),
@@ -249,7 +251,6 @@ func (f *Factory) CreateSplitProcedure(ctx context.Context, request SplitRequest
 		request.TableNames,
 		request.TargetNodeName,
 	)
-	return p, nil
 }
 
 func (f *Factory) allocProcedureID(ctx context.Context) (uint64, error) {
