@@ -17,6 +17,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// Fsm state change: begin-> CreateNewShardView -> UpdateShardTables -> OpenNewShard -> Finish
+// CreateNewShardView will create new shard metadata.
+// UpdateShardTables will update shard tables mapping between the old and new shard.
+// OpenNewShard will send open shard request to new shard leader.
 const (
 	eventCreateNewShardView = "EventCreateNewShardView"
 	eventUpdateShardTables  = "EventUpdateShardTables"
@@ -45,7 +49,6 @@ var (
 	}
 )
 
-// Procedure fsm: Update ShardTable Metadata -> OpenNewShard -> CloseTable
 type Procedure struct {
 	id uint64
 

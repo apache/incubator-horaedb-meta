@@ -17,8 +17,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// fsm state change: Begin -> UpdateMetadata -> CloseOldLeader -> OpenNewLeader -> Finish
-// TODO: add more detailed comments.
+// Fsm state change: Begin -> CloseOldLeader -> OpenNewLeader -> Finish.
+// CloseOldLeader will send close shard request if the old leader node exists.
+// OpenNewLeader will send open shard request to new leader node.
 const (
 	eventCloseOldLeader = "EventCloseOldLeader"
 	eventOpenNewLeader  = "EventOpenNewLeader"
@@ -66,6 +67,7 @@ type rawData struct {
 	FsmState string
 	State    procedure.State
 
+	snapShot          metadata.Snapshot
 	ShardID           storage.ShardID
 	OldLeaderNodeName string
 	NewLeaderNodeName string
@@ -293,6 +295,7 @@ func (p *Procedure) convertToMeta() (procedure.Meta, error) {
 		ID:                p.id,
 		FsmState:          p.fsm.Current(),
 		ShardID:           p.shardID,
+		snapShot:          p.snapShot,
 		OldLeaderNodeName: p.oldLeaderNodeName,
 		NewLeaderNodeName: p.newLeaderNodeName,
 		State:             p.state,
