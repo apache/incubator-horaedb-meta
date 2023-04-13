@@ -45,17 +45,9 @@ var (
 )
 
 type Procedure struct {
-	id  uint64
-	fsm *fsm.FSM
-
-	dispatch eventdispatch.Dispatch
-	storage  procedure.Storage
-
+	fsm                *fsm.FSM
+	params             ProcedureParams
 	relatedVersionInfo procedure.RelatedVersionInfo
-	snapShot           metadata.Snapshot
-	shardID            storage.ShardID
-	oldLeaderNodeName  string
-	newLeaderNodeName  string
 
 	// Protect the state.
 	lock  sync.RWMutex
@@ -94,7 +86,7 @@ type ProcedureParams struct {
 }
 
 func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
-	if err := validClusterTopology(params.ClusterSnapShot.Topology, params.ShardID, params.OldLeaderNodeName); err != nil {
+	if err := validateClusterTopology(params.ClusterSnapShot.Topology, params.ShardID, params.OldLeaderNodeName); err != nil {
 		return nil, err
 	}
 
@@ -107,15 +99,9 @@ func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
 	)
 
 	return &Procedure{
-		id:                 params.ID,
 		fsm:                transferLeaderOperationFsm,
-		dispatch:           params.Dispatch,
 		relatedVersionInfo: relatedVersionInfo,
-		snapShot:           params.ClusterSnapShot,
-		storage:            params.Storage,
-		shardID:            params.ShardID,
-		oldLeaderNodeName:  params.OldLeaderNodeName,
-		newLeaderNodeName:  params.NewLeaderNodeName,
+		params:             params,
 		state:              procedure.StateInit,
 	}, nil
 }
@@ -135,7 +121,7 @@ func buildRelatedVersionInfo(params ProcedureParams) procedure.RelatedVersionInf
 	return relatedVersionInfo
 }
 
-func validClusterTopology(topology metadata.Topology, shardID storage.ShardID, oldLeaderNodeName string) error {
+func validateClusterTopology(topology metadata.Topology, shardID storage.ShardID, oldLeaderNodeName string) error {
 	shardNodes := topology.ClusterView.ShardNodes
 	if len(shardNodes) == 0 {
 		log.Error("shard not exist in any node", zap.Uint32("shardID", uint32(shardID)))
@@ -164,7 +150,7 @@ func validClusterTopology(topology metadata.Topology, shardID storage.ShardID, o
 }
 
 func (p *Procedure) ID() uint64 {
-	return p.id
+	return p.params.ID
 }
 
 func (p *Procedure) Typ() procedure.Typ {
@@ -229,7 +215,7 @@ func (p *Procedure) persist(ctx context.Context) error {
 	if err != nil {
 		return errors.WithMessage(err, "convert to meta")
 	}
-	err = p.storage.CreateOrUpdate(ctx, meta)
+	err = p.params.Storage.CreateOrUpdate(ctx, meta)
 	if err != nil {
 		return errors.WithMessage(err, "createOrUpdate procedure storage")
 	}
@@ -256,10 +242,10 @@ func closeOldLeaderCallback(event *fsm.Event) {
 	ctx := req.ctx
 
 	closeShardRequest := eventdispatch.CloseShardRequest{
-		ShardID: uint32(req.p.shardID),
+		ShardID: uint32(req.p.params.ShardID),
 	}
-	if err := req.p.dispatch.CloseShard(ctx, req.p.oldLeaderNodeName, closeShardRequest); err != nil {
-		procedure.CancelEventWithLog(event, err, "close shard", zap.Uint32("shardID", uint32(req.p.shardID)), zap.String("oldLeaderName", req.p.oldLeaderNodeName))
+	if err := req.p.params.Dispatch.CloseShard(ctx, req.p.params.OldLeaderNodeName, closeShardRequest); err != nil {
+		procedure.CancelEventWithLog(event, err, "close shard", zap.Uint32("shardID", uint32(req.p.params.ShardID)), zap.String("oldLeaderName", req.p.params.OldLeaderNodeName))
 		return
 	}
 }
@@ -273,18 +259,18 @@ func openNewShardCallback(event *fsm.Event) {
 	ctx := req.ctx
 
 	var preVersion uint64
-	for _, shardView := range req.p.snapShot.Topology.ShardViews {
-		if req.p.shardID == shardView.ShardID {
+	for _, shardView := range req.p.params.ClusterSnapShot.Topology.ShardViews {
+		if req.p.params.ShardID == shardView.ShardID {
 			preVersion = shardView.Version
 		}
 	}
 
 	openShardRequest := eventdispatch.OpenShardRequest{
-		Shard: metadata.ShardInfo{ID: req.p.shardID, Role: storage.ShardRoleLeader, Version: preVersion + 1},
+		Shard: metadata.ShardInfo{ID: req.p.params.ShardID, Role: storage.ShardRoleLeader, Version: preVersion + 1},
 	}
 
-	if err := req.p.dispatch.OpenShard(ctx, req.p.newLeaderNodeName, openShardRequest); err != nil {
-		procedure.CancelEventWithLog(event, err, "open shard", zap.Uint32("shardID", uint32(req.p.shardID)), zap.String("newLeaderNode", req.p.newLeaderNodeName))
+	if err := req.p.params.Dispatch.OpenShard(ctx, req.p.params.NewLeaderNodeName, openShardRequest); err != nil {
+		procedure.CancelEventWithLog(event, err, "open shard", zap.Uint32("shardID", uint32(req.p.params.ShardID)), zap.String("newLeaderNode", req.p.params.NewLeaderNodeName))
 		return
 	}
 }
@@ -296,7 +282,7 @@ func finishCallback(event *fsm.Event) {
 		return
 	}
 
-	log.Info("transfer leader finish", zap.Uint32("shardID", uint32(request.p.shardID)), zap.String("oldLeaderNode", request.p.oldLeaderNodeName), zap.String("newLeaderNode", request.p.newLeaderNodeName))
+	log.Info("transfer leader finish", zap.Uint32("shardID", uint32(request.p.params.ShardID)), zap.String("oldLeaderNode", request.p.params.OldLeaderNodeName), zap.String("newLeaderNode", request.p.params.NewLeaderNodeName))
 }
 
 func (p *Procedure) updateStateWithLock(state procedure.State) {
@@ -312,21 +298,21 @@ func (p *Procedure) convertToMeta() (procedure.Meta, error) {
 	defer p.lock.RUnlock()
 
 	rawData := rawData{
-		ID:                p.id,
+		ID:                p.params.ID,
 		FsmState:          p.fsm.Current(),
-		ShardID:           p.shardID,
-		snapShot:          p.snapShot,
-		OldLeaderNodeName: p.oldLeaderNodeName,
-		NewLeaderNodeName: p.newLeaderNodeName,
+		ShardID:           p.params.ShardID,
+		snapShot:          p.params.ClusterSnapShot,
+		OldLeaderNodeName: p.params.OldLeaderNodeName,
+		NewLeaderNodeName: p.params.NewLeaderNodeName,
 		State:             p.state,
 	}
 	rawDataBytes, err := json.Marshal(rawData)
 	if err != nil {
-		return procedure.Meta{}, procedure.ErrEncodeRawData.WithCausef("marshal raw data, procedureID:%v, err:%v", p.shardID, err)
+		return procedure.Meta{}, procedure.ErrEncodeRawData.WithCausef("marshal raw data, procedureID:%v, err:%v", p.params.ShardID, err)
 	}
 
 	meta := procedure.Meta{
-		ID:    p.id,
+		ID:    p.params.ID,
 		Typ:   procedure.TransferLeader,
 		State: p.state,
 

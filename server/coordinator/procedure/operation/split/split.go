@@ -50,21 +50,9 @@ var (
 )
 
 type Procedure struct {
-	id uint64
-
-	fsm *fsm.FSM
-
-	dispatch        eventdispatch.Dispatch
-	storage         procedure.Storage
-	clusterMetadata *metadata.ClusterMetadata
-
+	fsm                *fsm.FSM
+	params             ProcedureParams
 	relatedVersionInfo procedure.RelatedVersionInfo
-	snapshot           metadata.Snapshot
-	shardID            storage.ShardID
-	newShardID         storage.ShardID
-	tableNames         []string
-	targetNodeName     string
-	schemaName         string
 
 	// Protect the state.
 	lock  sync.RWMutex
@@ -89,7 +77,7 @@ type ProcedureParams struct {
 }
 
 func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
-	if err := validClusterTopology(params.ClusterSnapShot.Topology, params.ShardID); err != nil {
+	if err := validateClusterTopology(params.ClusterSnapShot.Topology, params.ShardID); err != nil {
 		return nil, err
 	}
 
@@ -103,17 +91,9 @@ func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
 
 	return &Procedure{
 		fsm:                splitFsm,
-		id:                 params.Id,
-		dispatch:           params.Dispatch,
-		clusterMetadata:    params.ClusterMetadata,
 		relatedVersionInfo: relatedVersionInfo,
-		snapshot:           params.ClusterSnapShot,
-		shardID:            params.ShardID,
-		newShardID:         params.NewShardID,
-		targetNodeName:     params.TargetNodeName,
-		tableNames:         params.TableNames,
-		schemaName:         params.SchemaName,
-		storage:            params.Storage,
+		params:             params,
+		state:              procedure.StateInit,
 	}, nil
 }
 
@@ -133,7 +113,7 @@ func buildRelatedVersionInfo(params ProcedureParams) procedure.RelatedVersionInf
 	return relatedVersionInfo
 }
 
-func validClusterTopology(topology metadata.Topology, shardID storage.ShardID) error {
+func validateClusterTopology(topology metadata.Topology, shardID storage.ShardID) error {
 	// Validate cluster state.
 	curState := topology.ClusterView.State
 	if curState != storage.ClusterStateStable {
@@ -172,7 +152,7 @@ type callbackRequest struct {
 }
 
 func (p *Procedure) ID() uint64 {
-	return p.id
+	return p.params.Id
 }
 
 func (p *Procedure) Typ() procedure.Typ {
@@ -265,8 +245,8 @@ func createShardViewCallback(event *fsm.Event) {
 		return
 	}
 
-	if err := req.p.clusterMetadata.CreateShardViews(req.ctx, []metadata.CreateShardView{{
-		ShardID: req.p.newShardID,
+	if err := req.p.params.ClusterMetadata.CreateShardViews(req.ctx, []metadata.CreateShardView{{
+		ShardID: req.p.params.ShardID,
 		Tables:  []storage.TableID{},
 	}}); err != nil {
 		procedure.CancelEventWithLog(event, err, "create shard views")
@@ -281,11 +261,11 @@ func updateShardTablesCallback(event *fsm.Event) {
 		return
 	}
 
-	if err := request.p.clusterMetadata.MigrateTable(request.ctx, metadata.MigrateTableRequest{
-		SchemaName: request.p.schemaName,
-		TableNames: request.p.tableNames,
-		OldShardID: request.p.shardID,
-		NewShardID: request.p.newShardID,
+	if err := request.p.params.ClusterMetadata.MigrateTable(request.ctx, metadata.MigrateTableRequest{
+		SchemaName: request.p.params.SchemaName,
+		TableNames: request.p.params.TableNames,
+		OldShardID: request.p.params.ShardID,
+		NewShardID: request.p.params.NewShardID,
 	}); err != nil {
 		procedure.CancelEventWithLog(event, err, "update shard tables")
 		return
@@ -301,9 +281,9 @@ func openShardCallback(event *fsm.Event) {
 	ctx := request.ctx
 
 	// Send open new shard request to CSE.
-	if err := request.p.dispatch.OpenShard(ctx, request.p.targetNodeName, eventdispatch.OpenShardRequest{
+	if err := request.p.params.Dispatch.OpenShard(ctx, request.p.params.TargetNodeName, eventdispatch.OpenShardRequest{
 		Shard: metadata.ShardInfo{
-			ID:      request.p.newShardID,
+			ID:      request.p.params.NewShardID,
 			Role:    storage.ShardRoleLeader,
 			Version: 0,
 		},
@@ -319,7 +299,7 @@ func finishCallback(event *fsm.Event) {
 		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
-	log.Info("split procedure finish", zap.Uint32("shardID", uint32(request.p.shardID)), zap.Uint32("newShardID", uint32(request.p.newShardID)))
+	log.Info("split procedure finish", zap.Uint32("shardID", uint32(request.p.params.ShardID)), zap.Uint32("newShardID", uint32(request.p.params.NewShardID)))
 }
 
 func (p *Procedure) persist(ctx context.Context) error {
@@ -327,7 +307,7 @@ func (p *Procedure) persist(ctx context.Context) error {
 	if err != nil {
 		return errors.WithMessage(err, "convert to meta")
 	}
-	err = p.storage.CreateOrUpdate(ctx, meta)
+	err = p.params.Storage.CreateOrUpdate(ctx, meta)
 	if err != nil {
 		return errors.WithMessage(err, "createOrUpdate procedure storage")
 	}
@@ -347,19 +327,19 @@ func (p *Procedure) convertToMeta() (procedure.Meta, error) {
 	defer p.lock.RUnlock()
 
 	rawData := rawData{
-		SchemaName:     p.schemaName,
-		TableNames:     p.tableNames,
-		ShardID:        uint32(p.shardID),
-		NewShardID:     uint32(p.newShardID),
-		TargetNodeName: p.targetNodeName,
+		SchemaName:     p.params.SchemaName,
+		TableNames:     p.params.TableNames,
+		ShardID:        uint32(p.params.ShardID),
+		NewShardID:     uint32(p.params.NewShardID),
+		TargetNodeName: p.params.TargetNodeName,
 	}
 	rawDataBytes, err := json.Marshal(rawData)
 	if err != nil {
-		return procedure.Meta{}, procedure.ErrEncodeRawData.WithCausef("marshal raw data, procedureID:%v, err:%v", p.shardID, err)
+		return procedure.Meta{}, procedure.ErrEncodeRawData.WithCausef("marshal raw data, procedureID:%v, err:%v", p.params.ShardID, err)
 	}
 
 	meta := procedure.Meta{
-		ID:    p.id,
+		ID:    p.params.Id,
 		Typ:   procedure.Split,
 		State: p.state,
 
