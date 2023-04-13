@@ -44,7 +44,7 @@ func (p *RandomBalancedShardPicker) PickShards(_ context.Context, snapshot metad
 
 	if !enableDuplicateNode {
 		if len(nodeShardsMapping) < expectShardNum {
-			return []storage.ShardNode{}, errors.WithMessagef(ErrNodeNumberNotEnough, "number of nodes is:%d, expecet number of shards is:%d", len(nodeShardsMapping), expectShardNum)
+			return nil, errors.WithMessagef(ErrNodeNumberNotEnough, "number of nodes is:%d, expecet number of shards is:%d", len(nodeShardsMapping), expectShardNum)
 		}
 	}
 
@@ -74,7 +74,7 @@ func (p *RandomBalancedShardPicker) PickShards(_ context.Context, snapshot metad
 
 			selectNodeIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(nodeNames))))
 			if err != nil {
-				return []storage.ShardNode{}, errors.WithMessage(err, "generate random node index")
+				return nil, errors.WithMessage(err, "generate random node index")
 			}
 
 			nodeShards := tempNodeShardMapping[nodeNames[selectNodeIndex.Int64()]]
