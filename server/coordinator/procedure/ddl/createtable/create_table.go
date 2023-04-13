@@ -4,13 +4,14 @@ package createtable
 
 import (
 	"context"
-	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/ddl"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
@@ -48,13 +49,13 @@ func prepareCallback(event *fsm.Event) {
 	}
 	params := req.p.params
 
-	createTableResult, err := procedure.CreateTableMetadata(req.ctx, params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetName(), params.ShardID, nil)
+	createTableResult, err := ddl.CreateTableMetadata(req.ctx, params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetName(), params.ShardID, nil)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "create table metadata")
 		return
 	}
 
-	if err = procedure.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, createTableResult.ShardVersionUpdate.ShardID, procedure.BuildCreateTableRequest(createTableResult, params.SourceReq, params.SourceReq.GetPartitionTableInfo().GetPartitionInfo())); err != nil {
+	if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, createTableResult.ShardVersionUpdate.ShardID, ddl.BuildCreateTableRequest(createTableResult, params.SourceReq, params.SourceReq.GetPartitionTableInfo().GetPartitionInfo())); err != nil {
 		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}

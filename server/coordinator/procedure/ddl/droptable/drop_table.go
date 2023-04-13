@@ -5,11 +5,11 @@ package droptable
 import (
 	"context"
 	"fmt"
-	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -215,7 +215,7 @@ func validateTable(params ProcedureParams) (storage.ShardID, error) {
 		}
 	}
 
-	return 0, errors.WithMessage(metadata.ErrShardNotFound, fmt.Sprintf("The shard corresponding to the table was not found, schemaName:%s,tableName:%s", params.SourceReq.GetSchemaName(), params.SourceReq.GetName()))
+	return 0, errors.WithMessagef(metadata.ErrShardNotFound, "The shard corresponding to the table was not found, schema:%s, table:%s", params.SourceReq.GetSchemaName(), params.SourceReq.GetName())
 }
 
 type Procedure struct {

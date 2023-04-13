@@ -5,13 +5,14 @@ package createpartitiontable
 import (
 	"context"
 	"encoding/json"
-	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/ddl"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
@@ -197,14 +198,14 @@ func createPartitionTableCallback(event *fsm.Event) {
 	partTableShardNode := params.PartitionTableShards[0]
 
 	partInfo := req.p.params.SourceReq.GetPartitionTableInfo().GetPartitionInfo()
-	createTableResult, err := procedure.CreateTableMetadata(req.ctx, params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetName(), partTableShardNode.ShardInfo.ID, partInfo)
+	createTableResult, err := ddl.CreateTableMetadata(req.ctx, params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetName(), partTableShardNode.ShardInfo.ID, partInfo)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "create table metadata")
 		return
 	}
 	req.p.createTableResult = createTableResult
 
-	if err = procedure.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, partTableShardNode.ShardInfo.ID, procedure.BuildCreateTableRequest(createTableResult, params.SourceReq, partInfo)); err != nil {
+	if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, partTableShardNode.ShardInfo.ID, ddl.BuildCreateTableRequest(createTableResult, params.SourceReq, partInfo)); err != nil {
 		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}
@@ -220,13 +221,13 @@ func createDataTablesCallback(event *fsm.Event) {
 	params := req.p.params
 
 	for i, subTableShard := range params.SubTablesShards {
-		createTableResult, err := procedure.CreateTableMetadata(req.ctx, params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetPartitionTableInfo().SubTableNames[i], subTableShard.ShardInfo.ID, nil)
+		createTableResult, err := ddl.CreateTableMetadata(req.ctx, params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetPartitionTableInfo().SubTableNames[i], subTableShard.ShardInfo.ID, nil)
 		if err != nil {
 			procedure.CancelEventWithLog(event, err, "create table metadata")
 			return
 		}
 
-		if err = procedure.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, subTableShard.ShardInfo.ID, procedure.BuildCreateTableRequest(createTableResult, params.SourceReq, nil)); err != nil {
+		if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, subTableShard.ShardInfo.ID, ddl.BuildCreateTableRequest(createTableResult, params.SourceReq, nil)); err != nil {
 			procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
 			return
 		}
@@ -266,6 +267,7 @@ func (p *Procedure) persist(ctx context.Context) error {
 	return nil
 }
 
+// TODO: Replace rawData with structure defined by proto.
 type rawData struct {
 	ID       uint64
 	FsmState string
