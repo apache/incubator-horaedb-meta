@@ -5,6 +5,7 @@ package createpartitiontable
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
@@ -215,7 +216,7 @@ func createDataTablesCallback(event *fsm.Event) {
 	}
 	params := req.p.params
 	if len(params.SubTablesShards) != len(params.SourceReq.GetPartitionTableInfo().SubTableNames) {
-		procedure.CancelEventWithLog(event, procedure.ErrShardNumberNotEnough, "shards number must be equal to sub tables number", zap.Int("shardNumber", len(params.SubTablesShards)), zap.Int("subTableNumber", len(params.SourceReq.GetPartitionTableInfo().SubTableNames)))
+		panic(fmt.Sprintf("shards number must be equal to sub tables number, shardNumber:%d, subTableNumber:%d", len(params.SubTablesShards), len(params.SourceReq.GetPartitionTableInfo().SubTableNames)))
 		return
 	}
 
