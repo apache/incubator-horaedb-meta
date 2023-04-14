@@ -47,26 +47,25 @@ var (
 )
 
 type Procedure struct {
-	fsm                *fsm.FSM
-	params             ProcedureParams
-	relatedVersionInfo procedure.RelatedVersionInfo
-	createTableResult  metadata.CreateTableResult
+	fsm                        *fsm.FSM
+	params                     ProcedureParams
+	relatedVersionInfo         procedure.RelatedVersionInfo
+	createPartitionTableResult metadata.CreateTableMetadataResult
 
 	lock  sync.RWMutex
 	state procedure.State
 }
 
 type ProcedureParams struct {
-	ID                   uint64
-	ClusterMetadata      *metadata.ClusterMetadata
-	ClusterSnapshot      metadata.Snapshot
-	Dispatch             eventdispatch.Dispatch
-	Storage              procedure.Storage
-	SourceReq            *metaservicepb.CreateTableRequest
-	PartitionTableShards []metadata.ShardNodeWithVersion
-	SubTablesShards      []metadata.ShardNodeWithVersion
-	OnSucceeded          func(metadata.CreateTableResult) error
-	OnFailed             func(error) error
+	ID              uint64
+	ClusterMetadata *metadata.ClusterMetadata
+	ClusterSnapshot metadata.Snapshot
+	Dispatch        eventdispatch.Dispatch
+	Storage         procedure.Storage
+	SourceReq       *metaservicepb.CreateTableRequest
+	SubTablesShards []metadata.ShardNodeWithVersion
+	OnSucceeded     func(metadata.CreateTableResult) error
+	OnFailed        func(error) error
 }
 
 func NewProcedure(params ProcedureParams) *Procedure {
@@ -194,21 +193,16 @@ func createPartitionTableCallback(event *fsm.Event) {
 	}
 	params := req.p.params
 
-	// Select first shard to create partition table.
-	partTableShardNode := params.PartitionTableShards[0]
-
-	partInfo := req.p.params.SourceReq.GetPartitionTableInfo().GetPartitionInfo()
-	createTableResult, err := ddl.CreateTableMetadata(req.ctx, params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetName(), partTableShardNode.ShardInfo.ID, partInfo)
+	createTableMetadaResult, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, metadata.CreateTableMetadataRequest{
+		SchemaName:    params.SourceReq.GetSchemaName(),
+		TableName:     params.SourceReq.GetName(),
+		PartitionInfo: storage.PartitionInfo{Info: params.SourceReq.PartitionTableInfo.GetPartitionInfo()},
+	})
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "create table metadata")
 		return
 	}
-	req.p.createTableResult = createTableResult
-
-	if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, partTableShardNode.ShardInfo.ID, ddl.BuildCreateTableRequest(createTableResult, params.SourceReq, partInfo)); err != nil {
-		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
-		return
-	}
+	req.p.createPartitionTableResult = createTableMetadaResult
 }
 
 // 2. Create data tables in target nodes.
@@ -242,7 +236,10 @@ func finishCallback(event *fsm.Event) {
 	}
 	log.Info("create partition table finish")
 
-	if err := req.p.params.OnSucceeded(req.p.createTableResult); err != nil {
+	if err := req.p.params.OnSucceeded(metadata.CreateTableResult{
+		Table:              req.p.createPartitionTableResult.Table,
+		ShardVersionUpdate: metadata.ShardVersionUpdate{},
+	}); err != nil {
 		procedure.CancelEventWithLog(event, err, "create partition table on succeeded")
 		return
 	}
@@ -283,11 +280,10 @@ func (p *Procedure) convertToMeta() (procedure.Meta, error) {
 	defer p.lock.RUnlock()
 
 	rawData := rawData{
-		ID:                   p.params.ID,
-		FsmState:             p.fsm.Current(),
-		State:                p.state,
-		PartitionTableShards: p.params.PartitionTableShards,
-		SubTablesShards:      p.params.SubTablesShards,
+		ID:              p.params.ID,
+		FsmState:        p.fsm.Current(),
+		State:           p.state,
+		SubTablesShards: p.params.SubTablesShards,
 	}
 	rawDataBytes, err := json.Marshal(rawData)
 	if err != nil {
