@@ -6,9 +6,14 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
+	"time"
 
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/pkg/errors"
+)
+
+const (
+	expiredThreshold = time.Second * 10
 )
 
 type NodePicker interface {
@@ -22,9 +27,10 @@ func NewRandomNodePicker() NodePicker {
 }
 
 func (p *RandomNodePicker) PickNode(_ context.Context, registeredNodes []metadata.RegisteredNode) (metadata.RegisteredNode, error) {
+	now := time.Now().Unix()
 	onlineNodeLength := 0
 	for _, registeredNode := range registeredNodes {
-		if registeredNode.IsOnline() {
+		if !registeredNode.IsExpired(now, int64(expiredThreshold)) {
 			onlineNodeLength++
 		}
 	}
@@ -40,7 +46,7 @@ func (p *RandomNodePicker) PickNode(_ context.Context, registeredNodes []metadat
 	selectIdx := int(randSelectedIdx.Int64())
 	curOnlineIdx := -1
 	for idx := 0; idx < len(registeredNodes); idx++ {
-		if registeredNodes[idx].IsOnline() {
+		if !registeredNodes[idx].IsExpired(now, int64(expiredThreshold)) {
 			curOnlineIdx++
 		}
 		if curOnlineIdx == selectIdx {

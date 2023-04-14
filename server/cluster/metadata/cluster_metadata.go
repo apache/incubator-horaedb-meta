@@ -273,8 +273,33 @@ func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request Creat
 		Table: table,
 	}
 
-	log.Info("create table metadata succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", res)), zap.Object("result", res))
+	log.Info("create table metadata succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", res)))
 	return res, nil
+}
+
+func (c *ClusterMetadata) DropTableMetadata(ctx context.Context, schemaName, tableName string) (DropTableMetadataResult, error) {
+	log.Info("drop table start", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
+
+	table, ok, err := c.tableManager.GetTable(schemaName, tableName)
+	if err != nil {
+		return DropTableMetadataResult{}, errors.WithMessage(err, "get table")
+	}
+
+	if !ok {
+		return DropTableMetadataResult{}, ErrTableNotFound
+	}
+
+	err = c.tableManager.DropTable(ctx, schemaName, tableName)
+	if err != nil {
+		return DropTableMetadataResult{}, errors.WithMessage(err, "table manager drop table")
+	}
+
+	ret := DropTableMetadataResult{
+		table,
+	}
+	log.Info("drop table metadata success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("result", fmt.Sprintf("%+v", ret)))
+
+	return ret, nil
 }
 
 func (c *ClusterMetadata) CreateTable(ctx context.Context, request CreateTableRequest) (CreateTableResult, error) {
@@ -341,7 +366,7 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 	}
 
 	// Update shard node mapping.
-	var shardNodes map[string][]storage.ShardNode
+	shardNodes := make(map[string][]storage.ShardNode, len(registeredNode.ShardInfos))
 	for _, shardInfo := range registeredNode.ShardInfos {
 		shardNodes[registeredNode.Node.Name] = append(shardNodes[registeredNode.Node.Name], storage.ShardNode{
 			ID:        shardInfo.ID,
@@ -349,7 +374,7 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 			NodeName:  registeredNode.Node.Name,
 		})
 	}
-	if err := c.updateClusterViewByNode(ctx, shardNodes); err != nil {
+	if err := c.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view failed")
 	}
 
@@ -426,10 +451,11 @@ func (c *ClusterMetadata) RouteTables(_ context.Context, schemaName string, tabl
 		table := tables[tableID]
 		routeEntries[table.Name] = RouteEntry{
 			Table: TableInfo{
-				ID:         table.ID,
-				Name:       table.Name,
-				SchemaID:   table.SchemaID,
-				SchemaName: schemaName,
+				ID:            table.ID,
+				Name:          table.Name,
+				SchemaID:      table.SchemaID,
+				SchemaName:    schemaName,
+				PartitionInfo: table.PartitionInfo,
 			},
 			NodeShards: nodeShardsResult,
 		}
@@ -501,9 +527,16 @@ func (c *ClusterMetadata) UpdateClusterView(ctx context.Context, state storage.C
 	return nil
 }
 
-func (c *ClusterMetadata) updateClusterViewByNode(ctx context.Context, shardNodes map[string][]storage.ShardNode) error {
+func (c *ClusterMetadata) UpdateClusterViewByNode(ctx context.Context, shardNodes map[string][]storage.ShardNode) error {
 	if err := c.topologyManager.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view")
+	}
+	return nil
+}
+
+func (c *ClusterMetadata) DropShardNode(ctx context.Context, shardNodes []storage.ShardNode) error {
+	if err := c.topologyManager.DropShardNodes(ctx, shardNodes); err != nil {
+		return errors.WithMessage(err, "drop shard nodes")
 	}
 	return nil
 }
@@ -531,6 +564,21 @@ func (c *ClusterMetadata) GetClusterSnapshot() Snapshot {
 func (c *ClusterMetadata) Init(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	var createShardViews []CreateShardView
+	for i := uint32(0); i < c.metaData.ShardTotal; i++ {
+		shardID, err := c.AllocShardID(ctx)
+		if err != nil {
+			return errors.WithMessage(err, "alloc shard id failed")
+		}
+		createShardViews = append(createShardViews, CreateShardView{
+			ShardID: storage.ShardID(shardID),
+			Tables:  []storage.TableID{},
+		})
+	}
+	if err := c.topologyManager.CreateShardViews(ctx, createShardViews); err != nil {
+		return errors.WithMessage(err, "create shard view")
+	}
 
 	return c.topologyManager.InitClusterView(ctx)
 }

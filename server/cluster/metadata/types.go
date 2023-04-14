@@ -74,6 +74,10 @@ type DropTableResult struct {
 	ShardVersionUpdate []ShardVersionUpdate
 }
 
+type DropTableMetadataResult struct {
+	Table storage.Table
+}
+
 type OpenTableRequest struct {
 	SchemaName string
 	TableName  string
@@ -128,12 +132,8 @@ func NewRegisteredNode(meta storage.Node, shardInfos []ShardInfo) RegisteredNode
 	}
 }
 
-func (n RegisteredNode) IsOnline() bool {
-	return n.Node.State == storage.NodeStateOnline
-}
-
-func (n RegisteredNode) IsExpired(now uint64, aliveThreshold uint64) bool {
-	return now >= aliveThreshold+n.Node.LastTouchTime
+func (n RegisteredNode) IsExpired(now int64, aliveThreshold int64) bool {
+	return now >= aliveThreshold+int64(n.Node.LastTouchTime)
 }
 
 func ConvertShardsInfoToPB(shard ShardInfo) *metaservicepb.ShardInfo {

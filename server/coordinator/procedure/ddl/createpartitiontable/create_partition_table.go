@@ -217,7 +217,6 @@ func createDataTablesCallback(event *fsm.Event) {
 	params := req.p.params
 	if len(params.SubTablesShards) != len(params.SourceReq.GetPartitionTableInfo().SubTableNames) {
 		panic(fmt.Sprintf("shards number must be equal to sub tables number, shardNumber:%d, subTableNumber:%d", len(params.SubTablesShards), len(params.SourceReq.GetPartitionTableInfo().SubTableNames)))
-		return
 	}
 
 	for i, subTableShard := range params.SubTablesShards {

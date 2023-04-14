@@ -60,7 +60,7 @@ type Procedure struct {
 }
 
 type ProcedureParams struct {
-	Id uint64
+	ID uint64
 
 	Dispatch eventdispatch.Dispatch
 	Storage  procedure.Storage
@@ -152,7 +152,7 @@ type callbackRequest struct {
 }
 
 func (p *Procedure) ID() uint64 {
-	return p.params.Id
+	return p.params.ID
 }
 
 func (p *Procedure) Typ() procedure.Typ {
@@ -246,7 +246,7 @@ func createShardViewCallback(event *fsm.Event) {
 	}
 
 	if err := req.p.params.ClusterMetadata.CreateShardViews(req.ctx, []metadata.CreateShardView{{
-		ShardID: req.p.params.ShardID,
+		ShardID: req.p.params.NewShardID,
 		Tables:  []storage.TableID{},
 	}}); err != nil {
 		procedure.CancelEventWithLog(event, err, "create shard views")
@@ -339,7 +339,7 @@ func (p *Procedure) convertToMeta() (procedure.Meta, error) {
 	}
 
 	meta := procedure.Meta{
-		ID:    p.params.Id,
+		ID:    p.params.ID,
 		Typ:   procedure.Split,
 		State: p.state,
 

@@ -122,6 +122,19 @@ func buildRelatedVersionInfo(params ProcedureParams) procedure.RelatedVersionInf
 }
 
 func validateClusterTopology(topology metadata.Topology, shardID storage.ShardID, oldLeaderNodeName string) error {
+	found := false
+	for _, shardView := range topology.ShardViews {
+		if shardView.ShardID == shardID {
+			found = true
+		}
+	}
+	if !found {
+		log.Error("shard not found", zap.Uint64("shardID", uint64(shardID)))
+		return metadata.ErrShardNotFound
+	}
+	if len(oldLeaderNodeName) == 0 {
+		return nil
+	}
 	shardNodes := topology.ClusterView.ShardNodes
 	if len(shardNodes) == 0 {
 		log.Error("shard not exist in any node", zap.Uint32("shardID", uint32(shardID)))
@@ -135,16 +148,6 @@ func validateClusterTopology(topology metadata.Topology, shardID storage.ShardID
 				return metadata.ErrNodeNotFound
 			}
 		}
-	}
-	found := false
-	for _, shardView := range topology.ShardViews {
-		if shardView.ShardID == shardID {
-			found = true
-		}
-	}
-	if !found {
-		log.Error("shard not found", zap.Uint64("shardID", uint64(shardID)))
-		return metadata.ErrShardNotFound
 	}
 	return nil
 }
@@ -240,6 +243,10 @@ func closeOldLeaderCallback(event *fsm.Event) {
 		return
 	}
 	ctx := req.ctx
+
+	if len(req.p.params.OldLeaderNodeName) == 0 {
+		return
+	}
 
 	closeShardRequest := eventdispatch.CloseShardRequest{
 		ShardID: uint32(req.p.params.ShardID),

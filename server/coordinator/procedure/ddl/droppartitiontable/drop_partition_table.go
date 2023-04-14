@@ -59,6 +59,7 @@ type Procedure struct {
 type ProcedureParams struct {
 	ID              uint64
 	ClusterMetadata *metadata.ClusterMetadata
+	ClusterSnapshot metadata.Snapshot
 	Dispatch        eventdispatch.Dispatch
 	Storage         procedure.Storage
 	SourceReq       *metaservicepb.DropTableRequest
@@ -72,6 +73,7 @@ func NewProcedure(params ProcedureParams) *Procedure {
 		createDropPartitionTableEvents,
 		createDropPartitionTableCallbacks,
 	)
+
 	return &Procedure{
 		fsm:    fsm,
 		params: params,
@@ -86,11 +88,20 @@ func (p *Procedure) Typ() procedure.Typ {
 	return procedure.DropPartitionTable
 }
 
+func (p *Procedure) RelatedVersionInfo() procedure.RelatedVersionInfo {
+	return procedure.RelatedVersionInfo{}
+}
+
+func (p *Procedure) Priority() procedure.Priority {
+	return procedure.PriorityMed
+}
+
 func (p *Procedure) Start(ctx context.Context) error {
 	p.updateStateWithLock(procedure.StateRunning)
 
 	dropPartitionTableRequest := &callbackRequest{
 		ctx: ctx,
+		p:   p,
 	}
 
 	for {
@@ -254,28 +265,13 @@ func dropPartitionTableCallback(event *fsm.Event) {
 		return
 	}
 
-	dropTableResult, err := dropTableMetaData(event, req.tableName())
+	dropTableMetadataResult, err := req.p.params.ClusterMetadata.DropTableMetadata(req.ctx, req.schemaName(), req.tableName())
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", req.tableName()))
 		return
 	}
-	if !dropTableResult.exists {
-		procedure.CancelEventWithLog(event, procedure.ErrTableNotExists, fmt.Sprintf("table:%s", req.tableName()))
-		return
-	}
 
-	if len(dropTableResult.result.ShardVersionUpdate) == 0 {
-		procedure.CancelEventWithLog(event, procedure.ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult need >=1, current is %d", len(dropTableResult.result.ShardVersionUpdate)))
-		return
-	}
-
-	req.table = dropTableResult.table
-
-	// Drop table in the first shard.
-	if err := dispatchDropTable(event, dropTableResult.table, dropTableResult.result.ShardVersionUpdate[0]); err != nil {
-		procedure.CancelEventWithLog(event, err, fmt.Sprintf("drop table, table:%s", dropTableResult.table.Name))
-		return
-	}
+	req.table = dropTableMetadataResult.Table
 }
 
 func finishCallback(event *fsm.Event) {
