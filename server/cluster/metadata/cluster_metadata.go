@@ -269,12 +269,12 @@ func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request Creat
 		return CreateTableMetadataResult{}, errors.WithMessage(err, "table manager create table")
 	}
 
-	ret := CreateTableMetadataResult{
+	res := CreateTableMetadataResult{
 		Table: table,
 	}
 
-	log.Info("create table metadata succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", ret)))
-	return ret, nil
+	log.Info("create table metadata succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", res)), zap.Object("result", res))
+	return res, nil
 }
 
 func (c *ClusterMetadata) CreateTable(ctx context.Context, request CreateTableRequest) (CreateTableResult, error) {

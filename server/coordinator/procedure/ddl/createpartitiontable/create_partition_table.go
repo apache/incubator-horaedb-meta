@@ -16,6 +16,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 // fsm state change:
@@ -234,7 +235,7 @@ func finishCallback(event *fsm.Event) {
 		procedure.CancelEventWithLog(event, err, "get request from event")
 		return
 	}
-	log.Info("create partition table finish")
+	log.Info("create partition table finish", zap.String("tableName", req.p.params.SourceReq.GetName()))
 
 	if err := req.p.params.OnSucceeded(metadata.CreateTableResult{
 		Table:              req.p.createPartitionTableResult.Table,
