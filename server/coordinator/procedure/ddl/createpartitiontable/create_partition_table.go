@@ -88,7 +88,7 @@ func NewProcedure(params ProcedureParams) *Procedure {
 
 func buildRelatedVersionInfo(params ProcedureParams) procedure.RelatedVersionInfo {
 	shardWithVersion := make(map[storage.ShardID]uint64, len(params.SubTablesShards))
-	shardIDs := make([]storage.ShardID, len(params.SubTablesShards))
+	shardIDs := make([]storage.ShardID, 0, len(params.SubTablesShards))
 	for _, shardView := range params.SubTablesShards {
 		shardIDs = append(shardIDs, shardView.ShardInfo.ID)
 	}
@@ -214,6 +214,10 @@ func createDataTablesCallback(event *fsm.Event) {
 		return
 	}
 	params := req.p.params
+	if len(params.SubTablesShards) != len(params.SourceReq.GetPartitionTableInfo().SubTableNames) {
+		procedure.CancelEventWithLog(event, procedure.ErrShardNumberNotEnough, "shards number must be equal to sub tables number", zap.Int("shardNumber", len(params.SubTablesShards)), zap.Int("subTableNumber", len(params.SourceReq.GetPartitionTableInfo().SubTableNames)))
+		return
+	}
 
 	for i, subTableShard := range params.SubTablesShards {
 		createTableResult, err := ddl.CreateTableMetadata(req.ctx, params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetPartitionTableInfo().SubTableNames[i], subTableShard.ShardInfo.ID, nil)
