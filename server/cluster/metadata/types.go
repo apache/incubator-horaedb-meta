@@ -3,11 +3,14 @@
 package metadata
 
 import (
+	"time"
+
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/storage"
 )
 
 const (
+	expiredThreshold                     = time.Second * 10
 	MinShardID                           = 0
 	HeartbeatKeepAliveIntervalSec uint64 = 15
 )
@@ -132,8 +135,8 @@ func NewRegisteredNode(meta storage.Node, shardInfos []ShardInfo) RegisteredNode
 	}
 }
 
-func (n RegisteredNode) IsExpired(now int64, aliveThreshold int64) bool {
-	return now >= aliveThreshold+int64(n.Node.LastTouchTime)
+func (n RegisteredNode) IsExpired(now int64) bool {
+	return now >= int64(expiredThreshold)+int64(n.Node.LastTouchTime)
 }
 
 func ConvertShardsInfoToPB(shard ShardInfo) *metaservicepb.ShardInfo {

@@ -12,10 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	expiredThreshold = time.Second * 10
-)
-
 type NodePicker interface {
 	PickNode(ctx context.Context, registerNodes []metadata.RegisteredNode) (metadata.RegisteredNode, error)
 }
@@ -30,7 +26,7 @@ func (p *RandomNodePicker) PickNode(_ context.Context, registeredNodes []metadat
 	now := time.Now().Unix()
 	onlineNodeLength := 0
 	for _, registeredNode := range registeredNodes {
-		if !registeredNode.IsExpired(now, int64(expiredThreshold)) {
+		if !registeredNode.IsExpired(now) {
 			onlineNodeLength++
 		}
 	}
@@ -46,7 +42,7 @@ func (p *RandomNodePicker) PickNode(_ context.Context, registeredNodes []metadat
 	selectIdx := int(randSelectedIdx.Int64())
 	curOnlineIdx := -1
 	for idx := 0; idx < len(registeredNodes); idx++ {
-		if !registeredNodes[idx].IsExpired(now, int64(expiredThreshold)) {
+		if !registeredNodes[idx].IsExpired(now) {
 			curOnlineIdx++
 		}
 		if curOnlineIdx == selectIdx {

@@ -186,7 +186,7 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 		ShardID:   shardID,
 		Version:   prevVersion + 1,
 		TableIDs:  tableIDs,
-		CreatedAt: uint64(time.Now().UnixMilli()),
+		CreatedAt: generateCreateUnixTime(),
 	}
 
 	// Update shard view in storage.
@@ -252,7 +252,7 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 		ShardID:   shardView.ShardID,
 		Version:   prevVersion + 1,
 		TableIDs:  newTableIDs,
-		CreatedAt: uint64(time.Now().UnixMilli()),
+		CreatedAt: generateCreateUnixTime(),
 	}
 	if err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
 		ClusterID:     m.clusterID,
@@ -320,7 +320,7 @@ func (m *TopologyManagerImpl) EvictTable(ctx context.Context, tableID storage.Ta
 				ShardID:   shardView.ShardID,
 				Version:   prevVersion + 1,
 				TableIDs:  tableIDs,
-				CreatedAt: uint64(time.Now().UnixMilli()),
+				CreatedAt: generateCreateUnixTime(),
 			},
 			LatestVersion: prevVersion,
 		}); err != nil {
@@ -416,9 +416,9 @@ func (m *TopologyManagerImpl) DropShardNodes(ctx context.Context, shardNodes []s
 
 	newShardNodes := make([]storage.ShardNode, 0, len(m.clusterView.ShardNodes))
 
-	for _, originShardNode := range m.clusterView.ShardNodes {
-		if !contains(shardNodes, originShardNode) {
-			newShardNodes = append(newShardNodes, originShardNode)
+	for i := 0; i < len(m.clusterView.ShardNodes); i++ {
+		if contains(shardNodes, m.clusterView.ShardNodes[i]) {
+			newShardNodes = append(newShardNodes, m.clusterView.ShardNodes[i])
 		}
 	}
 
@@ -440,7 +440,7 @@ func (m *TopologyManagerImpl) InitClusterView(ctx context.Context) error {
 		Version:    0,
 		State:      storage.ClusterStateEmpty,
 		ShardNodes: nil,
-		CreatedAt:  uint64(time.Now().UnixMilli()),
+		CreatedAt:  generateCreateUnixTime(),
 	}
 
 	err := m.storage.CreateClusterView(ctx, storage.CreateClusterViewRequest{ClusterView: clusterView})
@@ -464,7 +464,7 @@ func (m *TopologyManagerImpl) updateClusterViewWithLock(ctx context.Context, sta
 		Version:    m.clusterView.Version + 1,
 		State:      state,
 		ShardNodes: shardNodes,
-		CreatedAt:  uint64(time.Now().UnixMilli()),
+		CreatedAt:  generateCreateUnixTime(),
 	}
 	if err := m.storage.UpdateClusterView(ctx, storage.UpdateClusterViewRequest{
 		ClusterID:     m.clusterID,
@@ -518,7 +518,7 @@ func (m *TopologyManagerImpl) CreateShardViews(ctx context.Context, createShardV
 			ShardID:   createShardView.ShardID,
 			Version:   0,
 			TableIDs:  createShardView.Tables,
-			CreatedAt: uint64(time.Now().UnixMilli()),
+			CreatedAt: generateCreateUnixTime(),
 		})
 	}
 	if err := m.storage.CreateShardViews(ctx, storage.CreateShardViewsRequest{
@@ -610,4 +610,8 @@ func (m *TopologyManagerImpl) loadNodes(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func generateCreateUnixTime() uint64 {
+	return uint64(time.Now().UnixMilli())
 }

@@ -110,7 +110,14 @@ func (c *ClusterMetadata) GetShardTables(shardIDs []storage.ShardID) map[storage
 	for _, shardID := range shardIDs {
 		_, exists := result[shardID]
 		if !exists {
-			result[shardID] = ShardTables{}
+			result[shardID] = ShardTables{
+				Shard: ShardInfo{
+					ID:      shardID,
+					Role:    storage.ShardRoleLeader,
+					Version: 0,
+				},
+				Tables: []TableInfo{},
+			}
 		}
 	}
 	return result
@@ -406,6 +413,7 @@ func (c *ClusterMetadata) AllocShardID(ctx context.Context) (uint32, error) {
 }
 
 func (c *ClusterMetadata) RouteTables(_ context.Context, schemaName string, tableNames []string) (RouteTablesResult, error) {
+	routeEntries := make(map[string]RouteEntry, len(tableNames))
 	tables := make(map[storage.TableID]storage.Table, len(tableNames))
 	tableIDs := make([]storage.TableID, 0, len(tableNames))
 	for _, tableName := range tableNames {
@@ -414,8 +422,22 @@ func (c *ClusterMetadata) RouteTables(_ context.Context, schemaName string, tabl
 			return RouteTablesResult{}, errors.WithMessage(err, "table manager get table")
 		}
 		if exists {
-			tables[table.ID] = table
-			tableIDs = append(tableIDs, table.ID)
+			// TODO: Adapt to the current implementation of the partition table, which may need to be reconstructed later.
+			if !table.IsPartitioned() {
+				tables[table.ID] = table
+				tableIDs = append(tableIDs, table.ID)
+			} else {
+				routeEntries[table.Name] = RouteEntry{
+					Table: TableInfo{
+						ID:            table.ID,
+						Name:          table.Name,
+						SchemaID:      table.SchemaID,
+						SchemaName:    schemaName,
+						PartitionInfo: table.PartitionInfo,
+					},
+					NodeShards: nil,
+				}
+			}
 		}
 	}
 
@@ -423,7 +445,6 @@ func (c *ClusterMetadata) RouteTables(_ context.Context, schemaName string, tabl
 	if err != nil {
 		return RouteTablesResult{}, errors.WithMessage(err, "topology get shard nodes by table ids")
 	}
-	routeEntries := make(map[string]RouteEntry, len(tableNames))
 	for tableID, value := range tableShardNodesWithShardViewVersion.ShardNodes {
 		nodeShards := make([]ShardNodeWithVersion, 0, len(value))
 		for _, shardNode := range value {

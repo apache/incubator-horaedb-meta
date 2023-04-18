@@ -87,13 +87,13 @@ func NewProcedure(params ProcedureParams) (*Procedure, error) {
 }
 
 func buildRelatedVersionInfo(params ProcedureParams) (procedure.RelatedVersionInfo, error) {
-	shardViewWithVersion := make(map[storage.ShardID]uint64, 0)
 	tableShardMapping := make(map[storage.TableID]storage.ShardID, len(params.SourceReq.PartitionTableInfo.GetSubTableNames()))
 	for shardID, shardView := range params.ClusterSnapshot.Topology.ShardViewsMapping {
 		for _, tableID := range shardView.TableIDs {
 			tableShardMapping[tableID] = shardID
 		}
 	}
+	shardViewWithVersion := make(map[storage.ShardID]uint64, 0)
 	for _, subTableName := range params.SourceReq.PartitionTableInfo.GetSubTableNames() {
 		table, exists, err := params.ClusterMetadata.GetTable(params.SourceReq.GetSchemaName(), subTableName)
 		if err != nil {

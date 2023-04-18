@@ -170,7 +170,7 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 	return createpartitiontable.NewProcedure(createpartitiontable.ProcedureParams{
 		ID:              id,
 		ClusterMetadata: request.ClusterMetadata,
-		ClusterSnapshot: metadata.Snapshot{},
+		ClusterSnapshot: snapshot,
 		Dispatch:        f.dispatch,
 		Storage:         f.storage,
 		SourceReq:       request.SourceReq,

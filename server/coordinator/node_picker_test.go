@@ -30,7 +30,7 @@ func TestRandomNodePicker(t *testing.T) {
 
 	for i := 0; i < nodeLength; i++ {
 		nodes = append(nodes, metadata.RegisteredNode{
-			Node:       storage.Node{Name: strconv.Itoa(i), LastTouchTime: uint64(time.Now().Unix() - int64(time.Minute))},
+			Node:       storage.Node{Name: strconv.Itoa(i), LastTouchTime: generateLastTouchTime(time.Minute)},
 			ShardInfos: nil,
 		})
 	}
@@ -40,7 +40,7 @@ func TestRandomNodePicker(t *testing.T) {
 	nodes = nodes[:0]
 	for i := 0; i < nodeLength; i++ {
 		nodes = append(nodes, metadata.RegisteredNode{
-			Node:       storage.Node{Name: strconv.Itoa(i), LastTouchTime: uint64(time.Now().Unix())},
+			Node:       storage.Node{Name: strconv.Itoa(i), LastTouchTime: generateLastTouchTime(0)},
 			ShardInfos: nil,
 		})
 	}
@@ -50,7 +50,7 @@ func TestRandomNodePicker(t *testing.T) {
 	nodes = nodes[:0]
 	for i := 0; i < nodeLength; i++ {
 		nodes = append(nodes, metadata.RegisteredNode{
-			Node:       storage.Node{Name: strconv.Itoa(i), LastTouchTime: uint64(time.Now().Unix() - int64(time.Minute))},
+			Node:       storage.Node{Name: strconv.Itoa(i), LastTouchTime: generateLastTouchTime(time.Minute)},
 			ShardInfos: nil,
 		})
 	}
@@ -58,4 +58,8 @@ func TestRandomNodePicker(t *testing.T) {
 	node, err := nodePicker.PickNode(ctx, nodes)
 	re.NoError(err)
 	re.Equal(strconv.Itoa(selectOnlineNodeIndex), node.Node.Name)
+}
+
+func generateLastTouchTime(duration time.Duration) uint64 {
+	return uint64(time.Now().Unix() - int64(duration))
 }
