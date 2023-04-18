@@ -38,31 +38,29 @@ func TestCreatePartitionTable(t *testing.T) {
 	shardPicker := coordinator.NewRandomBalancedShardPicker()
 	subTableShards, err := shardPicker.PickShards(ctx, c.GetMetadata().GetClusterSnapshot(), len(request.GetPartitionTableInfo().SubTableNames), true)
 
-	shardNodeWithVersion := make([]metadata.ShardNodeWithVersion, 0, len(subTableShards))
+	shardNodesWithVersion := make([]metadata.ShardNodeWithVersion, 0, len(subTableShards))
 	for _, subTableShard := range subTableShards {
-		for _, shardView := range c.GetMetadata().GetClusterSnapshot().Topology.ShardViews {
-			if shardView.ShardID == subTableShard.ID {
-				shardNodeWithVersion = append(shardNodeWithVersion, metadata.ShardNodeWithVersion{
-					ShardInfo: metadata.ShardInfo{
-						ID:      shardView.ShardID,
-						Role:    subTableShard.ShardRole,
-						Version: shardView.Version,
-					},
-					ShardNode: subTableShard,
-				})
-			}
-		}
+		shardView, exists := c.GetMetadata().GetClusterSnapshot().Topology.ShardViewsMapping[subTableShard.ID]
+		re.Equal(true, exists)
+		shardNodesWithVersion = append(shardNodesWithVersion, metadata.ShardNodeWithVersion{
+			ShardInfo: metadata.ShardInfo{
+				ID:      shardView.ShardID,
+				Role:    subTableShard.ShardRole,
+				Version: shardView.Version,
+			},
+			ShardNode: subTableShard,
+		})
 	}
 
 	re.NoError(err)
-	procedure := createpartitiontable.NewProcedure(createpartitiontable.ProcedureParams{
+	procedure, err := createpartitiontable.NewProcedure(createpartitiontable.ProcedureParams{
 		ID:              0,
 		ClusterMetadata: c.GetMetadata(),
 		ClusterSnapshot: c.GetMetadata().GetClusterSnapshot(),
 		Dispatch:        dispatch,
 		Storage:         s,
 		SourceReq:       request,
-		SubTablesShards: shardNodeWithVersion,
+		SubTablesShards: shardNodesWithVersion,
 		OnSucceeded: func(result metadata.CreateTableResult) error {
 			return nil
 		},
@@ -70,6 +68,7 @@ func TestCreatePartitionTable(t *testing.T) {
 			return nil
 		},
 	})
+	re.NoError(err)
 
 	err = procedure.Start(ctx)
 	re.NoError(err)

@@ -120,7 +120,7 @@ func InitStableCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 	c := InitEmptyCluster(ctx, t)
 	snapshot := c.GetMetadata().GetClusterSnapshot()
 	shardNodes := make([]storage.ShardNode, 0, DefaultShardTotal)
-	for _, shardView := range snapshot.Topology.ShardViews {
+	for _, shardView := range snapshot.Topology.ShardViewsMapping {
 		for _, node := range snapshot.RegisteredNodes {
 			shardNodes = append(shardNodes, storage.ShardNode{
 				ID:        shardView.ShardID,

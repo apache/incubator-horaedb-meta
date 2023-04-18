@@ -65,12 +65,10 @@ func TestSplit(t *testing.T) {
 	// 3. Tables in table mapping must be correct, the split table only exists on the new shard.
 	snapshot = c.GetMetadata().GetClusterSnapshot()
 
-	shardViewsMapping := make(map[storage.ShardID]storage.ShardView, 0)
-	for _, shardView := range snapshot.Topology.ShardViews {
-		shardViewsMapping[shardView.ShardID] = shardView
-	}
-	splitShard := shardViewsMapping[targetShardNode.ID]
-	newShard := shardViewsMapping[storage.ShardID(newShardID)]
+	splitShard, exists := snapshot.Topology.ShardViewsMapping[targetShardNode.ID]
+	re.Equal(true, exists)
+	newShard, exists := snapshot.Topology.ShardViewsMapping[storage.ShardID(newShardID)]
+	re.Equal(true, exists)
 	re.NotNil(splitShard)
 	re.NotNil(newShard)
 

@@ -60,14 +60,14 @@ type testShardEventCallback struct {
 	re     *require.Assertions
 }
 
-func (c *testShardEventCallback) OnShardRegistered(ctx context.Context, event ShardRegisterEvent) error {
+func (c *testShardEventCallback) OnShardRegistered(_ context.Context, event ShardRegisterEvent) error {
 	c.result = 2
 	c.re.Equal(storage.ShardID(TestShardID), event.ShardID)
 	c.re.Equal(TestNodeName, event.NewLeaderNode)
 	return nil
 }
 
-func (c *testShardEventCallback) OnShardExpired(ctx context.Context, event ShardExpireEvent) error {
+func (c *testShardEventCallback) OnShardExpired(_ context.Context, event ShardExpireEvent) error {
 	c.result = 1
 	c.re.Equal(storage.ShardID(TestShardID), event.ShardID)
 	c.re.Equal(TestNodeName, event.OldLeaderNode)

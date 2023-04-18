@@ -81,7 +81,7 @@ func TestCreateAndDropTable(t *testing.T) {
 func testCreateTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Cluster, snapshot metadata.Snapshot, shardID storage.ShardID, nodeName, tableName string) {
 	re := require.New(t)
 	// New CreateTableProcedure to create a new table.
-	p := createtable.NewProcedure(createtable.ProcedureParams{
+	p, err := createtable.NewProcedure(createtable.ProcedureParams{
 		Dispatch:        dispatch,
 		ClusterMetadata: c.GetMetadata(),
 		ClusterSnapshot: snapshot,
@@ -102,7 +102,8 @@ func testCreateTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.C
 			panic(fmt.Sprintf("create table failed, err:%v", err))
 		},
 	})
-	err := p.Start(context.Background())
+	re.NoError(err)
+	err = p.Start(context.Background())
 	re.NoError(err)
 }
 

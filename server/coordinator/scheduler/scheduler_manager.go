@@ -5,7 +5,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"github.com/CeresDB/ceresmeta/server/storage"
 	"reflect"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/coordinator/watch"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
@@ -131,7 +131,7 @@ type schedulerWatchCallback struct {
 	c *metadata.ClusterMetadata
 }
 
-func (callback *schedulerWatchCallback) OnShardRegistered(ctx context.Context, event watch.ShardRegisterEvent) error {
+func (callback *schedulerWatchCallback) OnShardRegistered(_ context.Context, _ watch.ShardRegisterEvent) error {
 	return nil
 }
 

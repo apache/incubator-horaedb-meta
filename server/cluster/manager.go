@@ -172,7 +172,7 @@ func (m *managerImpl) AllocSchemaID(ctx context.Context, clusterName, schemaName
 	return schema.ID, exists, nil
 }
 
-func (m *managerImpl) GetTables(clusterName, nodeName string, shardIDs []storage.ShardID) (map[storage.ShardID]metadata.ShardTables, error) {
+func (m *managerImpl) GetTables(clusterName, _ string, shardIDs []storage.ShardID) (map[storage.ShardID]metadata.ShardTables, error) {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		return nil, errors.WithMessage(err, "get cluster")

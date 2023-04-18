@@ -294,12 +294,9 @@ func (c *ClusterMetadata) DropTableMetadata(ctx context.Context, schemaName, tab
 		return DropTableMetadataResult{}, errors.WithMessage(err, "table manager drop table")
 	}
 
-	ret := DropTableMetadataResult{
-		table,
-	}
-	log.Info("drop table metadata success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("result", fmt.Sprintf("%+v", ret)))
+	log.Info("drop table metadata success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("result", fmt.Sprintf("%+v", table)))
 
-	return ret, nil
+	return DropTableMetadataResult{Table: table}, nil
 }
 
 func (c *ClusterMetadata) CreateTable(ctx context.Context, request CreateTableRequest) (CreateTableResult, error) {
@@ -565,7 +562,7 @@ func (c *ClusterMetadata) Init(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	var createShardViews []CreateShardView
+	createShardViews := make([]CreateShardView, 0, c.metaData.ShardTotal)
 	for i := uint32(0); i < c.metaData.ShardTotal; i++ {
 		shardID, err := c.AllocShardID(ctx)
 		if err != nil {

@@ -81,7 +81,10 @@ func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
 		return nil, err
 	}
 
-	relatedVersionInfo := buildRelatedVersionInfo(params)
+	relatedVersionInfo, err := buildRelatedVersionInfo(params)
+	if err != nil {
+		return nil, err
+	}
 
 	splitFsm := fsm.NewFSM(
 		stateBegin,
@@ -97,20 +100,22 @@ func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
 	}, nil
 }
 
-func buildRelatedVersionInfo(params ProcedureParams) procedure.RelatedVersionInfo {
+func buildRelatedVersionInfo(params ProcedureParams) (procedure.RelatedVersionInfo, error) {
 	shardWithVersion := make(map[storage.ShardID]uint64, 0)
-	for _, shardView := range params.ClusterSnapShot.Topology.ShardViews {
-		if shardView.ShardID == params.ShardID {
-			shardWithVersion[params.ShardID] = shardView.Version
-		}
+
+	shardView, exists := params.ClusterSnapShot.Topology.ShardViewsMapping[params.ShardID]
+	if !exists {
+		return procedure.RelatedVersionInfo{}, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in topology, shardID:%d", params.ShardID)
 	}
+	shardWithVersion[params.ShardID] = shardView.Version
 	shardWithVersion[params.NewShardID] = 0
+
 	relatedVersionInfo := procedure.RelatedVersionInfo{
 		ClusterID:        params.ClusterSnapShot.Topology.ClusterView.ClusterID,
 		ShardWithVersion: shardWithVersion,
 		ClusterVersion:   params.ClusterSnapShot.Topology.ClusterView.Version,
 	}
-	return relatedVersionInfo
+	return relatedVersionInfo, nil
 }
 
 func validateClusterTopology(topology metadata.Topology, shardID storage.ShardID) error {
@@ -121,13 +126,8 @@ func validateClusterTopology(topology metadata.Topology, shardID storage.ShardID
 		return metadata.ErrClusterStateInvalid
 	}
 
-	found := false
-	for _, shardView := range topology.ShardViews {
-		if shardView.ShardID == shardID {
-			found = true
-			break
-		}
-	}
+	_, found := topology.ShardViewsMapping[shardID]
+
 	if !found {
 		log.Error("shard not found", zap.Uint64("shardID", uint64(shardID)), zap.Error(metadata.ErrShardNotFound))
 		return metadata.ErrShardNotFound

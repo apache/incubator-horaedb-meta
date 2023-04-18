@@ -175,7 +175,7 @@ func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Pro
 }
 
 // Whether a waiting procedure could be running procedure.
-func (m *ManagerImpl) checkValid(ctx context.Context, procedure Procedure, cluster *metadata.ClusterMetadata) bool {
+func (m *ManagerImpl) checkValid(_ context.Context, _ Procedure, _ *metadata.ClusterMetadata) bool {
 	// ClusterVersion and ShardVersion in this procedure must be same with current cluster topology.
 	// TODO: Version verification is an important issue, implement it in another pull request.
 	return true

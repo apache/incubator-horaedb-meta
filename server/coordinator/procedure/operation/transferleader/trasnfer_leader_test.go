@@ -8,6 +8,7 @@ import (
 
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/transferleader"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/test"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +21,11 @@ func TestTransferLeader(t *testing.T) {
 
 	snapshot := c.GetMetadata().GetClusterSnapshot()
 
-	shardID := snapshot.Topology.ShardViews[0].ShardID
+	var targetShardID storage.ShardID
+	for shardID := range snapshot.Topology.ShardViewsMapping {
+		targetShardID = shardID
+		break
+	}
 	newLeaderNodeName := snapshot.RegisteredNodes[0].Node.Name
 
 	p, err := transferleader.NewProcedure(transferleader.ProcedureParams{
@@ -28,7 +33,7 @@ func TestTransferLeader(t *testing.T) {
 		Dispatch:          dispatch,
 		Storage:           s,
 		ClusterSnapShot:   snapshot,
-		ShardID:           shardID,
+		ShardID:           targetShardID,
 		OldLeaderNodeName: "",
 		NewLeaderNodeName: newLeaderNodeName,
 	})

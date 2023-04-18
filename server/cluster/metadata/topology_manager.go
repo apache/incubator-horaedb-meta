@@ -79,8 +79,8 @@ type CreateShardView struct {
 }
 
 type Topology struct {
-	ShardViews  []storage.ShardView
-	ClusterView storage.ClusterView
+	ShardViewsMapping map[storage.ShardID]storage.ShardView
+	ClusterView       storage.ClusterView
 }
 
 type TopologyManagerImpl struct {
@@ -166,7 +166,11 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	shardView := m.shardTablesMapping[shardID]
+	shardView, ok := m.shardTablesMapping[shardID]
+	if !ok {
+		return ShardVersionUpdate{}, ErrShardNotFound.WithCausef("shard id:%d", shardID)
+	}
+
 	prevVersion := shardView.Version
 
 	tableIDsToAdd := make([]storage.TableID, 0, len(tables))
@@ -205,20 +209,23 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 			m.tableShardMapping[tableID] = append(m.tableShardMapping[tableID], shardID)
 		}
 	}
-	for i, oldShardView := range m.shardViews {
-		if oldShardView.ShardID == shardID {
-			m.shardViews[i] = m.shardViews[len(m.shardViews)-1]
-			m.shardViews = m.shardViews[:len(m.shardViews)-1]
-			m.shardViews = append(m.shardViews, newShardView)
-			break
-		}
-	}
+
+	m.updateShardView(shardID, newShardView)
 
 	return ShardVersionUpdate{
 		ShardID:     shardID,
 		CurrVersion: prevVersion + 1,
 		PrevVersion: prevVersion,
 	}, nil
+}
+
+func (m *TopologyManagerImpl) updateShardView(shardID storage.ShardID, newShardView storage.ShardView) {
+	for i := range m.shardViews {
+		if m.shardViews[i].ShardID == shardID {
+			m.shardViews[i] = newShardView
+			break
+		}
+	}
 }
 
 func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.ShardID, tableIDs []storage.TableID) (ShardVersionUpdate, error) {
@@ -272,13 +279,7 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 		}
 	}
 
-	for i, oldShardView := range m.shardViews {
-		if oldShardView.ShardID == shardID {
-			m.shardViews[i] = m.shardViews[len(m.shardViews)-1]
-			m.shardViews = append(m.shardViews, newShardView)
-			break
-		}
-	}
+	m.updateShardView(shardID, newShardView)
 
 	return ShardVersionUpdate{
 		ShardID:     shardID,
@@ -538,12 +539,14 @@ func (m *TopologyManagerImpl) GetTopology() Topology {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	shardViews := make([]storage.ShardView, 0, len(m.shardViews))
-	shardViews = append(shardViews, m.shardViews...)
+	shardViewsMapping := make(map[storage.ShardID]storage.ShardView, len(m.shardViews))
+	for i := 0; i < len(m.shardViews); i++ {
+		shardViewsMapping[m.shardViews[i].ShardID] = m.shardViews[i]
+	}
 
 	return Topology{
-		ShardViews:  shardViews,
-		ClusterView: m.clusterView,
+		ShardViewsMapping: shardViewsMapping,
+		ClusterView:       m.clusterView,
 	}
 }
 
