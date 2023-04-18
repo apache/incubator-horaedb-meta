@@ -48,8 +48,9 @@ var (
 )
 
 type Procedure struct {
-	fsm    *fsm.FSM
-	params ProcedureParams
+	fsm                *fsm.FSM
+	params             ProcedureParams
+	relatedVersionInfo procedure.RelatedVersionInfo
 
 	// Protect the state.
 	lock  sync.RWMutex
@@ -67,17 +68,57 @@ type ProcedureParams struct {
 	OnFailed        func(error) error
 }
 
-func NewProcedure(params ProcedureParams) *Procedure {
+func NewProcedure(params ProcedureParams) (*Procedure, error) {
 	fsm := fsm.NewFSM(
 		stateBegin,
 		createDropPartitionTableEvents,
 		createDropPartitionTableCallbacks,
 	)
+	relatedVersionInfo, err := buildRelatedVersionInfo(params)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Procedure{
-		fsm:    fsm,
-		params: params,
+		fsm:                fsm,
+		params:             params,
+		relatedVersionInfo: relatedVersionInfo,
+	}, nil
+}
+
+func buildRelatedVersionInfo(params ProcedureParams) (procedure.RelatedVersionInfo, error) {
+	shardViewWithVersion := make(map[storage.ShardID]uint64, 0)
+	tableShardMapping := make(map[storage.TableID]storage.ShardID, len(params.SourceReq.PartitionTableInfo.GetSubTableNames()))
+	for shardID, shardView := range params.ClusterSnapshot.Topology.ShardViewsMapping {
+		for _, tableID := range shardView.TableIDs {
+			tableShardMapping[tableID] = shardID
+		}
 	}
+	for _, subTableName := range params.SourceReq.PartitionTableInfo.GetSubTableNames() {
+		table, exists, err := params.ClusterMetadata.GetTable(params.SourceReq.GetSchemaName(), subTableName)
+		if err != nil {
+			return procedure.RelatedVersionInfo{}, errors.WithMessagef(err, "get sub table, tableName:%s", subTableName)
+		}
+		if !exists {
+			return procedure.RelatedVersionInfo{}, errors.WithMessagef(procedure.ErrTableNotExists, "get sub table, tableName:%s", subTableName)
+		}
+		shardID, exists := tableShardMapping[table.ID]
+		if !exists {
+			return procedure.RelatedVersionInfo{}, errors.WithMessagef(metadata.ErrShardNotFound, "get shard of sub table, tableID:%d", table.ID)
+		}
+		shardView, exists := params.ClusterSnapshot.Topology.ShardViewsMapping[shardID]
+		if !exists {
+			return procedure.RelatedVersionInfo{}, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in topology, shardID:%d", shardID)
+		}
+		shardViewWithVersion[shardID] = shardView.Version
+	}
+
+	relatedVersionInfo := procedure.RelatedVersionInfo{
+		ClusterID:        params.ClusterSnapshot.Topology.ClusterView.ClusterID,
+		ShardWithVersion: shardViewWithVersion,
+		ClusterVersion:   params.ClusterSnapshot.Topology.ClusterView.Version,
+	}
+	return relatedVersionInfo, nil
 }
 
 func (p *Procedure) ID() uint64 {
@@ -89,7 +130,7 @@ func (p *Procedure) Typ() procedure.Typ {
 }
 
 func (p *Procedure) RelatedVersionInfo() procedure.RelatedVersionInfo {
-	return procedure.RelatedVersionInfo{}
+	return p.relatedVersionInfo
 }
 
 func (p *Procedure) Priority() procedure.Priority {

@@ -66,7 +66,7 @@ type ProcedureParams struct {
 	Storage  procedure.Storage
 
 	ClusterMetadata *metadata.ClusterMetadata
-	ClusterSnapShot metadata.Snapshot
+	ClusterSnapshot metadata.Snapshot
 
 	ShardID    storage.ShardID
 	NewShardID storage.ShardID
@@ -77,7 +77,7 @@ type ProcedureParams struct {
 }
 
 func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
-	if err := validateClusterTopology(params.ClusterSnapShot.Topology, params.ShardID); err != nil {
+	if err := validateClusterTopology(params.ClusterSnapshot.Topology, params.ShardID); err != nil {
 		return nil, err
 	}
 
@@ -103,7 +103,7 @@ func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
 func buildRelatedVersionInfo(params ProcedureParams) (procedure.RelatedVersionInfo, error) {
 	shardWithVersion := make(map[storage.ShardID]uint64, 0)
 
-	shardView, exists := params.ClusterSnapShot.Topology.ShardViewsMapping[params.ShardID]
+	shardView, exists := params.ClusterSnapshot.Topology.ShardViewsMapping[params.ShardID]
 	if !exists {
 		return procedure.RelatedVersionInfo{}, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in topology, shardID:%d", params.ShardID)
 	}
@@ -111,9 +111,9 @@ func buildRelatedVersionInfo(params ProcedureParams) (procedure.RelatedVersionIn
 	shardWithVersion[params.NewShardID] = 0
 
 	relatedVersionInfo := procedure.RelatedVersionInfo{
-		ClusterID:        params.ClusterSnapShot.Topology.ClusterView.ClusterID,
+		ClusterID:        params.ClusterSnapshot.Topology.ClusterView.ClusterID,
 		ShardWithVersion: shardWithVersion,
-		ClusterVersion:   params.ClusterSnapShot.Topology.ClusterView.Version,
+		ClusterVersion:   params.ClusterSnapshot.Topology.ClusterView.Version,
 	}
 	return relatedVersionInfo, nil
 }

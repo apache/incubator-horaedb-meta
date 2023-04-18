@@ -32,7 +32,7 @@ func TestTransferLeader(t *testing.T) {
 		ID:                0,
 		Dispatch:          dispatch,
 		Storage:           s,
-		ClusterSnapShot:   snapshot,
+		ClusterSnapshot:   snapshot,
 		ShardID:           targetShardID,
 		OldLeaderNodeName: "",
 		NewLeaderNodeName: newLeaderNodeName,

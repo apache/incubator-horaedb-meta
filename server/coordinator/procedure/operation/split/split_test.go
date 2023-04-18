@@ -48,7 +48,7 @@ func TestSplit(t *testing.T) {
 		Dispatch:        dispatch,
 		Storage:         s,
 		ClusterMetadata: c.GetMetadata(),
-		ClusterSnapShot: c.GetMetadata().GetClusterSnapshot(),
+		ClusterSnapshot: c.GetMetadata().GetClusterSnapshot(),
 		ShardID:         createTableNodeShard.ID,
 		NewShardID:      storage.ShardID(newShardID),
 		SchemaName:      test.TestSchemaName,

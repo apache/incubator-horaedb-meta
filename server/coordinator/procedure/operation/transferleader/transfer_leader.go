@@ -78,7 +78,7 @@ type ProcedureParams struct {
 	Dispatch eventdispatch.Dispatch
 	Storage  procedure.Storage
 
-	ClusterSnapShot metadata.Snapshot
+	ClusterSnapshot metadata.Snapshot
 
 	ShardID           storage.ShardID
 	OldLeaderNodeName string
@@ -86,7 +86,7 @@ type ProcedureParams struct {
 }
 
 func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
-	if err := validateClusterTopology(params.ClusterSnapShot.Topology, params.ShardID, params.OldLeaderNodeName); err != nil {
+	if err := validateClusterTopology(params.ClusterSnapshot.Topology, params.ShardID, params.OldLeaderNodeName); err != nil {
 		return nil, err
 	}
 
@@ -111,16 +111,16 @@ func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
 
 func buildRelatedVersionInfo(params ProcedureParams) (procedure.RelatedVersionInfo, error) {
 	shardViewWithVersion := make(map[storage.ShardID]uint64, 0)
-	shardView, exists := params.ClusterSnapShot.Topology.ShardViewsMapping[params.ShardID]
+	shardView, exists := params.ClusterSnapshot.Topology.ShardViewsMapping[params.ShardID]
 	if !exists {
 		return procedure.RelatedVersionInfo{}, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in topology, shardID:%d", params.ShardID)
 	}
 	shardViewWithVersion[params.ShardID] = shardView.Version
 
 	relatedVersionInfo := procedure.RelatedVersionInfo{
-		ClusterID:        params.ClusterSnapShot.Topology.ClusterView.ClusterID,
+		ClusterID:        params.ClusterSnapshot.Topology.ClusterView.ClusterID,
 		ShardWithVersion: shardViewWithVersion,
-		ClusterVersion:   params.ClusterSnapShot.Topology.ClusterView.Version,
+		ClusterVersion:   params.ClusterSnapshot.Topology.ClusterView.Version,
 	}
 	return relatedVersionInfo, nil
 }
@@ -264,7 +264,7 @@ func openNewShardCallback(event *fsm.Event) {
 	}
 	ctx := req.ctx
 
-	shardView, exists := req.p.params.ClusterSnapShot.Topology.ShardViewsMapping[req.p.params.ShardID]
+	shardView, exists := req.p.params.ClusterSnapshot.Topology.ShardViewsMapping[req.p.params.ShardID]
 	if !exists {
 		procedure.CancelEventWithLog(event, metadata.ErrShardNotFound, "shard not found in topology", zap.Uint64("shardID", uint64(req.p.params.ShardID)))
 		return
@@ -307,7 +307,7 @@ func (p *Procedure) convertToMeta() (procedure.Meta, error) {
 		ID:                p.params.ID,
 		FsmState:          p.fsm.Current(),
 		ShardID:           p.params.ShardID,
-		snapshot:          p.params.ClusterSnapShot,
+		snapshot:          p.params.ClusterSnapshot,
 		OldLeaderNodeName: p.params.OldLeaderNodeName,
 		NewLeaderNodeName: p.params.NewLeaderNodeName,
 		State:             p.state,

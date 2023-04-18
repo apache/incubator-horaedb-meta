@@ -189,7 +189,7 @@ func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTabl
 	snapshot := request.ClusterMetadata.GetClusterSnapshot()
 
 	if request.IsPartitionTable() {
-		procedure := droppartitiontable.NewProcedure(droppartitiontable.ProcedureParams{
+		return droppartitiontable.NewProcedure(droppartitiontable.ProcedureParams{
 			ID:              id,
 			ClusterMetadata: request.ClusterMetadata,
 			Dispatch:        f.dispatch,
@@ -198,7 +198,6 @@ func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTabl
 			OnSucceeded:     request.OnSucceeded,
 			OnFailed:        request.OnFailed,
 		})
-		return procedure, nil
 	}
 
 	return droptable.NewDropTableProcedure(droptable.ProcedureParams{
@@ -222,7 +221,7 @@ func (f *Factory) CreateTransferLeaderProcedure(ctx context.Context, request Tra
 		ID:                id,
 		Dispatch:          f.dispatch,
 		Storage:           f.storage,
-		ClusterSnapShot:   request.Snapshot,
+		ClusterSnapshot:   request.Snapshot,
 		ShardID:           request.ShardID,
 		OldLeaderNodeName: request.OldLeaderNodeName,
 		NewLeaderNodeName: request.NewLeaderNodeName,
@@ -241,7 +240,7 @@ func (f *Factory) CreateSplitProcedure(ctx context.Context, request SplitRequest
 			Dispatch:        f.dispatch,
 			Storage:         f.storage,
 			ClusterMetadata: request.ClusterMetadata,
-			ClusterSnapShot: metadata.Snapshot{},
+			ClusterSnapshot: metadata.Snapshot{},
 			ShardID:         request.ShardID,
 			NewShardID:      request.NewShardID,
 			SchemaName:      request.SchemaName,
