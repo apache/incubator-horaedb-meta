@@ -175,9 +175,25 @@ func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Pro
 }
 
 // Whether a waiting procedure could be running procedure.
-func (m *ManagerImpl) checkValid(_ context.Context, _ Procedure, _ *metadata.ClusterMetadata) bool {
+func (m *ManagerImpl) checkValid(p Procedure, clusterMetadata *metadata.ClusterMetadata) bool {
 	// ClusterVersion and ShardVersion in this procedure must be same with current cluster topology.
-	// TODO: Version verification is an important issue, implement it in another pull request.
+	snapshot := clusterMetadata.GetClusterSnapshot()
+	curClusterVersion := snapshot.Topology.ClusterView.Version
+	curShardViews := snapshot.Topology.ShardViewsMapping
+
+	relatedVersionInfo := p.RelatedVersionInfo()
+	if relatedVersionInfo.ClusterVersion != curClusterVersion {
+		return false
+	}
+	for shardID, version := range relatedVersionInfo.ShardWithVersion {
+		shardView, exists := curShardViews[shardID]
+		if !exists {
+			return false
+		}
+		if shardView.Version != version {
+			return false
+		}
+	}
 	return true
 }
 
@@ -195,7 +211,7 @@ func (m *ManagerImpl) promoteProcedure(ctx context.Context) ([]Procedure, error)
 			return readyProcs, nil
 		}
 
-		if !m.checkValid(ctx, p, m.metadata) {
+		if !m.checkValid(p, m.metadata) {
 			// This procedure is invalid, just remove it.
 			continue
 		}
