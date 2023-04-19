@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -182,12 +181,7 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 	tableIDs = append(tableIDs, shardView.TableIDs...)
 	tableIDs = append(tableIDs, tableIDsToAdd...)
 
-	newShardView := storage.ShardView{
-		ShardID:   shardID,
-		Version:   prevVersion + 1,
-		TableIDs:  tableIDs,
-		CreatedAt: generateCreateUnixTime(),
-	}
+	newShardView := storage.NewShardView(shardID, prevVersion+1, tableIDs)
 
 	// Update shard view in storage.
 	err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
@@ -248,12 +242,7 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 	}
 
 	// Update shardView in storage.
-	newShardView := storage.ShardView{
-		ShardID:   shardView.ShardID,
-		Version:   prevVersion + 1,
-		TableIDs:  newTableIDs,
-		CreatedAt: generateCreateUnixTime(),
-	}
+	newShardView := storage.NewShardView(shardView.ShardID, prevVersion+1, newTableIDs)
 	if err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
 		ClusterID:     m.clusterID,
 		ShardView:     newShardView,
@@ -315,13 +304,8 @@ func (m *TopologyManagerImpl) EvictTable(ctx context.Context, tableID storage.Ta
 
 		// Update shardView in storage.
 		if err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
-			ClusterID: m.clusterID,
-			ShardView: storage.ShardView{
-				ShardID:   shardView.ShardID,
-				Version:   prevVersion + 1,
-				TableIDs:  tableIDs,
-				CreatedAt: generateCreateUnixTime(),
-			},
+			ClusterID:     m.clusterID,
+			ShardView:     storage.NewShardView(shardView.ShardID, prevVersion+1, tableIDs),
 			LatestVersion: prevVersion,
 		}); err != nil {
 			return nil, errors.WithMessage(err, "storage update shard view")
@@ -435,13 +419,7 @@ func contains(shardNodes []storage.ShardNode, originShardNode storage.ShardNode)
 }
 
 func (m *TopologyManagerImpl) InitClusterView(ctx context.Context) error {
-	clusterView := storage.ClusterView{
-		ClusterID:  m.clusterID,
-		Version:    0,
-		State:      storage.ClusterStateEmpty,
-		ShardNodes: nil,
-		CreatedAt:  generateCreateUnixTime(),
-	}
+	clusterView := storage.NewClusterView(m.clusterID, 0, storage.ClusterStateEmpty, []storage.ShardNode{})
 
 	err := m.storage.CreateClusterView(ctx, storage.CreateClusterViewRequest{ClusterView: clusterView})
 	if err != nil {
@@ -459,13 +437,7 @@ func (m *TopologyManagerImpl) UpdateClusterView(ctx context.Context, state stora
 
 func (m *TopologyManagerImpl) updateClusterViewWithLock(ctx context.Context, state storage.ClusterState, shardNodes []storage.ShardNode) error {
 	// Update cluster view in storage.
-	newClusterView := storage.ClusterView{
-		ClusterID:  m.clusterID,
-		Version:    m.clusterView.Version + 1,
-		State:      state,
-		ShardNodes: shardNodes,
-		CreatedAt:  generateCreateUnixTime(),
-	}
+	newClusterView := storage.NewClusterView(m.clusterID, m.clusterView.Version+1, state, shardNodes)
 	if err := m.storage.UpdateClusterView(ctx, storage.UpdateClusterViewRequest{
 		ClusterID:     m.clusterID,
 		ClusterView:   newClusterView,
@@ -514,12 +486,7 @@ func (m *TopologyManagerImpl) CreateShardViews(ctx context.Context, createShardV
 	// Create shard view in storage.
 	shardViews := make([]storage.ShardView, 0, len(createShardViews))
 	for _, createShardView := range createShardViews {
-		shardViews = append(shardViews, storage.ShardView{
-			ShardID:   createShardView.ShardID,
-			Version:   0,
-			TableIDs:  createShardView.Tables,
-			CreatedAt: generateCreateUnixTime(),
-		})
+		shardViews = append(shardViews, storage.NewShardView(createShardView.ShardID, 0, createShardView.Tables))
 	}
 	if err := m.storage.CreateShardViews(ctx, storage.CreateShardViewsRequest{
 		ClusterID:  m.clusterID,
@@ -610,8 +577,4 @@ func (m *TopologyManagerImpl) loadNodes(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func generateCreateUnixTime() uint64 {
-	return uint64(time.Now().UnixMilli())
 }
