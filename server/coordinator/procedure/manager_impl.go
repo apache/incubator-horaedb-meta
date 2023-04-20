@@ -199,7 +199,7 @@ func (m *ManagerImpl) checkValid(p Procedure, clusterMetadata *metadata.ClusterM
 
 // Promote a waiting procedure to be a running procedure.
 // One procedure may be related with multiple shards.
-func (m *ManagerImpl) promoteProcedure(ctx context.Context) ([]Procedure, error) {
+func (m *ManagerImpl) promoteProcedure(_ context.Context) ([]Procedure, error) {
 	// Get waiting procedures, it has been sorted in queue.
 	queue := m.waitingProcedures
 
