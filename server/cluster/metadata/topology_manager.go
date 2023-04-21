@@ -303,6 +303,7 @@ func (m *TopologyManagerImpl) EvictTable(ctx context.Context, tableID storage.Ta
 		}
 
 		// Update shardView in storage.
+		// TODO: Move the code that modifies the version to the outside, and the actual version should be obtained from the call result of CeresDB.
 		newShardView := storage.NewShardView(shardView.ShardID, prevVersion+1, tableIDs)
 		if err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
 			ClusterID:     m.clusterID,

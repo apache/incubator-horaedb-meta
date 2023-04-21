@@ -117,7 +117,11 @@ func GetShardVersionByTableName(clusterMetadata *metadata.ClusterMetadata, schem
 		return storage.Table{}, metadata.ShardVersionUpdate{}, errors.WithMessage(procedure.ErrShardLeaderNotFound, "can't find leader")
 	}
 
-	prevVersion := shardVersions[leader.ID]
+	prevVersion, exists := shardVersions[leader.ID]
+	if !exists {
+		return storage.Table{}, metadata.ShardVersionUpdate{}, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
+	}
+
 	currVersion := prevVersion + 1
 
 	return table, metadata.ShardVersionUpdate{

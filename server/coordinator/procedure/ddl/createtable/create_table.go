@@ -49,11 +49,12 @@ func prepareCallback(event *fsm.Event) {
 	}
 	params := req.p.params
 
-	result, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, metadata.CreateTableMetadataRequest{
+	createTableMetadataRequest := metadata.CreateTableMetadataRequest{
 		SchemaName:    params.SourceReq.GetSchemaName(),
 		TableName:     params.SourceReq.GetName(),
 		PartitionInfo: storage.PartitionInfo{Info: params.SourceReq.PartitionTableInfo.GetPartitionInfo()},
-	})
+	}
+	result, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, createTableMetadataRequest)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "create table metadata")
 		return
@@ -65,7 +66,8 @@ func prepareCallback(event *fsm.Event) {
 		PrevVersion: req.p.relatedVersionInfo.ShardWithVersion[params.ShardID],
 	}
 
-	if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.ShardID, ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq)); err != nil {
+	createTableRequest := ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq)
+	if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.ShardID, createTableRequest); err != nil {
 		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}
