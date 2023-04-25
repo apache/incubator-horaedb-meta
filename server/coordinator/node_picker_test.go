@@ -25,7 +25,7 @@ func TestRandomNodePicker(t *testing.T) {
 	nodePicker := NewRandomNodePicker()
 
 	var nodes []metadata.RegisteredNode
-	_, err := nodePicker.PickNode(ctx, nodes)
+	_, err := nodePicker.PickNode(ctx, 0, nodes)
 	re.Error(err)
 
 	for i := 0; i < nodeLength; i++ {
@@ -34,7 +34,7 @@ func TestRandomNodePicker(t *testing.T) {
 			ShardInfos: nil,
 		})
 	}
-	_, err = nodePicker.PickNode(ctx, nodes)
+	_, err = nodePicker.PickNode(ctx, 0, nodes)
 	re.Error(err)
 
 	nodes = nodes[:0]
@@ -44,7 +44,7 @@ func TestRandomNodePicker(t *testing.T) {
 			ShardInfos: nil,
 		})
 	}
-	_, err = nodePicker.PickNode(ctx, nodes)
+	_, err = nodePicker.PickNode(ctx, 0, nodes)
 	re.NoError(err)
 
 	nodes = nodes[:0]
@@ -55,7 +55,7 @@ func TestRandomNodePicker(t *testing.T) {
 		})
 	}
 	nodes[selectOnlineNodeIndex].Node.LastTouchTime = uint64(time.Now().Unix())
-	node, err := nodePicker.PickNode(ctx, nodes)
+	node, err := nodePicker.PickNode(ctx, 0, nodes)
 	re.NoError(err)
 	re.Equal(strconv.Itoa(selectOnlineNodeIndex), node.Node.Name)
 }
