@@ -38,6 +38,22 @@ func newLease(rawLease clientv3.Lease, ttlSec int64) *lease {
 	}
 }
 
+type renewLeaseResult int
+
+const (
+	renewLeaseAlive renewLeaseResult = iota
+	renewLeaseFailed
+	renewLeaseExpired
+)
+
+func (r renewLeaseResult) failed() bool {
+	return r == renewLeaseFailed
+}
+
+func (r renewLeaseResult) alive() bool {
+	return r == renewLeaseAlive
+}
+
 func (l *lease) Grant(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, l.timeout)
 	defer cancel()
@@ -156,21 +172,34 @@ func (l *lease) renewLeaseBg(ctx context.Context, renewed chan<- bool) {
 		start := time.Now()
 		select {
 		case resp, ok := <-keepaliveStream:
-			if !ok {
-				l.logger.Error("keepalive stream is closed", zap.Int64("lease-id", int64(l.ID)))
-				renewed <- false
-				return
-			}
-			if resp.TTL < 0 {
-				l.logger.Warn("lease is expired", zap.Int64("lease-id", int64(l.ID)))
-				renewed <- false
+			renewRes := func() renewLeaseResult {
+				if !ok {
+					l.logger.Error("keepalive stream is closed", zap.Int64("lease-id", int64(l.ID)))
+					return renewLeaseFailed
+				}
+				if resp.TTL < 0 {
+					l.logger.Warn("lease is expired", zap.Int64("lease-id", int64(l.ID)))
+					return renewLeaseExpired
+				}
+
+				expireAt := start.Add(time.Duration(resp.TTL) * time.Second)
+				updated := l.setExpireTimeIfNewer(expireAt)
+				l.logger.Debug("got next expired time", zap.Time("expired-at", expireAt), zap.Bool("updated", updated), zap.Int64("lease-id", int64(l.ID)))
+				return renewLeaseAlive
+			}()
+
+			if renewRes.failed() {
+				l.logger.Error("stop renewing lease background because keepalive stream is closed", zap.Int64("lease-id", int64(l.ID)))
 				return
 			}
 
-			expireAt := start.Add(time.Duration(resp.TTL) * time.Second)
-			updated := l.setExpireTimeIfNewer(expireAt)
-			renewed <- true
-			l.logger.Debug("got next expired time", zap.Time("expired-at", expireAt), zap.Bool("updated", updated), zap.Int64("lease-id", int64(l.ID)))
+			// Notify result of the renew.
+			select {
+			case renewed <- renewRes.alive():
+			case <-ctx.Done():
+				l.logger.Info("stop renewing lease background because ctx is done", zap.Int64("lease-id", int64(l.ID)))
+				return
+			}
 		case <-ctx.Done():
 			l.logger.Info("stop renewing lease background because ctx is done", zap.Int64("lease-id", int64(l.ID)))
 			return
