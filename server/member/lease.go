@@ -167,7 +167,11 @@ func (l *lease) renewLeaseBg(ctx context.Context, renewed chan<- bool) {
 	defer l.logger.Info("stop renewing lease background", zap.Int64("lease-id", int64(l.ID)))
 
 	keepaliveStream, err := l.rawLease.KeepAlive(ctx, l.ID)
-	l.logger.Error("fail to keep lease alive", zap.Int64("lease-id", int64(l.ID)), zap.Error(err))
+	if err != nil {
+		l.logger.Error("fail to start keep lease alive stream", zap.Int64("lease-id", int64(l.ID)), zap.Error(err))
+		return
+	}
+
 	for {
 		start := time.Now()
 		select {
