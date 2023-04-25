@@ -38,22 +38,6 @@ func newLease(rawLease clientv3.Lease, ttlSec int64) *lease {
 	}
 }
 
-type renewLeaseResult int
-
-const (
-	renewLeaseAlive renewLeaseResult = iota
-	renewLeaseFailed
-	renewLeaseExpired
-)
-
-func (r renewLeaseResult) failed() bool {
-	return r == renewLeaseFailed
-}
-
-func (r renewLeaseResult) alive() bool {
-	return r == renewLeaseAlive
-}
-
 func (l *lease) Grant(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, l.timeout)
 	defer cancel()
@@ -101,7 +85,7 @@ func (l *lease) KeepAlive(ctx context.Context) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		l.renewLeaseBg(ctx1, l.timeout/3, renewed)
+		l.renewLeaseBg(ctx1, renewed)
 		wg.Done()
 	}()
 
@@ -162,51 +146,34 @@ func (l *lease) getExpireTime() time.Time {
 
 // `renewLeaseBg` keeps the lease alive by periodically call `lease.KeepAliveOnce`.
 // The l.expireTime will be updated during renewing and the renew lease result (whether alive) will be told to caller by `renewed` channel.
-func (l *lease) renewLeaseBg(ctx context.Context, interval time.Duration, renewed chan<- bool) {
-	l.logger.Info("start renewing lease background", zap.Duration("interval", interval))
-	defer l.logger.Info("stop renewing lease background", zap.Duration("interval", interval))
+func (l *lease) renewLeaseBg(ctx context.Context, renewed chan<- bool) {
+	l.logger.Info("start renewing lease background", zap.Int64("lease-id", int64(l.ID)))
+	defer l.logger.Info("stop renewing lease background", zap.Int64("lease-id", int64(l.ID)))
 
-L:
+	keepaliveStream, err := l.rawLease.KeepAlive(ctx, l.ID)
+	l.logger.Error("fail to keep lease alive", zap.Int64("lease-id", int64(l.ID)), zap.Error(err))
 	for {
-		renewOnce := func() renewLeaseResult {
-			start := time.Now()
-			ctx1, cancel := context.WithTimeout(ctx, l.timeout)
-			defer cancel()
-			resp, err := l.rawLease.KeepAliveOnce(ctx1, l.ID)
-			if err != nil {
-				l.logger.Error("lease keep alive failed", zap.Error(err))
-				return renewLeaseFailed
+		start := time.Now()
+		select {
+		case resp, ok := <-keepaliveStream:
+			if !ok {
+				l.logger.Error("keepalive stream is closed", zap.Int64("lease-id", int64(l.ID)))
+				renewed <- false
+				return
 			}
 			if resp.TTL < 0 {
-				l.logger.Warn("lease is expired")
-				return renewLeaseExpired
+				l.logger.Warn("lease is expired", zap.Int64("lease-id", int64(l.ID)))
+				renewed <- false
+				return
 			}
 
 			expireAt := start.Add(time.Duration(resp.TTL) * time.Second)
 			updated := l.setExpireTimeIfNewer(expireAt)
-			l.logger.Debug("got next expired time", zap.Time("expired-at", expireAt), zap.Bool("updated", updated))
-			return renewLeaseAlive
-		}
-
-		renewRes := renewOnce()
-
-		// Init the timer for next keep alive action.
-		t := time.After(interval)
-
-		if !renewRes.failed() {
-			// Notify result of the renew.
-			select {
-			case renewed <- renewRes.alive():
-			case <-ctx.Done():
-				break L
-			}
-		}
-
-		// Wait for next keep alive action.
-		select {
-		case <-t:
+			renewed <- true
+			l.logger.Debug("got next expired time", zap.Time("expired-at", expireAt), zap.Bool("updated", updated), zap.Int64("lease-id", int64(l.ID)))
 		case <-ctx.Done():
-			break L
+			l.logger.Info("stop renewing lease background because ctx is done", zap.Int64("lease-id", int64(l.ID)))
+			return
 		}
 	}
 }
