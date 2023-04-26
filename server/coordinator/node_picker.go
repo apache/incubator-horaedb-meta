@@ -39,16 +39,16 @@ func (p *ConsistentHashNodePicker) PickNode(_ context.Context, shardID storage.S
 		}
 	}
 
-	if aliveNodeNumber == 0 {
+	if hashRing.IsEmpty() {
 		return metadata.RegisteredNode{}, errors.WithMessage(ErrNodeNumberNotEnough, "at least one online nodes is required")
 	}
 
 	pickedNodeName := hashRing.Get(strconv.Itoa(int(shardID)))
 	log.Debug("ConsistentHashNodePicker pick result", zap.Uint64("shardID", uint64(shardID)), zap.String("node", pickedNodeName), zap.Int("nodeNumber", aliveNodeNumber))
 
-	for _, registerNode := range registerNodes {
-		if registerNode.Node.Name == pickedNodeName {
-			return registerNode, nil
+	for i := 0; i < len(registerNodes); i++ {
+		if registerNodes[i].Node.Name == pickedNodeName {
+			return registerNodes[i], nil
 		}
 	}
 
