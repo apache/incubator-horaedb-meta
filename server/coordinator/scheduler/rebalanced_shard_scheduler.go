@@ -4,9 +4,12 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
+	"go.uber.org/zap"
 )
 
 type RebalancedShardScheduler struct {
@@ -34,6 +37,7 @@ func (r RebalancedShardScheduler) Schedule(ctx context.Context, clusterSnapshot 
 			return ScheduleResult{}, err
 		}
 		if node.Node.Name != shardNode.NodeName {
+			log.Info("rebalanced shard scheduler generate new procedure", zap.Uint64("shardID", uint64(shardNode.ID)), zap.String("originNode", shardNode.NodeName), zap.String("newNode", node.Node.Name))
 			p, err := r.factory.CreateTransferLeaderProcedure(ctx, coordinator.TransferLeaderRequest{
 				Snapshot:          clusterSnapshot,
 				ShardID:           shardNode.ID,
@@ -45,7 +49,7 @@ func (r RebalancedShardScheduler) Schedule(ctx context.Context, clusterSnapshot 
 			}
 			return ScheduleResult{
 				Procedure: p,
-				Reason:    "",
+				Reason:    fmt.Sprintf("the shard:%d on the node:%s does not meet the balance requirements,it should be assigned to node:%s", shardNode.ID, shardNode.NodeName, node.Node.Name),
 			}, nil
 		}
 	}

@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	schedulerInterval = time.Second * 5
+	schedulerInterval   = time.Second * 5
+	defaultHashReplicas = 50
 )
 
 // Manager used to manage schedulers, it will register all schedulers when it starts.
@@ -60,7 +61,7 @@ func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory
 		registerSchedulers: []Scheduler{},
 		isRunning:          false,
 		factory:            factory,
-		nodePicker:         coordinator.NewConsistentHashNodePicker(5),
+		nodePicker:         coordinator.NewConsistentHashNodePicker(defaultHashReplicas),
 		clusterMetadata:    clusterMetadata,
 		client:             client,
 		rootPath:           rootPath,

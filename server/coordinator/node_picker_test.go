@@ -16,13 +16,14 @@ import (
 const (
 	nodeLength            = 3
 	selectOnlineNodeIndex = 1
+	defaultHashReplicas   = 50
 )
 
-func TestRandomNodePicker(t *testing.T) {
+func TestConsistentHashNodePicker(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
 
-	nodePicker := NewRandomNodePicker()
+	nodePicker := NewConsistentHashNodePicker(50)
 
 	var nodes []metadata.RegisteredNode
 	_, err := nodePicker.PickNode(ctx, 0, nodes)
@@ -54,12 +55,12 @@ func TestRandomNodePicker(t *testing.T) {
 			ShardInfos: nil,
 		})
 	}
-	nodes[selectOnlineNodeIndex].Node.LastTouchTime = uint64(time.Now().Unix())
+	nodes[selectOnlineNodeIndex].Node.LastTouchTime = uint64(time.Now().UnixMilli())
 	node, err := nodePicker.PickNode(ctx, 0, nodes)
 	re.NoError(err)
 	re.Equal(strconv.Itoa(selectOnlineNodeIndex), node.Node.Name)
 }
 
 func generateLastTouchTime(duration time.Duration) uint64 {
-	return uint64(time.Now().Unix() - int64(duration))
+	return uint64(time.Now().UnixMilli() - int64(duration))
 }
