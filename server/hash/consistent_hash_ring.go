@@ -1,5 +1,5 @@
 // Copyright 2023 CeresDB Project Authors. Licensed under Apache-2.0.
-// This file refer from [groupcache](https://github.com/golang/groupcache/blob/4a4ac3fbac33b83bb138f808c8945a2812023fc4/consistenthash/consistenthash.go)
+// The consistent hash ring refers to [groupcache](https://github.com/golang/groupcache/blob/4a4ac3fbac33b83bb138f808c8945a2812023fc4/consistenthash/consistenthash.go)
 /*
 Copyright 2013 Google Inc.
 Licensed under the Apache License, Version 2.0 (the "License");

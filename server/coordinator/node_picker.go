@@ -31,20 +31,26 @@ func (p *ConsistentHashNodePicker) PickNode(_ context.Context, shardID storage.S
 	now := time.Now()
 
 	hashRing := hash.New(p.hashReplicas, nil)
-	nodeMapping := make(map[string]metadata.RegisteredNode, len(registerNodes))
+	aliveNodeNumber := 0
 	for _, registerNode := range registerNodes {
 		if !registerNode.IsExpired(now) {
-			nodeMapping[registerNode.Node.Name] = registerNode
 			hashRing.Add(registerNode.Node.Name)
+			aliveNodeNumber++
 		}
 	}
 
-	log.Debug("pick node result", zap.Int("nodeNumber", len(nodeMapping)))
-	if len(nodeMapping) == 0 {
+	if aliveNodeNumber == 0 {
 		return metadata.RegisteredNode{}, errors.WithMessage(ErrNodeNumberNotEnough, "at least one online nodes is required")
 	}
 
 	pickedNodeName := hashRing.Get(strconv.Itoa(int(shardID)))
+	log.Debug("ConsistentHashNodePicker pick result", zap.Uint64("shardID", uint64(shardID)), zap.String("node", pickedNodeName), zap.Int("nodeNumber", aliveNodeNumber))
 
-	return nodeMapping[pickedNodeName], nil
+	for _, registerNode := range registerNodes {
+		if registerNode.Node.Name == pickedNodeName {
+			return registerNode, nil
+		}
+	}
+
+	return metadata.RegisteredNode{}, errors.WithMessagef(ErrPickNode, "pickedNode not found in register nodes, nodeName:%s", pickedNodeName)
 }
