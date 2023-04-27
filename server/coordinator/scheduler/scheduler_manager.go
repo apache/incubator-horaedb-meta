@@ -119,7 +119,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 				if m.deployMode && clusterSnapshot.Topology.ClusterView.State == storage.ClusterStateStable {
 					continue
 				}
-				if clusterSnapshot.Topology.ClusterView.State == storage.ClusterStatePrepare && len(clusterSnapshot.Topology.ShardViewsMapping) == len(clusterSnapshot.Topology.ClusterView.ShardNodes) {
+				if clusterSnapshot.Topology.IsPrepareFinished() {
 					if err := m.clusterMetadata.UpdateClusterView(ctx, storage.ClusterStateStable, clusterSnapshot.Topology.ClusterView.ShardNodes); err != nil {
 						log.Error("update cluster view failed", zap.Error(err))
 					}
@@ -201,8 +201,8 @@ func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot metadata.Sn
 
 func (m *ManagerImpl) UpdateDeployMode(_ context.Context, deployMode bool) {
 	m.lock.Lock()
-	defer m.lock.Unlock()
-
 	m.deployMode = deployMode
+	m.lock.Unlock()
+
 	log.Info("scheduler manager update deploy mode", zap.Bool("deployMode", deployMode))
 }

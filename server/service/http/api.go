@@ -53,7 +53,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/route", a.route)
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
-	router.Post("/deployMode", a.deployMode)
+	router.Put("/deployMode", a.deployMode)
 	router.Get("/healthCheck", a.healthCheck)
 
 	return router
