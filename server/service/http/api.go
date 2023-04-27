@@ -53,7 +53,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/route", a.route)
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
-	router.Put("/schedulerOperator", a.schedulerOperator)
+	router.Put("/enableScheduled", a.enableScheduled)
 	router.Get("/healthCheck", a.healthCheck)
 
 	return router
@@ -367,28 +367,28 @@ func (a *API) split(writer http.ResponseWriter, req *http.Request) {
 	a.respond(writer, newShardID)
 }
 
-type UpdateSchedulerOperatorRequest struct {
-	ClusterName       string `json:"clusterName"`
-	SchedulerOperator bool   `json:"schedulerOperator"`
+type UpdateEnableScheduledRequest struct {
+	ClusterName     string `json:"clusterName"`
+	EnableScheduled bool   `json:"enableScheduled"`
 }
 
-func (a *API) schedulerOperator(writer http.ResponseWriter, req *http.Request) {
-	var updateSchedulerOperatorRequest UpdateSchedulerOperatorRequest
-	err := json.NewDecoder(req.Body).Decode(&updateSchedulerOperatorRequest)
+func (a *API) enableScheduled(writer http.ResponseWriter, req *http.Request) {
+	var updateEnableScheduledRequest UpdateEnableScheduledRequest
+	err := json.NewDecoder(req.Body).Decode(&updateEnableScheduledRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
 		a.respondError(writer, ErrParseRequest, "")
 		return
 	}
 
-	c, err := a.clusterManager.GetCluster(req.Context(), updateSchedulerOperatorRequest.ClusterName)
+	c, err := a.clusterManager.GetCluster(req.Context(), updateEnableScheduledRequest.ClusterName)
 	if err != nil {
-		log.Error("cluster not found", zap.String("clusterName", updateSchedulerOperatorRequest.ClusterName), zap.Error(err))
+		log.Error("cluster not found", zap.String("clusterName", updateEnableScheduledRequest.ClusterName), zap.Error(err))
 		a.respondError(writer, metadata.ErrClusterNotFound, "cluster not found")
 		return
 	}
 
-	c.GetSchedulerManager().UpdateSchedulerOperator(req.Context(), updateSchedulerOperatorRequest.SchedulerOperator)
+	c.GetSchedulerManager().UpdateEnableScheduled(req.Context(), updateEnableScheduledRequest.EnableScheduled)
 
 	a.respond(writer, nil)
 }

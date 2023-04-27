@@ -28,7 +28,7 @@ type Cluster struct {
 	schedulerManager scheduler.Manager
 }
 
-func NewCluster(metadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, schedulerOperator bool) (*Cluster, error) {
+func NewCluster(metadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableScheduled bool) (*Cluster, error) {
 	procedureStorage := procedure.NewEtcdStorageImpl(client, rootPath)
 	procedureManager, err := procedure.NewManagerImpl(metadata)
 	if err != nil {
@@ -37,7 +37,7 @@ func NewCluster(metadata *metadata.ClusterMetadata, client *clientv3.Client, roo
 	dispatch := eventdispatch.NewDispatchImpl()
 	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(client, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage)
 
-	schedulerManager := scheduler.NewManager(procedureManager, procedureFactory, metadata, client, rootPath, schedulerOperator)
+	schedulerManager := scheduler.NewManager(procedureManager, procedureFactory, metadata, client, rootPath, enableScheduled)
 
 	return &Cluster{
 		metadata:         metadata,

@@ -35,7 +35,7 @@ type Manager interface {
 
 	Stop(ctx context.Context) error
 
-	UpdateSchedulerOperator(ctx context.Context, schedulerOperator bool)
+	UpdateEnableScheduled(ctx context.Context, enableScheduled bool)
 
 	// Scheduler will be called when received new heartbeat, every scheduler registered in schedulerManager will be called to generate procedures.
 	// Scheduler cloud be schedule with fix time interval or heartbeat.
@@ -55,10 +55,10 @@ type ManagerImpl struct {
 	registerSchedulers []Scheduler
 	shardWatch         *watch.ShardWatch
 	isRunning          bool
-	schedulerOperator  bool
+	enableScheduled    bool
 }
 
-func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, schedulerOperator bool) Manager {
+func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableScheduled bool) Manager {
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
 		registerSchedulers: []Scheduler{},
@@ -68,7 +68,7 @@ func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory
 		clusterMetadata:    clusterMetadata,
 		client:             client,
 		rootPath:           rootPath,
-		schedulerOperator:  schedulerOperator,
+		enableScheduled:    enableScheduled,
 	}
 }
 
@@ -117,7 +117,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 
 				// TODO: Perhaps these codes related to schedulerOperator need to be refactored.
 				// If schedulerOperator is turned on, the scheduler will only be scheduled in the non-stable state.
-				if m.schedulerOperator && clusterSnapshot.Topology.ClusterView.State == storage.ClusterStateStable {
+				if !m.enableScheduled && clusterSnapshot.Topology.ClusterView.State == storage.ClusterStateStable {
 					continue
 				}
 				if clusterSnapshot.Topology.IsPrepareFinished() {
@@ -200,10 +200,10 @@ func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot metadata.Sn
 	return results
 }
 
-func (m *ManagerImpl) UpdateSchedulerOperator(_ context.Context, schedulerOperator bool) {
+func (m *ManagerImpl) UpdateEnableScheduled(_ context.Context, enableScheduled bool) {
 	m.lock.Lock()
-	m.schedulerOperator = schedulerOperator
+	m.enableScheduled = enableScheduled
 	m.lock.Unlock()
 
-	log.Info("scheduler manager update scheduler operator", zap.Bool("schedulerOperator", schedulerOperator))
+	log.Info("scheduler manager update enableScheduled", zap.Bool("enableScheduled", enableScheduled))
 }
