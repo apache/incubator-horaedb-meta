@@ -49,25 +49,27 @@ type managerImpl struct {
 	running  bool
 	clusters map[string]*Cluster
 
-	storage         storage.Storage
-	kv              clientv3.KV
-	client          *clientv3.Client
-	alloc           id.Allocator
-	rootPath        string
-	idAllocatorStep uint
+	storage           storage.Storage
+	kv                clientv3.KV
+	client            *clientv3.Client
+	alloc             id.Allocator
+	rootPath          string
+	idAllocatorStep   uint
+	schedulerOperator bool
 }
 
-func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint) (Manager, error) {
+func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, schedulerOperator bool) (Manager, error) {
 	alloc := id.NewAllocatorImpl(kv, path.Join(rootPath, AllocClusterIDPrefix), idAllocatorStep)
 
 	manager := &managerImpl{
-		storage:         storage,
-		kv:              kv,
-		client:          client,
-		alloc:           alloc,
-		clusters:        make(map[string]*Cluster, 0),
-		rootPath:        rootPath,
-		idAllocatorStep: idAllocatorStep,
+		storage:           storage,
+		kv:                kv,
+		client:            client,
+		alloc:             alloc,
+		clusters:          make(map[string]*Cluster, 0),
+		rootPath:          rootPath,
+		idAllocatorStep:   idAllocatorStep,
+		schedulerOperator: schedulerOperator,
 	}
 
 	return manager, nil
@@ -132,7 +134,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 		return nil, errors.WithMessage(err, "cluster load")
 	}
 
-	c, err := NewCluster(clusterMetadata, m.client, m.rootPath)
+	c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.schedulerOperator)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new cluster")
 	}
@@ -285,7 +287,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 			return errors.WithMessage(err, "fail to load cluster")
 		}
 		log.Info("open cluster successfully", zap.String("cluster", clusterMetadata.Name()))
-		c, err := NewCluster(clusterMetadata, m.client, m.rootPath)
+		c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.schedulerOperator)
 		if err != nil {
 			return errors.WithMessage(err, "new cluster")
 		}

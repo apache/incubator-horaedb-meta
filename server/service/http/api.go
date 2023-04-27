@@ -53,7 +53,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/route", a.route)
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
-	router.Put("/deployMode", a.deployMode)
+	router.Put("/schedulerOperator", a.schedulerOperator)
 	router.Get("/healthCheck", a.healthCheck)
 
 	return router
@@ -367,28 +367,28 @@ func (a *API) split(writer http.ResponseWriter, req *http.Request) {
 	a.respond(writer, newShardID)
 }
 
-type UpdateDeployModeRequest struct {
-	ClusterName string `json:"clusterName"`
-	DeployMode  bool   `json:"deployMode"`
+type UpdateSchedulerOperatorRequest struct {
+	ClusterName       string `json:"clusterName"`
+	SchedulerOperator bool   `json:"schedulerOperator"`
 }
 
-func (a *API) deployMode(writer http.ResponseWriter, req *http.Request) {
-	var updateDeployModeRequest UpdateDeployModeRequest
-	err := json.NewDecoder(req.Body).Decode(&updateDeployModeRequest)
+func (a *API) schedulerOperator(writer http.ResponseWriter, req *http.Request) {
+	var updateSchedulerOperatorRequest UpdateSchedulerOperatorRequest
+	err := json.NewDecoder(req.Body).Decode(&updateSchedulerOperatorRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
 		a.respondError(writer, ErrParseRequest, "")
 		return
 	}
 
-	c, err := a.clusterManager.GetCluster(req.Context(), updateDeployModeRequest.ClusterName)
+	c, err := a.clusterManager.GetCluster(req.Context(), updateSchedulerOperatorRequest.ClusterName)
 	if err != nil {
-		log.Error("cluster not found", zap.String("clusterName", updateDeployModeRequest.ClusterName), zap.Error(err))
+		log.Error("cluster not found", zap.String("clusterName", updateSchedulerOperatorRequest.ClusterName), zap.Error(err))
 		a.respondError(writer, metadata.ErrClusterNotFound, "cluster not found")
 		return
 	}
 
-	c.GetSchedulerManager().UpdateDeployMode(req.Context(), updateDeployModeRequest.DeployMode)
+	c.GetSchedulerManager().UpdateSchedulerOperator(req.Context(), updateSchedulerOperatorRequest.SchedulerOperator)
 
 	a.respond(writer, nil)
 }
