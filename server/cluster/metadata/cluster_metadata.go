@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"path"
+	"sort"
 	"sync"
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -372,10 +373,7 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 	if err != nil {
 		return errors.WithMessage(err, "create or update registered node")
 	}
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
+	oldCache := c.registeredNodesCache[registeredNode.Node.Name]
 	c.registeredNodesCache[registeredNode.Node.Name] = registeredNode
 
 	// When the number of nodes in the cluster reaches the threshold, modify the cluster status to prepare.
@@ -385,7 +383,13 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 			log.Error("update cluster view failed", zap.Error(err))
 		}
 	}
+
 	// Update shard node mapping.
+	// Check whether to update persistence data.
+	if !needUpdate(oldCache, registeredNode) {
+		return nil
+	}
+
 	shardNodes := make(map[string][]storage.ShardNode, 1)
 	shardNodes[registeredNode.Node.Name] = make([]storage.ShardNode, 0, len(registeredNode.ShardInfos))
 	for _, shardInfo := range registeredNode.ShardInfos {
@@ -400,6 +404,32 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 	}
 
 	return nil
+}
+
+func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
+	oldShardIDs := make([]storage.ShardID, 0, len(oldCache.ShardInfos))
+	for i := 0; i < len(oldCache.ShardInfos); i++ {
+		oldShardIDs = append(oldShardIDs, oldCache.ShardInfos[i].ID)
+	}
+	sort.Slice(oldShardIDs, func(i, j int) bool {
+		return oldShardIDs[i] < oldShardIDs[j]
+	})
+	curShardIDs := make([]storage.ShardID, 0, len(registeredNode.ShardInfos))
+	for i := 0; i < len(registeredNode.ShardInfos); i++ {
+		curShardIDs = append(curShardIDs, registeredNode.ShardInfos[i].ID)
+	}
+	sort.Slice(curShardIDs, func(i, j int) bool {
+		return curShardIDs[i] < curShardIDs[j]
+	})
+	if len(oldShardIDs) != len(curShardIDs) {
+		return true
+	}
+	for i := 0; i < len(curShardIDs); i++ {
+		if curShardIDs[i] != oldShardIDs[i] {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *ClusterMetadata) GetRegisteredNodes() []RegisteredNode {
