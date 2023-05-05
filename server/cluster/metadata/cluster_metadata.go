@@ -373,7 +373,11 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 	if err != nil {
 		return errors.WithMessage(err, "create or update registered node")
 	}
-	oldCache := c.registeredNodesCache[registeredNode.Node.Name]
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	oldCache, exists := c.registeredNodesCache[registeredNode.Node.Name]
 	c.registeredNodesCache[registeredNode.Node.Name] = registeredNode
 
 	// When the number of nodes in the cluster reaches the threshold, modify the cluster status to prepare.
@@ -386,7 +390,7 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 
 	// Update shard node mapping.
 	// Check whether to update persistence data.
-	if !needUpdate(oldCache, registeredNode) {
+	if exists && !needUpdate(oldCache, registeredNode) {
 		return nil
 	}
 
@@ -407,6 +411,16 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 }
 
 func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
+	if len(oldCache.ShardInfos) != len(registeredNode.ShardInfos) {
+		return true
+	}
+	if len(oldCache.ShardInfos) >= 20 {
+		return sortCompare(oldCache, registeredNode)
+	}
+	return simpleCompare(oldCache, registeredNode)
+}
+
+func sortCompare(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 	oldShardIDs := make([]storage.ShardID, 0, len(oldCache.ShardInfos))
 	for i := 0; i < len(oldCache.ShardInfos); i++ {
 		oldShardIDs = append(oldShardIDs, oldCache.ShardInfos[i].ID)
@@ -421,14 +435,27 @@ func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 	sort.Slice(curShardIDs, func(i, j int) bool {
 		return curShardIDs[i] < curShardIDs[j]
 	})
-	if len(oldShardIDs) != len(curShardIDs) {
-		return true
-	}
 	for i := 0; i < len(curShardIDs); i++ {
 		if curShardIDs[i] != oldShardIDs[i] {
 			return true
 		}
 	}
+	return false
+}
+
+func simpleCompare(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
+	for i := 0; i < len(oldCache.ShardInfos); i++ {
+		found := false
+		for j := 0; j < len(registeredNode.ShardInfos); j++ {
+			if oldCache.ShardInfos[i].ID == registeredNode.ShardInfos[j].ID {
+				found = true
+			}
+		}
+		if !found {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -615,9 +642,6 @@ func (c *ClusterMetadata) CreateShardViews(ctx context.Context, views []CreateSh
 }
 
 func (c *ClusterMetadata) GetClusterSnapshot() Snapshot {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
 	return Snapshot{
 		Topology:        c.topologyManager.GetTopology(),
 		RegisteredNodes: c.GetRegisteredNodes(),
