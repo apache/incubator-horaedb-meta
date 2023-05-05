@@ -37,7 +37,7 @@ func BenchmarkCompareWith10Shards(b *testing.B) {
 }
 
 func BenchmarkSortWith20Shards(b *testing.B) {
-	registerNode := buildRegisterNode(20)
+	registerNode := buildRegisterNode(50)
 	oldCache := registerNode
 	for i := 0; i < b.N; i++ {
 		sortCompare(oldCache, registerNode)
@@ -45,7 +45,7 @@ func BenchmarkSortWith20Shards(b *testing.B) {
 }
 
 func BenchmarkCompareWith20Shards(b *testing.B) {
-	registerNode := buildRegisterNode(20)
+	registerNode := buildRegisterNode(50)
 	oldCache := registerNode
 	for i := 0; i < b.N; i++ {
 		simpleCompare(oldCache, registerNode)

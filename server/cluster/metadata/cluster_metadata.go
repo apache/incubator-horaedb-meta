@@ -411,7 +411,7 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 }
 
 func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
-	if len(oldCache.ShardInfos) >= 20 {
+	if len(oldCache.ShardInfos) >= 50 {
 		return !sortCompare(oldCache, registeredNode)
 	}
 	return !simpleCompare(oldCache, registeredNode)
