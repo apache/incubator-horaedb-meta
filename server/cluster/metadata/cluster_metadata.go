@@ -377,9 +377,6 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	oldCache, exists := c.registeredNodesCache[registeredNode.Node.Name]
-	c.registeredNodesCache[registeredNode.Node.Name] = registeredNode
-
 	// When the number of nodes in the cluster reaches the threshold, modify the cluster status to prepare.
 	// TODO: Consider the design of the entire cluster state, which may require refactoring.
 	if uint32(len(c.registeredNodesCache)) >= c.metaData.MinNodeCount && c.topologyManager.GetClusterState() == storage.ClusterStateEmpty {
@@ -390,6 +387,8 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 
 	// Update shard node mapping.
 	// Check whether to update persistence data.
+	oldCache, exists := c.registeredNodesCache[registeredNode.Node.Name]
+	c.registeredNodesCache[registeredNode.Node.Name] = registeredNode
 	if exists && !needUpdate(oldCache, registeredNode) {
 		return nil
 	}
@@ -418,7 +417,7 @@ func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 }
 
 // sortCompare compare if they are the same by sorted slice, return true when they are the same.
-func sortCompare(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
+func sortCompare(oldCache, registeredNode RegisteredNode) bool {
 	if len(oldCache.ShardInfos) != len(registeredNode.ShardInfos) {
 		return true
 	}
@@ -445,7 +444,7 @@ func sortCompare(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 }
 
 // simpleCompare compare if they are the same by simple loop, return true when they are the same.
-func simpleCompare(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
+func simpleCompare(oldCache, registeredNode RegisteredNode) bool {
 	if len(oldCache.ShardInfos) != len(registeredNode.ShardInfos) {
 		return true
 	}
