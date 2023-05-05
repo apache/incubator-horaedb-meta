@@ -10,6 +10,7 @@ import (
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
+	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
@@ -56,9 +57,10 @@ type managerImpl struct {
 	rootPath        string
 	idAllocatorStep uint
 	enableSchedule  bool
+	scheduleType    string
 }
 
-func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, enableSchedule bool) (Manager, error) {
+func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, enableSchedule bool, scheduleType string) (Manager, error) {
 	alloc := id.NewAllocatorImpl(kv, path.Join(rootPath, AllocClusterIDPrefix), idAllocatorStep)
 
 	manager := &managerImpl{
@@ -70,6 +72,7 @@ func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Cl
 		rootPath:        rootPath,
 		idAllocatorStep: idAllocatorStep,
 		enableSchedule:  enableSchedule,
+		scheduleType:    scheduleType,
 	}
 
 	return manager, nil
@@ -134,7 +137,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 		return nil, errors.WithMessage(err, "cluster load")
 	}
 
-	c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.enableSchedule)
+	c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.enableSchedule, m.scheduleType)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new cluster")
 	}
@@ -212,7 +215,16 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName string, regi
 		log.Error("get cluster", zap.Error(err), zap.String("clusterName", clusterName))
 		return errors.WithMessage(err, "get cluster")
 	}
-	err = cluster.metadata.RegisterNode(ctx, registeredNode)
+
+	var enableUpdateWhenStable bool
+	if m.scheduleType == scheduler.ScheduleTypeCluster {
+		enableUpdateWhenStable = true
+	}
+	if m.scheduleType == scheduler.ScheduleTypeLocal {
+		enableUpdateWhenStable = false
+	}
+	err = cluster.metadata.RegisterNode(ctx, registeredNode, enableUpdateWhenStable)
+
 	if err != nil {
 		return errors.WithMessage(err, "cluster register node")
 	}
@@ -287,7 +299,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 			return errors.WithMessage(err, "fail to load cluster")
 		}
 		log.Info("open cluster successfully", zap.String("cluster", clusterMetadata.Name()))
-		c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.enableSchedule)
+		c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.enableSchedule, m.scheduleType)
 		if err != nil {
 			return errors.WithMessage(err, "new cluster")
 		}

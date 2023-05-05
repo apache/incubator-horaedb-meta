@@ -28,6 +28,7 @@ const (
 	DefaultPartitionTableProportionOfNodes = 0.5
 	DefaultShardTotal                      = 4
 	DefaultSchedulerOperator               = true
+	DefaultScheduleType                    = "local"
 )
 
 type MockDispatch struct{}
@@ -98,7 +99,7 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 	err = clusterMetadata.Load(ctx)
 	re.NoError(err)
 
-	c, err := cluster.NewCluster(clusterMetadata, client, TestRootPath, DefaultSchedulerOperator)
+	c, err := cluster.NewCluster(clusterMetadata, client, TestRootPath, DefaultSchedulerOperator, DefaultScheduleType)
 	re.NoError(err)
 
 	_, _, err = c.GetMetadata().GetOrCreateSchema(ctx, TestSchemaName)
@@ -108,7 +109,7 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 		err = c.GetMetadata().RegisterNode(ctx, metadata.RegisteredNode{
 			Node:       storage.Node{Name: fmt.Sprintf("node%d", i)},
 			ShardInfos: nil,
-		})
+		}, true)
 		re.NoError(err)
 	}
 

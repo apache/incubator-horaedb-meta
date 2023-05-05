@@ -48,7 +48,8 @@ const (
 	defaultClusterReplicationFactor = 1
 	defaultClusterShardTotal        = 8
 	// TODO: enableSchedule should be set false, this is to be compatible with the implementation of CeresDB's local storage, which will be required later...
-	enableSchedule = false
+	enableSchedule      = true
+	defaultScheduleType = "local"
 
 	defaultHTTPPort = 8080
 
@@ -111,6 +112,8 @@ type Config struct {
 
 	// When the EnableSchedule is turned on, the failover scheduling will be turned on, which is used for CeresDB cluster publishing and using local storage.
 	EnableSchedule bool `toml:"enable-schedule" env:"ENABLE_SCHEDULE"`
+	// ScheduleType indicates the schedule type used by the CeresDB cluster, it will determine the strategy of CeresMeta scheduling cluster.
+	ScheduleType string `toml:"storage-type" env:"STORAGE_TYPE"`
 
 	ClientUrls          string `toml:"client-urls" env:"CLIENT_URLS"`
 	PeerUrls            string `toml:"peer-urls" env:"PEER_URLS"`
@@ -274,6 +277,7 @@ func MakeConfigParser() (*Parser, error) {
 		DefaultClusterReplicationFactor: defaultClusterReplicationFactor,
 		DefaultClusterShardTotal:        defaultClusterShardTotal,
 		EnableSchedule:                  enableSchedule,
+		ScheduleType:                    defaultScheduleType,
 
 		HTTPPort: defaultHTTPPort,
 	}

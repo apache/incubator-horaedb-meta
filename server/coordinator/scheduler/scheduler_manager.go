@@ -56,9 +56,10 @@ type ManagerImpl struct {
 	shardWatch         *watch.ShardWatch
 	isRunning          bool
 	enableSchedule     bool
+	scheduleType       string
 }
 
-func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool) Manager {
+func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, scheduleType string) Manager {
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
 		registerSchedulers: []Scheduler{},
@@ -69,6 +70,7 @@ func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory
 		client:             client,
 		rootPath:           rootPath,
 		enableSchedule:     enableSchedule,
+		scheduleType:       scheduleType,
 	}
 }
 
@@ -79,8 +81,10 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 	if m.isRunning {
 		m.registerSchedulers = m.registerSchedulers[:0]
 		m.isRunning = false
-		if err := m.shardWatch.Stop(ctx); err != nil {
-			return errors.WithMessage(err, "stop shard watch failed")
+		if m.scheduleType == ScheduleTypeCluster {
+			if err := m.shardWatch.Stop(ctx); err != nil {
+				return errors.WithMessage(err, "stop shard watch failed")
+			}
 		}
 	}
 
@@ -97,12 +101,15 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 
 	m.initRegister()
 
-	watch := watch.NewWatch(m.clusterMetadata.Name(), m.rootPath, m.client)
-	watch.RegisteringEventCallback(&schedulerWatchCallback{c: m.clusterMetadata})
-	m.shardWatch = watch
-	if err := watch.Start(ctx); err != nil {
-		return errors.WithMessage(err, "start shard watch failed")
+	if m.scheduleType == ScheduleTypeCluster {
+		watch := watch.NewWatch(m.clusterMetadata.Name(), m.rootPath, m.client)
+		watch.RegisteringEventCallback(&schedulerWatchCallback{c: m.clusterMetadata})
+		m.shardWatch = watch
+		if err := watch.Start(ctx); err != nil {
+			return errors.WithMessage(err, "start shard watch failed")
+		}
 	}
+
 	go func() {
 		for {
 			select {
@@ -167,11 +174,17 @@ func (callback *schedulerWatchCallback) OnShardExpired(ctx context.Context, even
 
 // Schedulers should to be initialized and registered here.
 func (m *ManagerImpl) initRegister() {
-	assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker)
-	m.registerScheduler(assignShardScheduler)
+	if m.scheduleType == ScheduleTypeCluster {
+		assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker)
+		m.registerScheduler(assignShardScheduler)
+		rebalancedShardScheduler := NewRebalancedShardScheduler(m.factory, m.nodePicker)
+		m.registerScheduler(rebalancedShardScheduler)
+	}
 
-	rebalancedShardScheduler := NewRebalancedShardScheduler(m.factory, m.nodePicker)
-	m.registerScheduler(rebalancedShardScheduler)
+	if m.scheduleType == ScheduleTypeLocal {
+		localStorageShardScheduler := NewLocalStorageShardScheduler(m.factory, m.nodePicker)
+		m.registerScheduler(localStorageShardScheduler)
+	}
 }
 
 func (m *ManagerImpl) registerScheduler(scheduler Scheduler) {

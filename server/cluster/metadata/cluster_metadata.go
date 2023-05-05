@@ -364,7 +364,7 @@ func (c *ClusterMetadata) GetShardNodeByTableIDs(tableIDs []storage.TableID) (Ge
 	return c.topologyManager.GetShardNodesByTableIDs(tableIDs)
 }
 
-func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode RegisteredNode) error {
+func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode RegisteredNode, enableUpdateWhenStable bool) error {
 	registeredNode.Node.State = storage.NodeStateOnline
 	err := c.storage.CreateOrUpdateNode(ctx, storage.CreateOrUpdateNodeRequest{
 		ClusterID: c.clusterID,
@@ -401,6 +401,10 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 			ShardRole: shardInfo.Role,
 			NodeName:  registeredNode.Node.Name,
 		})
+	}
+
+	if !enableUpdateWhenStable && c.topologyManager.GetClusterState() == storage.ClusterStateStable {
+		return nil
 	}
 	if err := c.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view failed")
