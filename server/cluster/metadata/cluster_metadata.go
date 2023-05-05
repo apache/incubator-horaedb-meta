@@ -415,11 +415,12 @@ func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 		return true
 	}
 	if len(oldCache.ShardInfos) >= 20 {
-		return sortCompare(oldCache, registeredNode)
+		return !sortCompare(oldCache, registeredNode)
 	}
-	return simpleCompare(oldCache, registeredNode)
+	return !simpleCompare(oldCache, registeredNode)
 }
 
+// sortCompare compare if they are the same by sorted slice, return true when they are the same.
 func sortCompare(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 	oldShardIDs := make([]storage.ShardID, 0, len(oldCache.ShardInfos))
 	for i := 0; i < len(oldCache.ShardInfos); i++ {
@@ -437,26 +438,25 @@ func sortCompare(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 	})
 	for i := 0; i < len(curShardIDs); i++ {
 		if curShardIDs[i] != oldShardIDs[i] {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
 
+// simpleCompare compare if they are the same by simple loop, return true when they are the same.
 func simpleCompare(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
+L1:
 	for i := 0; i < len(oldCache.ShardInfos); i++ {
-		found := false
 		for j := 0; j < len(registeredNode.ShardInfos); j++ {
 			if oldCache.ShardInfos[i].ID == registeredNode.ShardInfos[j].ID {
-				found = true
+				continue L1
 			}
 		}
-		if !found {
-			return true
-		}
+		return false
 	}
 
-	return false
+	return true
 }
 
 func (c *ClusterMetadata) GetRegisteredNodes() []RegisteredNode {
