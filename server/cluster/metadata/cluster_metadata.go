@@ -411,26 +411,26 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 
 func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 	if len(oldCache.ShardInfos) >= 50 {
-		return !sortCompare(oldCache, registeredNode)
+		return !sortCompare(oldCache.ShardInfos, registeredNode.ShardInfos)
 	}
-	return !simpleCompare(oldCache, registeredNode)
+	return !simpleCompare(oldCache.ShardInfos, registeredNode.ShardInfos)
 }
 
 // sortCompare compare if they are the same by sorted slice, return true when they are the same.
-func sortCompare(oldCache, registeredNode RegisteredNode) bool {
-	if len(oldCache.ShardInfos) != len(registeredNode.ShardInfos) {
+func sortCompare(oldShardInfos, newShardInfos []ShardInfo) bool {
+	if len(oldShardInfos) != len(newShardInfos) {
 		return true
 	}
-	oldShardIDs := make([]storage.ShardID, 0, len(oldCache.ShardInfos))
-	for i := 0; i < len(oldCache.ShardInfos); i++ {
-		oldShardIDs = append(oldShardIDs, oldCache.ShardInfos[i].ID)
+	oldShardIDs := make([]storage.ShardID, 0, len(oldShardInfos))
+	for i := 0; i < len(oldShardInfos); i++ {
+		oldShardIDs = append(oldShardIDs, oldShardInfos[i].ID)
 	}
 	sort.Slice(oldShardIDs, func(i, j int) bool {
 		return oldShardIDs[i] < oldShardIDs[j]
 	})
-	curShardIDs := make([]storage.ShardID, 0, len(registeredNode.ShardInfos))
-	for i := 0; i < len(registeredNode.ShardInfos); i++ {
-		curShardIDs = append(curShardIDs, registeredNode.ShardInfos[i].ID)
+	curShardIDs := make([]storage.ShardID, 0, len(newShardInfos))
+	for i := 0; i < len(newShardInfos); i++ {
+		curShardIDs = append(curShardIDs, newShardInfos[i].ID)
 	}
 	sort.Slice(curShardIDs, func(i, j int) bool {
 		return curShardIDs[i] < curShardIDs[j]
@@ -444,14 +444,14 @@ func sortCompare(oldCache, registeredNode RegisteredNode) bool {
 }
 
 // simpleCompare compare if they are the same by simple loop, return true when they are the same.
-func simpleCompare(oldCache, registeredNode RegisteredNode) bool {
-	if len(oldCache.ShardInfos) != len(registeredNode.ShardInfos) {
+func simpleCompare(oldShardInfos, newShardInfos []ShardInfo) bool {
+	if len(oldShardInfos) != len(newShardInfos) {
 		return true
 	}
 L1:
-	for i := 0; i < len(oldCache.ShardInfos); i++ {
-		for j := 0; j < len(registeredNode.ShardInfos); j++ {
-			if oldCache.ShardInfos[i].ID == registeredNode.ShardInfos[j].ID {
+	for i := 0; i < len(newShardInfos); i++ {
+		for j := 0; j < len(newShardInfos); j++ {
+			if oldShardInfos[i].ID == newShardInfos[j].ID {
 				continue L1
 			}
 		}

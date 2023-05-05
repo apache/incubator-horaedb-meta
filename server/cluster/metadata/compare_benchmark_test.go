@@ -24,7 +24,7 @@ func BenchmarkSortWith10Shards(b *testing.B) {
 	registerNode := buildRegisterNode(10)
 	oldCache := registerNode
 	for i := 0; i < b.N; i++ {
-		sortCompare(oldCache, registerNode)
+		sortCompare(oldCache.ShardInfos, registerNode.ShardInfos)
 	}
 }
 
@@ -32,23 +32,23 @@ func BenchmarkCompareWith10Shards(b *testing.B) {
 	registerNode := buildRegisterNode(10)
 	oldCache := registerNode
 	for i := 0; i < b.N; i++ {
-		simpleCompare(oldCache, registerNode)
+		simpleCompare(oldCache.ShardInfos, registerNode.ShardInfos)
 	}
 }
 
-func BenchmarkSortWith20Shards(b *testing.B) {
+func BenchmarkSortWith50Shards(b *testing.B) {
 	registerNode := buildRegisterNode(50)
 	oldCache := registerNode
 	for i := 0; i < b.N; i++ {
-		sortCompare(oldCache, registerNode)
+		sortCompare(oldCache.ShardInfos, registerNode.ShardInfos)
 	}
 }
 
-func BenchmarkCompareWith20Shards(b *testing.B) {
+func BenchmarkCompareWith50Shards(b *testing.B) {
 	registerNode := buildRegisterNode(50)
 	oldCache := registerNode
 	for i := 0; i < b.N; i++ {
-		simpleCompare(oldCache, registerNode)
+		simpleCompare(oldCache.ShardInfos, registerNode.ShardInfos)
 	}
 }
 
@@ -56,7 +56,7 @@ func BenchmarkSortWith100Shards(b *testing.B) {
 	registerNode := buildRegisterNode(100)
 	oldCache := registerNode
 	for i := 0; i < b.N; i++ {
-		sortCompare(oldCache, registerNode)
+		sortCompare(oldCache.ShardInfos, registerNode.ShardInfos)
 	}
 }
 
@@ -64,6 +64,6 @@ func BenchmarkCompareWith100Shards(b *testing.B) {
 	registerNode := buildRegisterNode(100)
 	oldCache := registerNode
 	for i := 0; i < b.N; i++ {
-		simpleCompare(oldCache, registerNode)
+		simpleCompare(oldCache.ShardInfos, registerNode.ShardInfos)
 	}
 }
