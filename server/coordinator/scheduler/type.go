@@ -12,11 +12,11 @@ const (
 )
 
 func ParseTopologyType(rawString string) (TopologyType, error) {
-	if rawString == TopologyTypeDynamic {
-		return TopologyTypeDynamic, nil
-	}
-	if rawString == TopologyTypeStatic {
+	switch rawString {
+	case TopologyTypeStatic:
 		return TopologyTypeStatic, nil
+	case TopologyTypeDynamic:
+		return TopologyTypeDynamic, nil
 	}
 
 	return "", errors.WithMessagef(ErrParseTopologyType, "rawString:%s could not be parsed to topologyType", rawString)
