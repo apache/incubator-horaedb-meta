@@ -53,15 +53,21 @@ type ManagerImpl struct {
 	// This lock is used to protect the following field.
 	lock               sync.RWMutex
 	registerSchedulers []Scheduler
-	shardWatch         *watch.ShardWatch
+	shardWatch         watch.ShardWatch
 	isRunning          bool
 	enableSchedule     bool
 	topologyType       metadata.TopologyType
 }
 
 func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType metadata.TopologyType) Manager {
-	shardWatch := watch.NewWatch(clusterMetadata.Name(), rootPath, client, topologyType)
-	shardWatch.RegisteringEventCallback(&schedulerWatchCallback{c: clusterMetadata})
+	var shardWatch watch.ShardWatch
+	switch topologyType {
+	case metadata.TopologyTypeDynamic:
+		shardWatch = watch.NewEtcdShardWatch(clusterMetadata.Name(), rootPath, client, topologyType)
+		shardWatch.RegisteringEventCallback(&schedulerWatchCallback{c: clusterMetadata})
+	case metadata.TopologyTypeStatic:
+		shardWatch = watch.NewNoopShardWatch()
+	}
 
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
