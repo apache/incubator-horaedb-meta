@@ -57,10 +57,10 @@ type managerImpl struct {
 	rootPath        string
 	idAllocatorStep uint
 	enableSchedule  bool
-	scheduleType    string
+	topologyType    scheduler.TopologyType
 }
 
-func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, enableSchedule bool, scheduleType string) (Manager, error) {
+func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, enableSchedule bool, topologyType scheduler.TopologyType) (Manager, error) {
 	alloc := id.NewAllocatorImpl(kv, path.Join(rootPath, AllocClusterIDPrefix), idAllocatorStep)
 
 	manager := &managerImpl{
@@ -72,7 +72,7 @@ func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Cl
 		rootPath:        rootPath,
 		idAllocatorStep: idAllocatorStep,
 		enableSchedule:  enableSchedule,
-		scheduleType:    scheduleType,
+		topologyType:    topologyType,
 	}
 
 	return manager, nil
@@ -137,7 +137,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 		return nil, errors.WithMessage(err, "cluster load")
 	}
 
-	c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.enableSchedule, m.scheduleType)
+	c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.enableSchedule, m.topologyType)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new cluster")
 	}
@@ -217,10 +217,10 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName string, regi
 	}
 
 	var enableUpdateWhenStable bool
-	if m.scheduleType == scheduler.ScheduleTypeCluster {
+	if m.topologyType == scheduler.TopologyTypeDynamic {
 		enableUpdateWhenStable = true
 	}
-	if m.scheduleType == scheduler.ScheduleTypeLocal {
+	if m.topologyType == scheduler.TopologyTypeStatic {
 		enableUpdateWhenStable = false
 	}
 	err = cluster.metadata.RegisterNode(ctx, registeredNode, enableUpdateWhenStable)
@@ -299,7 +299,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 			return errors.WithMessage(err, "fail to load cluster")
 		}
 		log.Info("open cluster successfully", zap.String("cluster", clusterMetadata.Name()))
-		c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.enableSchedule, m.scheduleType)
+		c, err := NewCluster(clusterMetadata, m.client, m.rootPath, m.enableSchedule, m.topologyType)
 		if err != nil {
 			return errors.WithMessage(err, "new cluster")
 		}

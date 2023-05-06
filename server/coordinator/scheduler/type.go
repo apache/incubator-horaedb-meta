@@ -2,9 +2,9 @@
 
 package scheduler
 
-type ScheduleType string
+type TopologyType string
 
 const (
-	ScheduleTypeLocal   = "local"
-	ScheduleTypeCluster = "Cluster"
+	TopologyTypeStatic  = "static"
+	TopologyTypeDynamic = "dynamic"
 )

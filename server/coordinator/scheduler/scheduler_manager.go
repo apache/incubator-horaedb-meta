@@ -56,10 +56,10 @@ type ManagerImpl struct {
 	shardWatch         *watch.ShardWatch
 	isRunning          bool
 	enableSchedule     bool
-	scheduleType       string
+	topologyType       TopologyType
 }
 
-func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, scheduleType string) Manager {
+func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType TopologyType) Manager {
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
 		registerSchedulers: []Scheduler{},
@@ -70,7 +70,7 @@ func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory
 		client:             client,
 		rootPath:           rootPath,
 		enableSchedule:     enableSchedule,
-		scheduleType:       scheduleType,
+		topologyType:       topologyType,
 	}
 }
 
@@ -81,7 +81,7 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 	if m.isRunning {
 		m.registerSchedulers = m.registerSchedulers[:0]
 		m.isRunning = false
-		if m.scheduleType == ScheduleTypeCluster {
+		if m.topologyType == TopologyTypeDynamic {
 			if err := m.shardWatch.Stop(ctx); err != nil {
 				return errors.WithMessage(err, "stop shard watch failed")
 			}
@@ -101,7 +101,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 
 	m.initRegister()
 
-	if m.scheduleType == ScheduleTypeCluster {
+	if m.topologyType == TopologyTypeDynamic {
 		watch := watch.NewWatch(m.clusterMetadata.Name(), m.rootPath, m.client)
 		watch.RegisteringEventCallback(&schedulerWatchCallback{c: m.clusterMetadata})
 		m.shardWatch = watch
@@ -174,14 +174,14 @@ func (callback *schedulerWatchCallback) OnShardExpired(ctx context.Context, even
 
 // Schedulers should to be initialized and registered here.
 func (m *ManagerImpl) initRegister() {
-	if m.scheduleType == ScheduleTypeCluster {
+	if m.topologyType == TopologyTypeDynamic {
 		assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker)
 		m.registerScheduler(assignShardScheduler)
 		rebalancedShardScheduler := NewRebalancedShardScheduler(m.factory, m.nodePicker)
 		m.registerScheduler(rebalancedShardScheduler)
 	}
 
-	if m.scheduleType == ScheduleTypeLocal {
+	if m.topologyType == TopologyTypeStatic {
 		localStorageShardScheduler := NewLocalStorageShardScheduler(m.factory, m.nodePicker)
 		m.registerScheduler(localStorageShardScheduler)
 	}
