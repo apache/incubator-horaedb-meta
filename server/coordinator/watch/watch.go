@@ -67,15 +67,15 @@ func NewNoopShardWatch() ShardWatch {
 	return NoopShardWatch{}
 }
 
-func (n NoopShardWatch) Start(ctx context.Context) error {
+func (n NoopShardWatch) Start(_ context.Context) error {
 	return nil
 }
 
-func (n NoopShardWatch) Stop(ctx context.Context) error {
+func (n NoopShardWatch) Stop(_ context.Context) error {
 	return nil
 }
 
-func (n NoopShardWatch) RegisteringEventCallback(eventCallback ShardEventCallback) {}
+func (n NoopShardWatch) RegisteringEventCallback(_ ShardEventCallback) {}
 
 func NewEtcdShardWatch(clusterName string, rootPath string, client *clientv3.Client, topologyType metadata.TopologyType) ShardWatch {
 	return &EtcdShardWatch{

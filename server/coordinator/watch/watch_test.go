@@ -30,7 +30,7 @@ func TestWatch(t *testing.T) {
 	ctx := context.Background()
 
 	_, client, _ := etcdutil.PrepareEtcdServerAndClient(t)
-	watch := NewWatch(TestClusterName, TestRootPath, client, DefaultTopologyType)
+	watch := NewEtcdShardWatch(TestClusterName, TestRootPath, client, DefaultTopologyType)
 	err := watch.Start(ctx)
 	re.NoError(err)
 

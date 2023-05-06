@@ -45,7 +45,7 @@ type ClusterMetadata struct {
 	enableUpdateWhenStable bool
 }
 
-func NewClusterMetadata(meta storage.Cluster, storage storage.Storage, kv clientv3.KV, rootPath string, idAllocatorStep uint, enableUpdateWhenState bool) *ClusterMetadata {
+func NewClusterMetadata(meta storage.Cluster, storage storage.Storage, kv clientv3.KV, rootPath string, idAllocatorStep uint, enableUpdateWhenStable bool) *ClusterMetadata {
 	schemaIDAlloc := id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocSchemaIDPrefix), idAllocatorStep)
 	tableIDAlloc := id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocTableIDPrefix), idAllocatorStep)
 	// FIXME: Load ShardTopology when cluster create, pass exist ShardID to allocator.
@@ -60,7 +60,7 @@ func NewClusterMetadata(meta storage.Cluster, storage storage.Storage, kv client
 		storage:                storage,
 		kv:                     kv,
 		shardIDAlloc:           shardIDAlloc,
-		enableUpdateWhenStable: enableUpdateWhenState,
+		enableUpdateWhenStable: enableUpdateWhenStable,
 	}
 
 	return cluster
@@ -390,7 +390,6 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 		}
 	}
 
-
 	if !c.enableUpdateWhenStable && c.topologyManager.GetClusterState() == storage.ClusterStateStable {
 		return nil
 	}
@@ -413,9 +412,6 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 		})
 	}
 
-	if !enableUpdateWhenStable && c.topologyManager.GetClusterState() == storage.ClusterStateStable {
-		return nil
-	}
 	if err := c.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
 		return errors.WithMessage(err, "update cluster view failed")
 	}
