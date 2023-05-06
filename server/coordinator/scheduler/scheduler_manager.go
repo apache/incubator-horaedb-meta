@@ -56,17 +56,12 @@ type ManagerImpl struct {
 	shardWatch         *watch.ShardWatch
 	isRunning          bool
 	enableSchedule     bool
-	topologyType       TopologyType
+	topologyType       metadata.TopologyType
 }
 
-func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType TopologyType) Manager {
-	shardWatch := watch.NewWatch(clusterMetadata.Name(), rootPath, client)
-	switch topologyType {
-	case TopologyTypeDynamic:
-		shardWatch.RegisteringEventCallback(&schedulerWatchCallback{c: clusterMetadata})
-	case TopologyTypeStatic:
-		// StaticTopology do not need to register watch callback.
-	}
+func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType metadata.TopologyType) Manager {
+	shardWatch := watch.NewWatch(clusterMetadata.Name(), rootPath, client, topologyType)
+	shardWatch.RegisteringEventCallback(&schedulerWatchCallback{c: clusterMetadata})
 
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
@@ -178,9 +173,9 @@ func (callback *schedulerWatchCallback) OnShardExpired(ctx context.Context, even
 func (m *ManagerImpl) initRegister() {
 	var schedulers []Scheduler
 	switch m.topologyType {
-	case TopologyTypeDynamic:
+	case metadata.TopologyTypeDynamic:
 		schedulers = m.createDynamicTopologySchedulers()
-	case TopologyTypeStatic:
+	case metadata.TopologyTypeStatic:
 		schedulers = m.createStaticTopologySchedulers()
 	}
 	for i := 0; i < len(schedulers); i++ {

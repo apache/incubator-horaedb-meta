@@ -28,7 +28,7 @@ type Cluster struct {
 	schedulerManager scheduler.Manager
 }
 
-func NewCluster(metadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType scheduler.TopologyType) (*Cluster, error) {
+func NewCluster(metadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType metadata.TopologyType) (*Cluster, error) {
 	procedureStorage := procedure.NewEtcdStorageImpl(client, rootPath)
 	procedureManager, err := procedure.NewManagerImpl(metadata)
 	if err != nil {

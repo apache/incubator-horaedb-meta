@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
@@ -16,11 +17,12 @@ import (
 )
 
 const (
-	TestClusterName = "defaultCluster"
-	TestRootPath    = "/rootPath"
-	TestShardPath   = "shards"
-	TestShardID     = 1
-	TestNodeName    = "testNode"
+	TestClusterName     = "defaultCluster"
+	TestRootPath        = "/rootPath"
+	TestShardPath       = "shards"
+	TestShardID         = 1
+	TestNodeName        = "testNode"
+	DefaultTopologyType = metadata.TopologyTypeDynamic
 )
 
 func TestWatch(t *testing.T) {
@@ -28,7 +30,7 @@ func TestWatch(t *testing.T) {
 	ctx := context.Background()
 
 	_, client, _ := etcdutil.PrepareEtcdServerAndClient(t)
-	watch := NewWatch(TestClusterName, TestRootPath, client)
+	watch := NewWatch(TestClusterName, TestRootPath, client, DefaultTopologyType)
 	err := watch.Start(ctx)
 	re.NoError(err)
 

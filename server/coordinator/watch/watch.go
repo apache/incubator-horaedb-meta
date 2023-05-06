@@ -11,6 +11,7 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
+	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -48,17 +49,19 @@ type ShardWatch struct {
 	etcdClient     *clientv3.Client
 	eventCallbacks []ShardEventCallback
 
-	lock      sync.RWMutex
-	isRunning bool
-	cancel    context.CancelFunc
+	lock         sync.RWMutex
+	isRunning    bool
+	cancel       context.CancelFunc
+	topologyType metadata.TopologyType
 }
 
-func NewWatch(clusterName string, rootPath string, client *clientv3.Client) *ShardWatch {
+func NewWatch(clusterName string, rootPath string, client *clientv3.Client, topologyType metadata.TopologyType) *ShardWatch {
 	return &ShardWatch{
 		clusterName:    clusterName,
 		rootPath:       rootPath,
 		etcdClient:     client,
 		eventCallbacks: []ShardEventCallback{},
+		topologyType:   topologyType,
 	}
 }
 
@@ -66,13 +69,17 @@ func (w *ShardWatch) Start(ctx context.Context) error {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
+	switch w.topologyType {
+	case metadata.TopologyTypeDynamic:
+		shardKeyPrefix := encodeShardKeyPrefix(w.rootPath, w.clusterName, shardPath)
+		if err := w.startWatch(ctx, shardKeyPrefix); err != nil {
+			return errors.WithMessage(err, "etcd register watch failed")
+		}
+	case metadata.TopologyTypeStatic:
+		// StaticTopology do not need to register watch callback.
+	}
 	if w.isRunning {
 		return nil
-	}
-
-	shardKeyPrefix := encodeShardKeyPrefix(w.rootPath, w.clusterName, shardPath)
-	if err := w.startWatch(ctx, shardKeyPrefix); err != nil {
-		return errors.WithMessage(err, "etcd register watch failed")
 	}
 
 	w.isRunning = true
@@ -83,8 +90,13 @@ func (w *ShardWatch) Stop(_ context.Context) error {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
+	switch w.topologyType {
+	case metadata.TopologyTypeDynamic:
+		w.cancel()
+	case metadata.TopologyTypeStatic:
+	}
+
 	w.isRunning = false
-	w.cancel()
 	return nil
 }
 

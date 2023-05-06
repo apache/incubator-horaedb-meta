@@ -10,7 +10,6 @@ import (
 
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
-	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
@@ -57,10 +56,10 @@ type managerImpl struct {
 	rootPath        string
 	idAllocatorStep uint
 	enableSchedule  bool
-	topologyType    scheduler.TopologyType
+	topologyType    metadata.TopologyType
 }
 
-func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, enableSchedule bool, topologyType scheduler.TopologyType) (Manager, error) {
+func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, enableSchedule bool, topologyType metadata.TopologyType) (Manager, error) {
 	alloc := id.NewAllocatorImpl(kv, path.Join(rootPath, AllocClusterIDPrefix), idAllocatorStep)
 
 	manager := &managerImpl{
@@ -125,7 +124,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 		return nil, errors.WithMessage(err, "cluster create cluster")
 	}
 
-	clusterMetadata := metadata.NewClusterMetadata(clusterMetadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep, m.topologyType == scheduler.TopologyTypeDynamic)
+	clusterMetadata := metadata.NewClusterMetadata(clusterMetadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep, m.topologyType == metadata.TopologyTypeDynamic)
 
 	if err = clusterMetadata.Init(ctx); err != nil {
 		log.Error("fail to init cluster", zap.Error(err), zap.String("clusterName", clusterName))
@@ -286,7 +285,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 
 	m.clusters = make(map[string]*Cluster, len(clusters.Clusters))
 	for _, metadataStorage := range clusters.Clusters {
-		clusterMetadata := metadata.NewClusterMetadata(metadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep, m.topologyType == scheduler.TopologyTypeDynamic)
+		clusterMetadata := metadata.NewClusterMetadata(metadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep, m.topologyType == metadata.TopologyTypeDynamic)
 		if err := clusterMetadata.Load(ctx); err != nil {
 			log.Error("fail to load cluster", zap.String("cluster", clusterMetadata.Name()), zap.Error(err))
 			return errors.WithMessage(err, "fail to load cluster")

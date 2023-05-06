@@ -53,7 +53,8 @@ func (s *StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnap
 			}, nil
 		}
 	case storage.ClusterStateStable:
-		for _, shardNode := range clusterSnapshot.Topology.ClusterView.ShardNodes {
+		for i := 0; i < len(clusterSnapshot.Topology.ClusterView.ShardNodes); i++ {
+			shardNode := clusterSnapshot.Topology.ClusterView.ShardNodes[i]
 			node, err := findOnlineNodeByName(shardNode.NodeName, clusterSnapshot.RegisteredNodes)
 			if err != nil {
 				return ScheduleResult{}, err
@@ -82,7 +83,8 @@ func (s *StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnap
 
 func findOnlineNodeByName(nodeName string, nodes []metadata.RegisteredNode) (metadata.RegisteredNode, error) {
 	now := time.Now()
-	for _, node := range nodes {
+	for i := 0; i < len(nodes); i++ {
+		node := nodes[i]
 		if node.IsExpired(now) {
 			continue
 		}
@@ -95,8 +97,8 @@ func findOnlineNodeByName(nodeName string, nodes []metadata.RegisteredNode) (met
 }
 
 func contains(shardID storage.ShardID, shardInfos []metadata.ShardInfo) bool {
-	for _, shardInfo := range shardInfos {
-		if shardInfo.ID == shardID {
+	for i := 0; i < len(shardInfos); i++ {
+		if shardInfos[i].ID == shardID {
 			return true
 		}
 	}
