@@ -654,9 +654,6 @@ func (c *ClusterMetadata) CreateShardViews(ctx context.Context, views []CreateSh
 }
 
 func (c *ClusterMetadata) GetClusterSnapshot() Snapshot {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
 	return Snapshot{
 		Topology:        c.topologyManager.GetTopology(),
 		RegisteredNodes: c.GetRegisteredNodes(),
