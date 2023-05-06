@@ -13,21 +13,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-type LocalStorageShardScheduler struct {
+type StaticTopologyShardScheduler struct {
 	factory    *coordinator.Factory
 	nodePicker coordinator.NodePicker
 }
 
-func NewLocalStorageShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker) Scheduler {
-	return &LocalStorageShardScheduler{factory: factory, nodePicker: nodePicker}
+func NewStaticTopologyShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker) Scheduler {
+	return &StaticTopologyShardScheduler{factory: factory, nodePicker: nodePicker}
 }
 
-func (s *LocalStorageShardScheduler) Schedule(ctx context.Context, clusterSnapshot metadata.Snapshot) (ScheduleResult, error) {
-	if clusterSnapshot.Topology.ClusterView.State == storage.ClusterStateEmpty {
+func (s *StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnapshot metadata.Snapshot) (ScheduleResult, error) {
+	switch clusterSnapshot.Topology.ClusterView.State {
+	case storage.ClusterStateEmpty:
 		return ScheduleResult{}, nil
-	}
-
-	if clusterSnapshot.Topology.ClusterView.State == storage.ClusterStatePrepare {
+	case storage.ClusterStatePrepare:
 		for _, shardView := range clusterSnapshot.Topology.ShardViewsMapping {
 			_, exists := findNodeByShard(shardView.ShardID, clusterSnapshot.Topology.ClusterView.ShardNodes)
 			if exists {
@@ -53,12 +52,9 @@ func (s *LocalStorageShardScheduler) Schedule(ctx context.Context, clusterSnapsh
 				Reason:    fmt.Sprintf("Cluster initialization, shard:%d is assigned to node:%s", shardView.ShardID, newLeaderNode.Node.Name),
 			}, nil
 		}
-	}
-
-	// Reopen shards
-	if clusterSnapshot.Topology.ClusterView.State == storage.ClusterStateStable {
+	case storage.ClusterStateStable:
 		for _, shardNode := range clusterSnapshot.Topology.ClusterView.ShardNodes {
-			node, err := findNodeByName(shardNode.NodeName, clusterSnapshot.RegisteredNodes)
+			node, err := findOnlineNodeByName(shardNode.NodeName, clusterSnapshot.RegisteredNodes)
 			if err != nil {
 				return ScheduleResult{}, err
 			}
@@ -84,9 +80,10 @@ func (s *LocalStorageShardScheduler) Schedule(ctx context.Context, clusterSnapsh
 	return ScheduleResult{}, nil
 }
 
-func findNodeByName(nodeName string, nodes []metadata.RegisteredNode) (metadata.RegisteredNode, error) {
+func findOnlineNodeByName(nodeName string, nodes []metadata.RegisteredNode) (metadata.RegisteredNode, error) {
+	now := time.Now()
 	for _, node := range nodes {
-		if node.IsExpired(time.Now()) {
+		if node.IsExpired(now) {
 			continue
 		}
 		if node.Node.Name == nodeName {

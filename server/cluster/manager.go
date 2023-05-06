@@ -217,10 +217,10 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName string, regi
 	}
 
 	var enableUpdateWhenStable bool
-	if m.topologyType == scheduler.TopologyTypeDynamic {
+	switch m.topologyType {
+	case scheduler.TopologyTypeDynamic:
 		enableUpdateWhenStable = true
-	}
-	if m.topologyType == scheduler.TopologyTypeStatic {
+	case scheduler.TopologyTypeStatic:
 		enableUpdateWhenStable = false
 	}
 	err = cluster.metadata.RegisterNode(ctx, registeredNode, enableUpdateWhenStable)

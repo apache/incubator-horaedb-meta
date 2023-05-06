@@ -27,7 +27,7 @@ const (
 	defaultReplicationFactor        = 1
 	defaultShardTotal               = 8
 	defaultEnableSchedule           = true
-	defaultTopologyType             = "local"
+	defaultTopologyType             = "static"
 	node1                           = "127.0.0.1:8081"
 	node2                           = "127.0.0.2:8081"
 	table1                          = "table1"

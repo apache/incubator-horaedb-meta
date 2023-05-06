@@ -174,17 +174,27 @@ func (callback *schedulerWatchCallback) OnShardExpired(ctx context.Context, even
 
 // Schedulers should to be initialized and registered here.
 func (m *ManagerImpl) initRegister() {
-	if m.topologyType == TopologyTypeDynamic {
-		assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker)
-		m.registerScheduler(assignShardScheduler)
-		rebalancedShardScheduler := NewRebalancedShardScheduler(m.factory, m.nodePicker)
-		m.registerScheduler(rebalancedShardScheduler)
+	var schedulers []Scheduler
+	switch m.topologyType {
+	case TopologyTypeDynamic:
+		schedulers = m.createDynamicTopologySchedulers()
+	case TopologyTypeStatic:
+		schedulers = m.createStaticTopologySchedulers()
 	}
+	for i := 0; i < len(schedulers); i++ {
+		m.registerScheduler(schedulers[i])
+	}
+}
 
-	if m.topologyType == TopologyTypeStatic {
-		localStorageShardScheduler := NewLocalStorageShardScheduler(m.factory, m.nodePicker)
-		m.registerScheduler(localStorageShardScheduler)
-	}
+func (m *ManagerImpl) createStaticTopologySchedulers() []Scheduler {
+	staticTopologyShardScheduler := NewStaticTopologyShardScheduler(m.factory, m.nodePicker)
+	return []Scheduler{staticTopologyShardScheduler}
+}
+
+func (m *ManagerImpl) createDynamicTopologySchedulers() []Scheduler {
+	assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker)
+	rebalancedShardScheduler := NewRebalancedShardScheduler(m.factory, m.nodePicker)
+	return []Scheduler{assignShardScheduler, rebalancedShardScheduler}
 }
 
 func (m *ManagerImpl) registerScheduler(scheduler Scheduler) {

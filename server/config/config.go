@@ -47,8 +47,8 @@ const (
 	defaultClusterNodeCount         = 2
 	defaultClusterReplicationFactor = 1
 	defaultClusterShardTotal        = 8
-	// TODO: enableSchedule should be set false, this is to be compatible with the implementation of CeresDB's local storage, which will be required later...
-	enableSchedule      = true
+	enableSchedule                  = true
+	// topologyType is used to determine the scheduling cluster strategy of CeresMeta. It should be determined according to the storage method of CeresDB. The default is static to support local storage.
 	defaultTopologyType = "static"
 
 	defaultHTTPPort = 8080

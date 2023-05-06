@@ -28,7 +28,7 @@ const (
 	DefaultPartitionTableProportionOfNodes = 0.5
 	DefaultShardTotal                      = 4
 	DefaultSchedulerOperator               = true
-	DefaultTopologyType                    = "local"
+	DefaultTopologyType                    = "static"
 )
 
 type MockDispatch struct{}
