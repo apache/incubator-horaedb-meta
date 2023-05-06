@@ -60,6 +60,14 @@ type ManagerImpl struct {
 }
 
 func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType TopologyType) Manager {
+	shardWatch := watch.NewWatch(clusterMetadata.Name(), rootPath, client)
+	switch topologyType {
+	case TopologyTypeDynamic:
+		shardWatch.RegisteringEventCallback(&schedulerWatchCallback{c: clusterMetadata})
+	case TopologyTypeStatic:
+		// StaticTopology do not need to register watch callback.
+	}
+
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
 		registerSchedulers: []Scheduler{},
@@ -68,6 +76,7 @@ func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory
 		nodePicker:         coordinator.NewConsistentHashNodePicker(defaultHashReplicas),
 		clusterMetadata:    clusterMetadata,
 		client:             client,
+		shardWatch:         shardWatch,
 		rootPath:           rootPath,
 		enableSchedule:     enableSchedule,
 		topologyType:       topologyType,
@@ -81,10 +90,8 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 	if m.isRunning {
 		m.registerSchedulers = m.registerSchedulers[:0]
 		m.isRunning = false
-		if m.topologyType == TopologyTypeDynamic {
-			if err := m.shardWatch.Stop(ctx); err != nil {
-				return errors.WithMessage(err, "stop shard watch failed")
-			}
+		if err := m.shardWatch.Stop(ctx); err != nil {
+			return errors.WithMessage(err, "stop shard watch failed")
 		}
 	}
 
@@ -101,13 +108,8 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 
 	m.initRegister()
 
-	if m.topologyType == TopologyTypeDynamic {
-		watch := watch.NewWatch(m.clusterMetadata.Name(), m.rootPath, m.client)
-		watch.RegisteringEventCallback(&schedulerWatchCallback{c: m.clusterMetadata})
-		m.shardWatch = watch
-		if err := watch.Start(ctx); err != nil {
-			return errors.WithMessage(err, "start shard watch failed")
-		}
+	if err := m.shardWatch.Start(ctx); err != nil {
+		return errors.WithMessage(err, "start shard watch failed")
 	}
 
 	go func() {

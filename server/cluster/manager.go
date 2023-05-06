@@ -125,7 +125,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 		return nil, errors.WithMessage(err, "cluster create cluster")
 	}
 
-	clusterMetadata := metadata.NewClusterMetadata(clusterMetadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
+	clusterMetadata := metadata.NewClusterMetadata(clusterMetadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep, m.topologyType == scheduler.TopologyTypeDynamic)
 
 	if err = clusterMetadata.Init(ctx); err != nil {
 		log.Error("fail to init cluster", zap.Error(err), zap.String("clusterName", clusterName))
@@ -216,14 +216,7 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName string, regi
 		return errors.WithMessage(err, "get cluster")
 	}
 
-	var enableUpdateWhenStable bool
-	switch m.topologyType {
-	case scheduler.TopologyTypeDynamic:
-		enableUpdateWhenStable = true
-	case scheduler.TopologyTypeStatic:
-		enableUpdateWhenStable = false
-	}
-	err = cluster.metadata.RegisterNode(ctx, registeredNode, enableUpdateWhenStable)
+	err = cluster.metadata.RegisterNode(ctx, registeredNode)
 
 	if err != nil {
 		return errors.WithMessage(err, "cluster register node")
@@ -293,7 +286,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 
 	m.clusters = make(map[string]*Cluster, len(clusters.Clusters))
 	for _, metadataStorage := range clusters.Clusters {
-		clusterMetadata := metadata.NewClusterMetadata(metadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
+		clusterMetadata := metadata.NewClusterMetadata(metadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep, m.topologyType == scheduler.TopologyTypeDynamic)
 		if err := clusterMetadata.Load(ctx); err != nil {
 			log.Error("fail to load cluster", zap.String("cluster", clusterMetadata.Name()), zap.Error(err))
 			return errors.WithMessage(err, "fail to load cluster")

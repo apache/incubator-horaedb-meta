@@ -91,7 +91,7 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 		ReplicationFactor: DefaultReplicationFactor,
 		ShardTotal:        DefaultShardTotal,
 		CreatedAt:         0,
-	}, clusterStorage, client, TestRootPath, DefaultIDAllocatorStep)
+	}, clusterStorage, client, TestRootPath, DefaultIDAllocatorStep, false)
 
 	err := clusterMetadata.Init(ctx)
 	re.NoError(err)
@@ -109,7 +109,7 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 		err = c.GetMetadata().RegisterNode(ctx, metadata.RegisteredNode{
 			Node:       storage.Node{Name: fmt.Sprintf("node%d", i)},
 			ShardInfos: nil,
-		}, true)
+		})
 		re.NoError(err)
 	}
 
