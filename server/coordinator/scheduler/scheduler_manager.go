@@ -63,7 +63,7 @@ func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory
 	var shardWatch watch.ShardWatch
 	switch topologyType {
 	case metadata.TopologyTypeDynamic:
-		shardWatch = watch.NewEtcdShardWatch(clusterMetadata.Name(), rootPath, client, topologyType)
+		shardWatch = watch.NewEtcdShardWatch(clusterMetadata.Name(), rootPath, client)
 		shardWatch.RegisteringEventCallback(&schedulerWatchCallback{c: clusterMetadata})
 	case metadata.TopologyTypeStatic:
 		shardWatch = watch.NewNoopShardWatch()

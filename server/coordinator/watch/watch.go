@@ -11,7 +11,6 @@ import (
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
-	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/api/v3/mvccpb"
@@ -55,10 +54,9 @@ type EtcdShardWatch struct {
 	etcdClient     *clientv3.Client
 	eventCallbacks []ShardEventCallback
 
-	lock         sync.RWMutex
-	isRunning    bool
-	cancel       context.CancelFunc
-	topologyType metadata.TopologyType
+	lock      sync.RWMutex
+	isRunning bool
+	cancel    context.CancelFunc
 }
 
 type NoopShardWatch struct{}
@@ -77,13 +75,12 @@ func (n NoopShardWatch) Stop(_ context.Context) error {
 
 func (n NoopShardWatch) RegisteringEventCallback(_ ShardEventCallback) {}
 
-func NewEtcdShardWatch(clusterName string, rootPath string, client *clientv3.Client, topologyType metadata.TopologyType) ShardWatch {
+func NewEtcdShardWatch(clusterName string, rootPath string, client *clientv3.Client) ShardWatch {
 	return &EtcdShardWatch{
 		clusterName:    clusterName,
 		rootPath:       rootPath,
 		etcdClient:     client,
 		eventCallbacks: []ShardEventCallback{},
-		topologyType:   topologyType,
 	}
 }
 
