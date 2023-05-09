@@ -13,6 +13,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.uber.org/zap"
 )
 
 const (
@@ -21,6 +22,7 @@ const (
 )
 
 type Cluster struct {
+	logger   *zap.Logger
 	metadata *metadata.ClusterMetadata
 
 	procedureFactory *coordinator.Factory
@@ -28,18 +30,20 @@ type Cluster struct {
 	schedulerManager scheduler.Manager
 }
 
-func NewCluster(metadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType metadata.TopologyType) (*Cluster, error) {
+func NewCluster(metadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, logger *zap.Logger,
+) (*Cluster, error) {
 	procedureStorage := procedure.NewEtcdStorageImpl(client, rootPath)
-	procedureManager, err := procedure.NewManagerImpl(metadata)
+	procedureManager, err := procedure.NewManagerImpl(metadata, logger)
 	if err != nil {
 		return nil, errors.WithMessage(err, "create procedure manager")
 	}
 	dispatch := eventdispatch.NewDispatchImpl()
-	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(client, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage)
+	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(client, defaultProcedurePrefixKey, defaultAllocStep, logger), dispatch, procedureStorage)
 
-	schedulerManager := scheduler.NewManager(procedureManager, procedureFactory, metadata, client, rootPath, enableSchedule, topologyType)
+	schedulerManager := scheduler.NewManager(procedureManager, procedureFactory, metadata, client, rootPath, metadata.GetEnableSchedule(), metadata.GetTopologyType(), logger)
 
 	return &Cluster{
+		logger:           logger,
 		metadata:         metadata,
 		procedureFactory: procedureFactory,
 		procedureManager: procedureManager,

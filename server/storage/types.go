@@ -16,12 +16,16 @@ type (
 	ClusterState int
 	ShardRole    int
 	NodeState    int
+	TopologyType string
 )
 
 const (
 	ClusterStateEmpty ClusterState = iota + 1
 	ClusterStateStable
 	ClusterStatePrepare
+
+	TopologyTypeStatic  = "static"
+	TopologyTypeDynamic = "dynamic"
 )
 
 const (
@@ -39,6 +43,10 @@ type ListClustersResult struct {
 }
 
 type CreateClusterRequest struct {
+	Cluster Cluster
+}
+
+type UpdateClusterRequest struct {
 	Cluster Cluster
 }
 
@@ -144,7 +152,10 @@ type Cluster struct {
 	MinNodeCount      uint32
 	ReplicationFactor uint32
 	ShardTotal        uint32
+	EnableSchedule    bool
+	TopologyType      TopologyType
 	CreatedAt         uint64
+	ModifiedAt        uint64
 }
 
 type ShardNode struct {
@@ -250,6 +261,8 @@ func convertClusterPB(cluster *clusterpb.Cluster) Cluster {
 		MinNodeCount:      cluster.MinNodeCount,
 		ReplicationFactor: cluster.ReplicationFactor,
 		ShardTotal:        cluster.ShardTotal,
+		EnableSchedule:    cluster.EnableSchedule,
+		TopologyType:      convertTopologyTypePB(cluster.TopologyType),
 		CreatedAt:         cluster.CreatedAt,
 	}
 }
@@ -261,8 +274,30 @@ func convertClusterToPB(cluster Cluster) clusterpb.Cluster {
 		MinNodeCount:      cluster.MinNodeCount,
 		ReplicationFactor: cluster.ReplicationFactor,
 		ShardTotal:        cluster.ShardTotal,
+		EnableSchedule:    cluster.EnableSchedule,
+		TopologyType:      convertTopologyTypeToPB(cluster.TopologyType),
 		CreatedAt:         cluster.CreatedAt,
 	}
+}
+
+func convertTopologyTypeToPB(topologyType TopologyType) clusterpb.Cluster_TopologyType {
+	switch topologyType {
+	case TopologyTypeStatic:
+		return clusterpb.Cluster_STATIC
+	case TopologyTypeDynamic:
+		return clusterpb.Cluster_DYNAMIC
+	}
+	return clusterpb.Cluster_STATIC
+}
+
+func convertTopologyTypePB(topologyType clusterpb.Cluster_TopologyType) TopologyType {
+	switch topologyType {
+	case clusterpb.Cluster_STATIC:
+		return TopologyTypeStatic
+	case clusterpb.Cluster_DYNAMIC:
+		return TopologyTypeDynamic
+	}
+	return TopologyTypeStatic
 }
 
 func convertClusterStateToPB(state ClusterState) clusterpb.ClusterView_ClusterState {

@@ -46,13 +46,16 @@ func NewAPI(clusterManager cluster.Manager, serverStatus *status.ServerStatus, f
 func (a *API) NewAPIRouter() *Router {
 	router := New().WithPrefix(apiPrefix).WithInstrumentation(printRequestInsmt)
 
-	// Register post/get API.
+	// Register API.
 	router.Post("/getShardTables", a.getShardTables)
 	router.Post("/transferLeader", a.transferLeader)
 	router.Post("/split", a.split)
 	router.Post("/route", a.route)
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
+	router.Get("/listClusters", a.listClusters)
+	router.Put("/createCluster", a.createCluster)
+	router.Post("/updateCluster", a.updateCluster)
 	router.Put("/enableSchedule", a.enableSchedule)
 	router.Get("/healthCheck", a.healthCheck)
 
@@ -365,6 +368,113 @@ func (a *API) split(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	a.respond(writer, newShardID)
+}
+
+func (a *API) listClusters(writer http.ResponseWriter, rep *http.Request) {
+	clusters, err := a.clusterManager.ListClusters(rep.Context())
+	if err != nil {
+		log.Error("list clusters")
+		a.respondError(writer, ErrGetCluster, "list clusters failed")
+		return
+	}
+
+	clusterMetadatas := make([]storage.Cluster, 0, len(clusters))
+	for i := 0; i < len(clusters); i++ {
+		storageMetadata := clusters[i].GetMetadata().GetStorageMetadata()
+		clusterMetadatas = append(clusterMetadatas, storageMetadata)
+	}
+	a.respond(writer, clusterMetadatas)
+}
+
+type CreateClusterRequest struct {
+	ClusterName       string `json:"clusterName"`
+	ClusterNodeCount  uint32 `json:"clusterNodeCount"`
+	ClusterShardTotal uint32 `json:"clusterShardTotal"`
+	EnableSchedule    bool   `json:"enableSchedule"`
+	TopologyType      string `json:"topologyType"`
+}
+
+func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
+	var createClusterRequest CreateClusterRequest
+	err := json.NewDecoder(req.Body).Decode(&createClusterRequest)
+	if err != nil {
+		log.Error("decode request body failed", zap.Error(err))
+		a.respondError(writer, ErrParseRequest, "")
+		return
+	}
+
+	if _, err := a.clusterManager.GetCluster(req.Context(), createClusterRequest.ClusterName); err == nil {
+		log.Error("get cluster when create cluster", zap.Error(err))
+		a.respondError(writer, metadata.ErrClusterAlreadyExists, fmt.Sprintf("cluster:%s already exists", createClusterRequest.ClusterName))
+		return
+	}
+
+	topologyType, err := metadata.ParseTopologyType(createClusterRequest.TopologyType)
+	if err != nil {
+		log.Error("parse topology type", zap.Error(err))
+		a.respondError(writer, metadata.ErrCreateCluster, "parse topology type failed")
+		return
+	}
+	c, err := a.clusterManager.CreateCluster(req.Context(), createClusterRequest.ClusterName, metadata.CreateClusterOpts{
+		NodeCount:         createClusterRequest.ClusterNodeCount,
+		ReplicationFactor: 1,
+		ShardTotal:        createClusterRequest.ClusterShardTotal,
+		EnableSchedule:    createClusterRequest.EnableSchedule,
+		TopologyType:      topologyType,
+	})
+	if err != nil {
+		log.Error("create cluster", zap.Error(err))
+		a.respondError(writer, metadata.ErrCreateCluster, "create cluster failed")
+		return
+	}
+
+	a.respond(writer, c.GetMetadata().GetClusterID())
+}
+
+type UpdateClusterRequest struct {
+	ClusterName       string `json:"clusterName"`
+	ClusterNodeCount  uint32 `json:"clusterNodeCount"`
+	ClusterShardTotal uint32 `json:"clusterShardTotal"`
+	EnableSchedule    bool   `json:"enableSchedule"`
+	TopologyType      string `json:"topologyType"`
+}
+
+func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
+	var updateClusterRequest UpdateClusterRequest
+	err := json.NewDecoder(req.Body).Decode(&updateClusterRequest)
+	if err != nil {
+		log.Error("decode request body failed", zap.Error(err))
+		a.respondError(writer, ErrParseRequest, "")
+		return
+	}
+
+	topologyType, err := metadata.ParseTopologyType(updateClusterRequest.TopologyType)
+	if err != nil {
+		log.Error("parse topology")
+		a.respondError(writer, metadata.ErrParseTopologyType, fmt.Sprintf("parse topology failed, topology type:%s", updateClusterRequest.TopologyType))
+		return
+	}
+
+	c, err := a.clusterManager.GetCluster(req.Context(), updateClusterRequest.ClusterName)
+	if err != nil {
+		log.Error("get cluster when update cluster", zap.Error(err))
+		a.respondError(writer, metadata.ErrClusterNotFound, fmt.Sprintf("cluster:%s not found", updateClusterRequest.ClusterName))
+		return
+	}
+
+	if err := a.clusterManager.UpdateCluster(req.Context(), updateClusterRequest.ClusterName, metadata.CreateClusterOpts{
+		NodeCount:         updateClusterRequest.ClusterNodeCount,
+		ReplicationFactor: 1,
+		ShardTotal:        updateClusterRequest.ClusterShardTotal,
+		EnableSchedule:    updateClusterRequest.EnableSchedule,
+		TopologyType:      topologyType,
+	}); err != nil {
+		log.Error("update cluster", zap.Error(err))
+		a.respondError(writer, metadata.ErrUpdateCluster, "update cluster failed")
+		return
+	}
+
+	a.respond(writer, c.GetMetadata().GetClusterID())
 }
 
 type UpdateEnableScheduleRequest struct {
