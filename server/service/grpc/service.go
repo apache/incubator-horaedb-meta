@@ -5,6 +5,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"golang.org/x/time/rate"
 	"strings"
 	"sync"
 	"time"
@@ -30,12 +31,14 @@ type Service struct {
 	// Store as map[string]*grpc.ClientConn
 	// TODO: remove unavailable connection
 	conns sync.Map
+	l     *rate.Limiter
 }
 
-func NewService(opTimeout time.Duration, h Handler) *Service {
+func NewService(opTimeout time.Duration, h Handler, r int, b int) *Service {
 	return &Service{
 		opTimeout: opTimeout,
 		h:         h,
+		l:         rate.NewLimiter(rate.Limit(r), b),
 	}
 }
 
@@ -48,6 +51,10 @@ type Handler interface {
 
 // NodeHeartbeat implements gRPC CeresmetaServer.
 func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHeartbeatRequest) (*metaservicepb.NodeHeartbeatResponse, error) {
+	if !s.l.Allow() {
+		return nil, ErrOperation.WithCausef("flow limit")
+	}
+
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.NodeHeartbeatResponse{Header: responseHeader(err, "grpc heartbeat")}, nil
@@ -89,6 +96,10 @@ func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHear
 
 // AllocSchemaID implements gRPC CeresmetaServer.
 func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
+	if !s.l.Allow() {
+		return nil, ErrOperation.WithCausef("flow limit")
+	}
+
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "grpc alloc schema id")}, nil
@@ -115,6 +126,10 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 
 // GetTablesOfShards implements gRPC CeresmetaServer.
 func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetTablesOfShardsRequest) (*metaservicepb.GetTablesOfShardsResponse, error) {
+	if !s.l.Allow() {
+		return nil, ErrOperation.WithCausef("flow limit")
+	}
+
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.GetTablesOfShardsResponse{Header: responseHeader(err, "grpc get tables of shards")}, nil
@@ -143,6 +158,10 @@ func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetT
 
 // CreateTable implements gRPC CeresmetaServer.
 func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTableRequest) (*metaservicepb.CreateTableResponse, error) {
+	if !s.l.Allow() {
+		return nil, ErrOperation.WithCausef("flow limit")
+	}
+
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
@@ -214,6 +233,10 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 
 // DropTable implements gRPC CeresmetaServer.
 func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
+	if !s.l.Allow() {
+		return nil, ErrOperation.WithCausef("flow limit")
+	}
+
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "drop table")}, nil
@@ -274,6 +297,10 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 
 // RouteTables implements gRPC CeresmetaServer.
 func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTablesRequest) (*metaservicepb.RouteTablesResponse, error) {
+	if !s.l.Allow() {
+		return nil, ErrOperation.WithCausef("flow limit")
+	}
+
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.RouteTablesResponse{Header: responseHeader(err, "grpc routeTables")}, nil
@@ -296,6 +323,10 @@ func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTable
 
 // GetNodes implements gRPC CeresmetaServer.
 func (s *Service) GetNodes(ctx context.Context, req *metaservicepb.GetNodesRequest) (*metaservicepb.GetNodesResponse, error) {
+	if !s.l.Allow() {
+		return nil, ErrOperation.WithCausef("flow limit")
+	}
+
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.GetNodesResponse{Header: responseHeader(err, "grpc get nodes")}, nil

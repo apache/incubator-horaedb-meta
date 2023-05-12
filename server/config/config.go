@@ -18,11 +18,13 @@ import (
 )
 
 const (
-	defaultGrpcHandleTimeoutMs int64 = 60 * 1000
-	defaultEtcdStartTimeoutMs  int64 = 60 * 1000
-	defaultCallTimeoutMs             = 5 * 1000
-	defaultMaxTxnOps                 = 128
-	defaultEtcdLeaseTTLSec           = 10
+	defaultGrpcHandleTimeoutMs     int64 = 60 * 1000
+	defaultGrpcOperationBurstCount int   = 100 * 1000
+	defaultGrpcOperationRateCount  int   = 10 * 1000
+	defaultEtcdStartTimeoutMs      int64 = 60 * 1000
+	defaultCallTimeoutMs                 = 5 * 1000
+	defaultMaxTxnOps                     = 128
+	defaultEtcdLeaseTTLSec               = 10
 
 	defaultNodeNamePrefix          = "ceresmeta"
 	defaultRootPath                = "/ceresdb"
@@ -71,10 +73,12 @@ type Config struct {
 	Log     log.Config `toml:"log" env:"LOG"`
 	EtcdLog log.Config `toml:"etcd-log" env:"ETCD_LOG"`
 
-	GrpcHandleTimeoutMs int64 `toml:"grpc-handle-timeout-ms" env:"GRPC_HANDLER_TIMEOUT_MS"`
-	EtcdStartTimeoutMs  int64 `toml:"etcd-start-timeout-ms" env:"ETCD_START_TIMEOUT_MS"`
-	EtcdCallTimeoutMs   int64 `toml:"etcd-call-timeout-ms" env:"ETCD_CALL_TIMEOUT_MS"`
-	EtcdMaxTxnOps       int64 `toml:"etcd-max-txn-ops" env:"ETCD_MAX_TXN_OPS"`
+	GrpcHandleTimeoutMs     int64 `toml:"grpc-handle-timeout-ms" env:"GRPC_HANDLER_TIMEOUT_MS"`
+	GrpcOperationBurstCount int   `toml:"grpc-operation-burst-count" env:"GRPC_OPERATION_BURST_COUNT"`
+	GrpcOperationRateCount  int   `toml:"grpc-operation-rate-count" env:"GRPC_OPERATION_RATE_COUNT"`
+	EtcdStartTimeoutMs      int64 `toml:"etcd-start-timeout-ms" env:"ETCD_START_TIMEOUT_MS"`
+	EtcdCallTimeoutMs       int64 `toml:"etcd-call-timeout-ms" env:"ETCD_CALL_TIMEOUT_MS"`
+	EtcdMaxTxnOps           int64 `toml:"etcd-max-txn-ops" env:"ETCD_MAX_TXN_OPS"`
 
 	LeaseTTLSec int64 `toml:"lease-sec" env:"LEASE_SEC"`
 
@@ -241,10 +245,12 @@ func MakeConfigParser() (*Parser, error) {
 			File:  log.DefaultLogFile,
 		},
 
-		GrpcHandleTimeoutMs: defaultGrpcHandleTimeoutMs,
-		EtcdStartTimeoutMs:  defaultEtcdStartTimeoutMs,
-		EtcdCallTimeoutMs:   defaultCallTimeoutMs,
-		EtcdMaxTxnOps:       defaultMaxTxnOps,
+		GrpcHandleTimeoutMs:     defaultGrpcHandleTimeoutMs,
+		GrpcOperationBurstCount: defaultGrpcOperationBurstCount,
+		GrpcOperationRateCount:  defaultGrpcOperationRateCount,
+		EtcdStartTimeoutMs:      defaultEtcdStartTimeoutMs,
+		EtcdCallTimeoutMs:       defaultCallTimeoutMs,
+		EtcdMaxTxnOps:           defaultMaxTxnOps,
 
 		LeaseTTLSec: defaultEtcdLeaseTTLSec,
 

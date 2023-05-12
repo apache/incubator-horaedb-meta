@@ -11,4 +11,5 @@ var (
 	ErrBindHeartbeatStream   = coderr.NewCodeError(coderr.Internal, "bind heartbeat sender")
 	ErrUnbindHeartbeatStream = coderr.NewCodeError(coderr.Internal, "unbind heartbeat sender")
 	ErrForward               = coderr.NewCodeError(coderr.Internal, "grpc forward")
+	ErrOperation             = coderr.NewCodeError(coderr.Internal, "grpc operation")
 )
