@@ -30,17 +30,16 @@ type Cluster struct {
 	schedulerManager scheduler.Manager
 }
 
-func NewCluster(metadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, logger *zap.Logger,
-) (*Cluster, error) {
+func NewCluster(logger *zap.Logger, metadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string) (*Cluster, error) {
 	procedureStorage := procedure.NewEtcdStorageImpl(client, rootPath)
-	procedureManager, err := procedure.NewManagerImpl(metadata, logger)
+	procedureManager, err := procedure.NewManagerImpl(logger, metadata)
 	if err != nil {
 		return nil, errors.WithMessage(err, "create procedure manager")
 	}
 	dispatch := eventdispatch.NewDispatchImpl()
-	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(client, defaultProcedurePrefixKey, defaultAllocStep, logger), dispatch, procedureStorage)
+	procedureFactory := coordinator.NewFactory(id.NewAllocatorImpl(logger, client, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage)
 
-	schedulerManager := scheduler.NewManager(procedureManager, procedureFactory, metadata, client, rootPath, metadata.GetEnableSchedule(), metadata.GetTopologyType(), logger)
+	schedulerManager := scheduler.NewManager(logger, procedureManager, procedureFactory, metadata, client, rootPath, metadata.GetEnableSchedule(), metadata.GetTopologyType())
 
 	return &Cluster{
 		logger:           logger,

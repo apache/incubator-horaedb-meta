@@ -108,7 +108,7 @@ func (s *metaStorageImpl) CreateCluster(ctx context.Context, req CreateClusterRe
 	return nil
 }
 
-// UpdateCluster return error if the cluster is not exists.
+// UpdateCluster return an error if the cluster does not exist.
 func (s *metaStorageImpl) UpdateCluster(ctx context.Context, req UpdateClusterRequest) error {
 	c := convertClusterToPB(req.Cluster)
 	value, err := proto.Marshal(&c)

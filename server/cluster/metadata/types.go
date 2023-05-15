@@ -54,6 +54,10 @@ type CreateClusterOpts struct {
 	TopologyType      storage.TopologyType
 }
 
+type UpdateClusterOpts struct {
+	EnableSchedule bool
+}
+
 type CreateTableMetadataRequest struct {
 	SchemaName    string
 	TableName     string
@@ -178,5 +182,5 @@ func ParseTopologyType(rawString string) (storage.TopologyType, error) {
 		return storage.TopologyTypeDynamic, nil
 	}
 
-	return "", errors.WithMessagef(ErrParseTopologyType, "rawString:%s could not be parsed to topologyType", rawString)
+	return "", errors.WithMessagef(ErrParseTopologyType, "could not be parsed to topologyType, rawString:%s", rawString)
 }

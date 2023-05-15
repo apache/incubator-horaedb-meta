@@ -41,27 +41,24 @@ type ClusterMetadata struct {
 	storage      storage.Storage
 	kv           clientv3.KV
 	shardIDAlloc id.Allocator
-
-	enableUpdateWhenStable bool
 }
 
-func NewClusterMetadata(meta storage.Cluster, storage storage.Storage, kv clientv3.KV, rootPath string, idAllocatorStep uint, enableUpdateWhenStable bool, logger *zap.Logger) *ClusterMetadata {
-	schemaIDAlloc := id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocSchemaIDPrefix), idAllocatorStep, logger)
-	tableIDAlloc := id.NewAllocatorImpl(kv, path.Join(rootPath, meta.Name, AllocTableIDPrefix), idAllocatorStep, logger)
+func NewClusterMetadata(logger *zap.Logger, meta storage.Cluster, storage storage.Storage, kv clientv3.KV, rootPath string, idAllocatorStep uint) *ClusterMetadata {
+	schemaIDAlloc := id.NewAllocatorImpl(logger, kv, path.Join(rootPath, meta.Name, AllocSchemaIDPrefix), idAllocatorStep)
+	tableIDAlloc := id.NewAllocatorImpl(logger, kv, path.Join(rootPath, meta.Name, AllocTableIDPrefix), idAllocatorStep)
 	// FIXME: Load ShardTopology when cluster create, pass exist ShardID to allocator.
 	shardIDAlloc := id.NewReusableAllocatorImpl([]uint64{}, MinShardID)
 
 	cluster := &ClusterMetadata{
-		logger:                 logger,
-		clusterID:              meta.ID,
-		metaData:               meta,
-		tableManager:           NewTableManagerImpl(storage, meta.ID, schemaIDAlloc, tableIDAlloc, logger),
-		topologyManager:        NewTopologyManagerImpl(storage, meta.ID, shardIDAlloc, logger),
-		registeredNodesCache:   map[string]RegisteredNode{},
-		storage:                storage,
-		kv:                     kv,
-		shardIDAlloc:           shardIDAlloc,
-		enableUpdateWhenStable: enableUpdateWhenStable,
+		logger:               logger,
+		clusterID:            meta.ID,
+		metaData:             meta,
+		tableManager:         NewTableManagerImpl(logger, storage, meta.ID, schemaIDAlloc, tableIDAlloc),
+		topologyManager:      NewTopologyManagerImpl(logger, storage, meta.ID, shardIDAlloc),
+		registeredNodesCache: map[string]RegisteredNode{},
+		storage:              storage,
+		kv:                   kv,
+		shardIDAlloc:         shardIDAlloc,
 	}
 
 	return cluster
@@ -399,7 +396,8 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 	// Check whether to update persistence data.
 	oldCache, exists := c.registeredNodesCache[registeredNode.Node.Name]
 	c.registeredNodesCache[registeredNode.Node.Name] = registeredNode
-	if !c.enableUpdateWhenStable && c.topologyManager.GetClusterState() == storage.ClusterStateStable {
+	enableUpdateWhenStable := c.metaData.TopologyType == storage.TopologyTypeDynamic
+	if !enableUpdateWhenStable && c.topologyManager.GetClusterState() == storage.ClusterStateStable {
 		return nil
 	}
 	if exists && !needUpdate(oldCache, registeredNode) {
@@ -608,6 +606,13 @@ func (c *ClusterMetadata) GetClusterMinNodeCount() uint32 {
 	defer c.lock.RUnlock()
 
 	return c.metaData.MinNodeCount
+}
+
+func (c *ClusterMetadata) GetReplicationFactory() uint32 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.metaData.ReplicationFactor
 }
 
 func (c *ClusterMetadata) GetTotalShardNum() uint32 {

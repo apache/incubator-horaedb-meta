@@ -32,7 +32,7 @@ func TestMultipleAllocBasedOnKV(t *testing.T) {
 
 func testAllocIDValue(t *testing.T, kv clientv3.KV, start, size int) {
 	re := require.New(t)
-	alloc := NewAllocatorImpl(kv, defaultRootPath+defaultAllocIDKey, defaultStep, zap.NewNop())
+	alloc := NewAllocatorImpl(zap.NewNop(), kv, defaultRootPath+defaultAllocIDKey, defaultStep)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 

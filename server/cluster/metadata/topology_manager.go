@@ -119,12 +119,12 @@ type TopologyManagerImpl struct {
 	nodes map[string]storage.Node // NodeName in memory.
 }
 
-func NewTopologyManagerImpl(storage storage.Storage, clusterID storage.ClusterID, shardIDAlloc id.Allocator, logger *zap.Logger) TopologyManager {
+func NewTopologyManagerImpl(logger *zap.Logger, storage storage.Storage, clusterID storage.ClusterID, shardIDAlloc id.Allocator) TopologyManager {
 	return &TopologyManagerImpl{
+		logger:       logger,
 		storage:      storage,
 		clusterID:    clusterID,
 		shardIDAlloc: shardIDAlloc,
-		logger:       logger,
 	}
 }
 

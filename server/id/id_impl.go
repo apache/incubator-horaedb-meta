@@ -28,8 +28,8 @@ type AllocatorImpl struct {
 	isInitialized bool
 }
 
-func NewAllocatorImpl(kv clientv3.KV, key string, allocStep uint, logger *zap.Logger) Allocator {
-	return &AllocatorImpl{kv: kv, key: key, allocStep: allocStep, logger: logger}
+func NewAllocatorImpl(logger *zap.Logger, kv clientv3.KV, key string, allocStep uint) Allocator {
+	return &AllocatorImpl{logger: logger, kv: kv, key: key, allocStep: allocStep}
 }
 
 func (a *AllocatorImpl) isExhausted() bool {
@@ -82,7 +82,7 @@ func (a *AllocatorImpl) slowRebaseLocked(ctx context.Context) error {
 	}
 
 	currEnd := string(resp.Kvs[0].Value)
-	return a.doRebaseLocked(ctx, decodeID(currEnd, a.logger))
+	return a.doRebaseLocked(ctx, decodeID(a.logger, currEnd))
 }
 
 func (a *AllocatorImpl) fastRebaseLocked(ctx context.Context) error {
@@ -143,7 +143,7 @@ func encodeID(value uint64) string {
 	return fmt.Sprintf("%d", value)
 }
 
-func decodeID(value string, logger *zap.Logger) uint64 {
+func decodeID(logger *zap.Logger, value string) uint64 {
 	res, err := strconv.ParseUint(value, 10, 64)
 	if err != nil {
 		logger.Error("convert string to int failed", zap.Error(err), zap.String("val", value))

@@ -264,6 +264,7 @@ func convertClusterPB(cluster *clusterpb.Cluster) Cluster {
 		EnableSchedule:    cluster.EnableSchedule,
 		TopologyType:      convertTopologyTypePB(cluster.TopologyType),
 		CreatedAt:         cluster.CreatedAt,
+		ModifiedAt:        cluster.ModifiedAt,
 	}
 }
 
@@ -277,6 +278,7 @@ func convertClusterToPB(cluster Cluster) clusterpb.Cluster {
 		EnableSchedule:    cluster.EnableSchedule,
 		TopologyType:      convertTopologyTypeToPB(cluster.TopologyType),
 		CreatedAt:         cluster.CreatedAt,
+		ModifiedAt:        cluster.ModifiedAt,
 	}
 }
 

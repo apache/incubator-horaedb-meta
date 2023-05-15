@@ -52,13 +52,13 @@ type TableManagerImpl struct {
 	schemaTables map[storage.SchemaID]*Tables // schemaName -> tables
 }
 
-func NewTableManagerImpl(storage storage.Storage, clusterID storage.ClusterID, schemaIDAlloc id.Allocator, tableIDAlloc id.Allocator, logger *zap.Logger) TableManager {
+func NewTableManagerImpl(logger *zap.Logger, storage storage.Storage, clusterID storage.ClusterID, schemaIDAlloc id.Allocator, tableIDAlloc id.Allocator) TableManager {
 	return &TableManagerImpl{
+		logger:        logger,
 		storage:       storage,
 		clusterID:     clusterID,
 		schemaIDAlloc: schemaIDAlloc,
 		tableIDAlloc:  tableIDAlloc,
-		logger:        logger,
 	}
 }
 

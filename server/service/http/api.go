@@ -56,7 +56,6 @@ func (a *API) NewAPIRouter() *Router {
 	router.Get("/listClusters", a.listClusters)
 	router.Put("/createCluster", a.createCluster)
 	router.Post("/updateCluster", a.updateCluster)
-	router.Put("/enableSchedule", a.enableSchedule)
 	router.Get("/healthCheck", a.healthCheck)
 
 	return router
@@ -448,13 +447,6 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	topologyType, err := metadata.ParseTopologyType(updateClusterRequest.TopologyType)
-	if err != nil {
-		log.Error("parse topology")
-		a.respondError(writer, metadata.ErrParseTopologyType, fmt.Sprintf("parse topology failed, topology type:%s", updateClusterRequest.TopologyType))
-		return
-	}
-
 	c, err := a.clusterManager.GetCluster(req.Context(), updateClusterRequest.ClusterName)
 	if err != nil {
 		log.Error("get cluster when update cluster", zap.Error(err))
@@ -462,12 +454,8 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := a.clusterManager.UpdateCluster(req.Context(), updateClusterRequest.ClusterName, metadata.CreateClusterOpts{
-		NodeCount:         updateClusterRequest.ClusterNodeCount,
-		ReplicationFactor: 1,
-		ShardTotal:        updateClusterRequest.ClusterShardTotal,
-		EnableSchedule:    updateClusterRequest.EnableSchedule,
-		TopologyType:      topologyType,
+	if err := a.clusterManager.UpdateCluster(req.Context(), updateClusterRequest.ClusterName, metadata.UpdateClusterOpts{
+		EnableSchedule: updateClusterRequest.EnableSchedule,
 	}); err != nil {
 		log.Error("update cluster", zap.Error(err))
 		a.respondError(writer, metadata.ErrUpdateCluster, "update cluster failed")
@@ -475,32 +463,6 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	a.respond(writer, c.GetMetadata().GetClusterID())
-}
-
-type UpdateEnableScheduleRequest struct {
-	ClusterName    string `json:"clusterName"`
-	EnableSchedule bool   `json:"enableSchedule"`
-}
-
-func (a *API) enableSchedule(writer http.ResponseWriter, req *http.Request) {
-	var updateEnableScheduleRequest UpdateEnableScheduleRequest
-	err := json.NewDecoder(req.Body).Decode(&updateEnableScheduleRequest)
-	if err != nil {
-		log.Error("decode request body failed", zap.Error(err))
-		a.respondError(writer, ErrParseRequest, "")
-		return
-	}
-
-	c, err := a.clusterManager.GetCluster(req.Context(), updateEnableScheduleRequest.ClusterName)
-	if err != nil {
-		log.Error("cluster not found", zap.String("clusterName", updateEnableScheduleRequest.ClusterName), zap.Error(err))
-		a.respondError(writer, metadata.ErrClusterNotFound, "cluster not found")
-		return
-	}
-
-	c.GetSchedulerManager().UpdateEnableSchedule(req.Context(), updateEnableScheduleRequest.EnableSchedule)
-
-	a.respond(writer, nil)
 }
 
 func (a *API) healthCheck(writer http.ResponseWriter, _ *http.Request) {

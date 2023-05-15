@@ -87,7 +87,7 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 
 	logger := zap.NewNop()
 
-	clusterMetadata := metadata.NewClusterMetadata(storage.Cluster{
+	clusterMetadata := metadata.NewClusterMetadata(logger, storage.Cluster{
 		ID:                0,
 		Name:              ClusterName,
 		MinNodeCount:      DefaultNodeCount,
@@ -96,7 +96,7 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 		EnableSchedule:    DefaultSchedulerOperator,
 		TopologyType:      DefaultTopologyType,
 		CreatedAt:         0,
-	}, clusterStorage, client, TestRootPath, DefaultIDAllocatorStep, false, logger)
+	}, clusterStorage, client, TestRootPath, DefaultIDAllocatorStep)
 
 	err := clusterMetadata.Init(ctx)
 	re.NoError(err)
@@ -104,7 +104,7 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 	err = clusterMetadata.Load(ctx)
 	re.NoError(err)
 
-	c, err := cluster.NewCluster(clusterMetadata, client, TestRootPath, logger)
+	c, err := cluster.NewCluster(logger, clusterMetadata, client, TestRootPath)
 	re.NoError(err)
 
 	_, _, err = c.GetMetadata().GetOrCreateSchema(ctx, TestSchemaName)

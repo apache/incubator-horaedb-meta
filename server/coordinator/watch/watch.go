@@ -75,7 +75,7 @@ func (n NoopShardWatch) Stop(_ context.Context) error {
 
 func (n NoopShardWatch) RegisteringEventCallback(_ ShardEventCallback) {}
 
-func NewEtcdShardWatch(clusterName string, rootPath string, client *clientv3.Client, logger *zap.Logger) ShardWatch {
+func NewEtcdShardWatch(logger *zap.Logger, clusterName string, rootPath string, client *clientv3.Client) ShardWatch {
 	return &EtcdShardWatch{
 		logger:         logger,
 		clusterName:    clusterName,

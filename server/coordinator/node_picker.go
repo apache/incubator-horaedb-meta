@@ -23,7 +23,7 @@ type ConsistentHashNodePicker struct {
 	hashReplicas int
 }
 
-func NewConsistentHashNodePicker(hashReplicas int, logger *zap.Logger) NodePicker {
+func NewConsistentHashNodePicker(logger *zap.Logger, hashReplicas int) NodePicker {
 	return &ConsistentHashNodePicker{hashReplicas: hashReplicas, logger: logger}
 }
 

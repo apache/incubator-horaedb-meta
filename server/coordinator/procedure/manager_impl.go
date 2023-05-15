@@ -105,7 +105,7 @@ func (m *ManagerImpl) ListRunningProcedure(_ context.Context) ([]*Info, error) {
 	return procedureInfos, nil
 }
 
-func NewManagerImpl(metadata *metadata.ClusterMetadata, logger *zap.Logger) (Manager, error) {
+func NewManagerImpl(logger *zap.Logger, metadata *metadata.ClusterMetadata) (Manager, error) {
 	entryLock := lock.NewEntryLock(10)
 	manager := &ManagerImpl{
 		logger:             logger,

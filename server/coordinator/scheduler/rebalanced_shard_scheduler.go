@@ -17,7 +17,7 @@ type RebalancedShardScheduler struct {
 	nodePicker coordinator.NodePicker
 }
 
-func NewRebalancedShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker, logger *zap.Logger) Scheduler {
+func NewRebalancedShardScheduler(logger *zap.Logger, factory *coordinator.Factory, nodePicker coordinator.NodePicker) Scheduler {
 	return &RebalancedShardScheduler{
 		logger:     logger,
 		factory:    factory,

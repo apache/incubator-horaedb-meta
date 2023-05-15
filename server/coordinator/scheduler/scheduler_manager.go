@@ -59,11 +59,11 @@ type ManagerImpl struct {
 	topologyType       storage.TopologyType
 }
 
-func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType storage.TopologyType, logger *zap.Logger) Manager {
+func NewManager(logger *zap.Logger, procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType storage.TopologyType) Manager {
 	var shardWatch watch.ShardWatch
 	switch topologyType {
 	case storage.TopologyTypeDynamic:
-		shardWatch = watch.NewEtcdShardWatch(clusterMetadata.Name(), rootPath, client, logger)
+		shardWatch = watch.NewEtcdShardWatch(logger, clusterMetadata.Name(), rootPath, client)
 		shardWatch.RegisteringEventCallback(&schedulerWatchCallback{c: clusterMetadata})
 	case storage.TopologyTypeStatic:
 		shardWatch = watch.NewNoopShardWatch()
@@ -74,7 +74,7 @@ func NewManager(procedureManager procedure.Manager, factory *coordinator.Factory
 		registerSchedulers: []Scheduler{},
 		isRunning:          false,
 		factory:            factory,
-		nodePicker:         coordinator.NewConsistentHashNodePicker(defaultHashReplicas, logger),
+		nodePicker:         coordinator.NewConsistentHashNodePicker(logger, defaultHashReplicas),
 		clusterMetadata:    clusterMetadata,
 		client:             client,
 		shardWatch:         shardWatch,
@@ -116,35 +116,34 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 
 	go func() {
 		for {
-			select {
-			case <-ctx.Done():
+			if !m.isRunning {
 				m.logger.Info("scheduler manager is canceled")
 				return
-			default:
-				time.Sleep(schedulerInterval)
-				// Get latest cluster snapshot.
-				clusterSnapshot := m.clusterMetadata.GetClusterSnapshot()
-				m.logger.Debug("scheduler manager invoke", zap.String("clusterSnapshot", fmt.Sprintf("%v", clusterSnapshot)))
+			}
 
-				// TODO: Perhaps these codes related to schedulerOperator need to be refactored.
-				// If schedulerOperator is turned on, the scheduler will only be scheduled in the non-stable state.
-				if !m.enableSchedule && clusterSnapshot.Topology.ClusterView.State == storage.ClusterStateStable {
-					continue
-				}
-				if clusterSnapshot.Topology.IsPrepareFinished() {
-					if err := m.clusterMetadata.UpdateClusterView(ctx, storage.ClusterStateStable, clusterSnapshot.Topology.ClusterView.ShardNodes); err != nil {
-						m.logger.Error("update cluster view failed", zap.Error(err))
-					}
-					continue
-				}
+			time.Sleep(schedulerInterval)
+			// Get latest cluster snapshot.
+			clusterSnapshot := m.clusterMetadata.GetClusterSnapshot()
+			m.logger.Debug("scheduler manager invoke", zap.String("clusterSnapshot", fmt.Sprintf("%v", clusterSnapshot)))
 
-				results := m.Scheduler(ctx, clusterSnapshot)
-				for _, result := range results {
-					if nil != result.Procedure {
-						m.logger.Info("scheduler submit new procedure", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.String("Reason", result.Reason))
-						if err := m.procedureManager.Submit(ctx, result.Procedure); err != nil {
-							m.logger.Error("scheduler submit new procedure failed", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.Error(err))
-						}
+			// TODO: Perhaps these codes related to schedulerOperator need to be refactored.
+			// If schedulerOperator is turned on, the scheduler will only be scheduled in the non-stable state.
+			if !m.enableSchedule && clusterSnapshot.Topology.ClusterView.State == storage.ClusterStateStable {
+				continue
+			}
+			if clusterSnapshot.Topology.IsPrepareFinished() {
+				if err := m.clusterMetadata.UpdateClusterView(ctx, storage.ClusterStateStable, clusterSnapshot.Topology.ClusterView.ShardNodes); err != nil {
+					m.logger.Error("update cluster view failed", zap.Error(err))
+				}
+				continue
+			}
+
+			results := m.Scheduler(ctx, clusterSnapshot)
+			for _, result := range results {
+				if result.Procedure != nil {
+					m.logger.Info("scheduler submit new procedure", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.String("Reason", result.Reason))
+					if err := m.procedureManager.Submit(ctx, result.Procedure); err != nil {
+						m.logger.Error("scheduler submit new procedure failed", zap.Uint64("ProcedureID", result.Procedure.ID()), zap.Error(err))
 					}
 				}
 			}
@@ -197,7 +196,7 @@ func (m *ManagerImpl) createStaticTopologySchedulers() []Scheduler {
 
 func (m *ManagerImpl) createDynamicTopologySchedulers() []Scheduler {
 	assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker)
-	rebalancedShardScheduler := NewRebalancedShardScheduler(m.factory, m.nodePicker, m.logger)
+	rebalancedShardScheduler := NewRebalancedShardScheduler(m.logger, m.factory, m.nodePicker)
 	return []Scheduler{assignShardScheduler, rebalancedShardScheduler}
 }
 

@@ -24,7 +24,7 @@ func TestConsistentHashNodePicker(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
 
-	nodePicker := NewConsistentHashNodePicker(50, zap.NewNop())
+	nodePicker := NewConsistentHashNodePicker(zap.NewNop(), 50)
 
 	var nodes []metadata.RegisteredNode
 	_, err := nodePicker.PickNode(ctx, 0, nodes)
