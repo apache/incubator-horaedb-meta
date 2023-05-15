@@ -4,9 +4,7 @@ package test
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/CeresDB/ceresmeta/server/cluster"
