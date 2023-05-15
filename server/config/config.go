@@ -18,13 +18,15 @@ import (
 )
 
 const (
-	defaultGrpcHandleTimeoutMs     int64 = 60 * 1000
-	defaultGrpcOperationBurstCount int   = 100 * 1000
-	defaultGrpcOperationRateCount  int   = 10 * 1000
-	defaultEtcdStartTimeoutMs      int64 = 60 * 1000
-	defaultCallTimeoutMs                 = 5 * 1000
-	defaultMaxTxnOps                     = 128
-	defaultEtcdLeaseTTLSec               = 10
+	defaultGrpcHandleTimeoutMs int64 = 60 * 1000
+	// grpc operation burst count is used to set burst of grpc flow limiter.
+	defaultGrpcOperationBurst int = 100 * 1000
+	// grpc operation rate count is used to set rate of grpc flow limiter.
+	defaultGrpcOperationRate  int   = 10 * 1000
+	defaultEtcdStartTimeoutMs int64 = 60 * 1000
+	defaultCallTimeoutMs            = 5 * 1000
+	defaultMaxTxnOps                = 128
+	defaultEtcdLeaseTTLSec          = 10
 
 	defaultNodeNamePrefix          = "ceresmeta"
 	defaultRootPath                = "/ceresdb"
@@ -64,21 +66,25 @@ const (
 	defaultLogFile     = "/ceresmeta.log"
 )
 
+type LimiterConfig struct {
+	Rate  int
+	Burst int
+}
+
 // Config is server start config, it has three input modes:
 // 1. toml config file
 // 2. env variables
 // Their loading has priority, and low priority configurations will be overwritten by high priority configurations.
 // The priority from high to low is: env variables > toml config file.
 type Config struct {
-	Log     log.Config `toml:"log" env:"LOG"`
-	EtcdLog log.Config `toml:"etcd-log" env:"ETCD_LOG"`
+	Log             log.Config    `toml:"log" env:"LOG"`
+	EtcdLog         log.Config    `toml:"etcd-log" env:"ETCD_LOG"`
+	GrpcFlowLimiter LimiterConfig `toml:"grpc-flow-limiter" env:"GRPC_FLOW_LIMITER"`
 
-	GrpcHandleTimeoutMs     int64 `toml:"grpc-handle-timeout-ms" env:"GRPC_HANDLER_TIMEOUT_MS"`
-	GrpcOperationBurstCount int   `toml:"grpc-operation-burst-count" env:"GRPC_OPERATION_BURST_COUNT"`
-	GrpcOperationRateCount  int   `toml:"grpc-operation-rate-count" env:"GRPC_OPERATION_RATE_COUNT"`
-	EtcdStartTimeoutMs      int64 `toml:"etcd-start-timeout-ms" env:"ETCD_START_TIMEOUT_MS"`
-	EtcdCallTimeoutMs       int64 `toml:"etcd-call-timeout-ms" env:"ETCD_CALL_TIMEOUT_MS"`
-	EtcdMaxTxnOps           int64 `toml:"etcd-max-txn-ops" env:"ETCD_MAX_TXN_OPS"`
+	GrpcHandleTimeoutMs int64 `toml:"grpc-handle-timeout-ms" env:"GRPC_HANDLER_TIMEOUT_MS"`
+	EtcdStartTimeoutMs  int64 `toml:"etcd-start-timeout-ms" env:"ETCD_START_TIMEOUT_MS"`
+	EtcdCallTimeoutMs   int64 `toml:"etcd-call-timeout-ms" env:"ETCD_CALL_TIMEOUT_MS"`
+	EtcdMaxTxnOps       int64 `toml:"etcd-max-txn-ops" env:"ETCD_MAX_TXN_OPS"`
 
 	LeaseTTLSec int64 `toml:"lease-sec" env:"LEASE_SEC"`
 
@@ -244,13 +250,15 @@ func MakeConfigParser() (*Parser, error) {
 			Level: log.DefaultLogLevel,
 			File:  log.DefaultLogFile,
 		},
+		GrpcFlowLimiter: LimiterConfig{
+			Rate:  defaultGrpcOperationRate,
+			Burst: defaultGrpcOperationBurst,
+		},
 
-		GrpcHandleTimeoutMs:     defaultGrpcHandleTimeoutMs,
-		GrpcOperationBurstCount: defaultGrpcOperationBurstCount,
-		GrpcOperationRateCount:  defaultGrpcOperationRateCount,
-		EtcdStartTimeoutMs:      defaultEtcdStartTimeoutMs,
-		EtcdCallTimeoutMs:       defaultCallTimeoutMs,
-		EtcdMaxTxnOps:           defaultMaxTxnOps,
+		GrpcHandleTimeoutMs: defaultGrpcHandleTimeoutMs,
+		EtcdStartTimeoutMs:  defaultEtcdStartTimeoutMs,
+		EtcdCallTimeoutMs:   defaultCallTimeoutMs,
+		EtcdMaxTxnOps:       defaultMaxTxnOps,
 
 		LeaseTTLSec: defaultEtcdLeaseTTLSec,
 

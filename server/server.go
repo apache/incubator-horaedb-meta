@@ -67,7 +67,7 @@ func CreateServer(cfg *config.Config) (*Server, error) {
 		etcdCfg: etcdCfg,
 	}
 
-	grpcService := metagrpc.NewService(cfg.GrpcHandleTimeout(), srv, cfg.GrpcOperationRateCount, cfg.GrpcOperationBurstCount)
+	grpcService := metagrpc.NewService(cfg.GrpcHandleTimeout(), srv, cfg.GrpcFlowLimiter)
 	etcdCfg.ServiceRegister = func(grpcSrv *grpc.Server) {
 		grpcSrv.RegisterService(&metaservicepb.CeresmetaRpcService_ServiceDesc, grpcService)
 	}
