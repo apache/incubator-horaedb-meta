@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
@@ -54,7 +55,7 @@ type ManagerImpl struct {
 	lock               sync.RWMutex
 	registerSchedulers []Scheduler
 	shardWatch         watch.ShardWatch
-	isRunning          bool
+	isRunning          atomic.Bool
 	enableSchedule     bool
 	topologyType       storage.TopologyType
 }
@@ -72,7 +73,6 @@ func NewManager(logger *zap.Logger, procedureManager procedure.Manager, factory 
 	return &ManagerImpl{
 		procedureManager:   procedureManager,
 		registerSchedulers: []Scheduler{},
-		isRunning:          false,
 		factory:            factory,
 		nodePicker:         coordinator.NewConsistentHashNodePicker(logger, defaultHashReplicas),
 		clusterMetadata:    clusterMetadata,
@@ -89,9 +89,9 @@ func (m *ManagerImpl) Stop(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if m.isRunning {
+	if m.isRunning.Load() {
 		m.registerSchedulers = m.registerSchedulers[:0]
-		m.isRunning = false
+		m.isRunning.Store(false)
 		if err := m.shardWatch.Stop(ctx); err != nil {
 			return errors.WithMessage(err, "stop shard watch failed")
 		}
@@ -104,7 +104,7 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if m.isRunning {
+	if m.isRunning.Load() {
 		return nil
 	}
 
@@ -114,11 +114,10 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 		return errors.WithMessage(err, "start shard watch failed")
 	}
 
-	m.isRunning = true
-
 	go func() {
+		m.isRunning.Store(true)
 		for {
-			if !m.isRunning {
+			if !m.isRunning.Load() {
 				m.logger.Info("scheduler manager is canceled")
 				return
 			}

@@ -608,13 +608,6 @@ func (c *ClusterMetadata) GetClusterMinNodeCount() uint32 {
 	return c.metaData.MinNodeCount
 }
 
-func (c *ClusterMetadata) GetReplicationFactory() uint32 {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	return c.metaData.ReplicationFactor
-}
-
 func (c *ClusterMetadata) GetTotalShardNum() uint32 {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

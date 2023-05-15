@@ -18,18 +18,16 @@ import (
 )
 
 const (
-	TestTableName0                         = "table0"
-	TestTableName1                         = "table1"
-	TestSchemaName                         = "TestSchemaName"
-	TestRootPath                           = "/rootPath"
-	DefaultIDAllocatorStep                 = 20
-	ClusterName                            = "ceresdbCluster1"
-	DefaultNodeCount                       = 2
-	DefaultReplicationFactor               = 1
-	DefaultPartitionTableProportionOfNodes = 0.5
-	DefaultShardTotal                      = 4
-	DefaultSchedulerOperator               = true
-	DefaultTopologyType                    = "static"
+	TestTableName0           = "table0"
+	TestTableName1           = "table1"
+	TestSchemaName           = "TestSchemaName"
+	TestRootPath             = "/rootPath"
+	DefaultIDAllocatorStep   = 20
+	ClusterName              = "ceresdbCluster1"
+	DefaultNodeCount         = 2
+	DefaultShardTotal        = 4
+	DefaultSchedulerOperator = true
+	DefaultTopologyType      = "static"
 )
 
 type MockDispatch struct{}
@@ -88,14 +86,13 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 	logger := zap.NewNop()
 
 	clusterMetadata := metadata.NewClusterMetadata(logger, storage.Cluster{
-		ID:                0,
-		Name:              ClusterName,
-		MinNodeCount:      DefaultNodeCount,
-		ReplicationFactor: DefaultReplicationFactor,
-		ShardTotal:        DefaultShardTotal,
-		EnableSchedule:    DefaultSchedulerOperator,
-		TopologyType:      DefaultTopologyType,
-		CreatedAt:         0,
+		ID:             0,
+		Name:           ClusterName,
+		MinNodeCount:   DefaultNodeCount,
+		ShardTotal:     DefaultShardTotal,
+		EnableSchedule: DefaultSchedulerOperator,
+		TopologyType:   DefaultTopologyType,
+		CreatedAt:      0,
 	}, clusterStorage, client, TestRootPath, DefaultIDAllocatorStep)
 
 	err := clusterMetadata.Init(ctx)

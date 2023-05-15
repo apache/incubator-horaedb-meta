@@ -107,15 +107,14 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 
 	createTime := time.Now().UnixMilli()
 	clusterMetadataStorage := storage.Cluster{
-		ID:                clusterID,
-		Name:              clusterName,
-		MinNodeCount:      opts.NodeCount,
-		ReplicationFactor: opts.ReplicationFactor,
-		ShardTotal:        opts.ShardTotal,
-		EnableSchedule:    opts.EnableSchedule,
-		TopologyType:      opts.TopologyType,
-		CreatedAt:         uint64(createTime),
-		ModifiedAt:        uint64(createTime),
+		ID:             clusterID,
+		Name:           clusterName,
+		MinNodeCount:   opts.NodeCount,
+		ShardTotal:     opts.ShardTotal,
+		EnableSchedule: opts.EnableSchedule,
+		TopologyType:   opts.TopologyType,
+		CreatedAt:      uint64(createTime),
+		ModifiedAt:     uint64(createTime),
 	}
 	err = m.storage.CreateCluster(ctx, storage.CreateClusterRequest{
 		Cluster: clusterMetadataStorage,
@@ -160,15 +159,14 @@ func (m *managerImpl) UpdateCluster(ctx context.Context, clusterName string, opt
 	}
 
 	err = m.storage.UpdateCluster(ctx, storage.UpdateClusterRequest{Cluster: storage.Cluster{
-		ID:                c.GetMetadata().GetClusterID(),
-		Name:              c.GetMetadata().Name(),
-		MinNodeCount:      c.GetMetadata().GetClusterMinNodeCount(),
-		ReplicationFactor: c.GetMetadata().GetReplicationFactory(),
-		ShardTotal:        c.GetMetadata().GetTotalShardNum(),
-		EnableSchedule:    opt.EnableSchedule,
-		TopologyType:      c.GetMetadata().GetTopologyType(),
-		CreatedAt:         c.GetMetadata().GetCreateTime(),
-		ModifiedAt:        uint64(time.Now().UnixMilli()),
+		ID:             c.GetMetadata().GetClusterID(),
+		Name:           c.GetMetadata().Name(),
+		MinNodeCount:   c.GetMetadata().GetClusterMinNodeCount(),
+		ShardTotal:     c.GetMetadata().GetTotalShardNum(),
+		EnableSchedule: opt.EnableSchedule,
+		TopologyType:   c.GetMetadata().GetTopologyType(),
+		CreatedAt:      c.GetMetadata().GetCreateTime(),
+		ModifiedAt:     uint64(time.Now().UnixMilli()),
 	}})
 	if err != nil {
 		log.Error("update cluster", zap.Error(err))
