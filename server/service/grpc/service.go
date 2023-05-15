@@ -5,11 +5,12 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"github.com/CeresDB/ceresmeta/server/config"
-	"golang.org/x/time/rate"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/CeresDB/ceresmeta/server/config"
+	"golang.org/x/time/rate"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/commonpb"
