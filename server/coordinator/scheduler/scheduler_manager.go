@@ -114,6 +114,8 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 		return errors.WithMessage(err, "start shard watch failed")
 	}
 
+	m.isRunning = true
+
 	go func() {
 		for {
 			if !m.isRunning {
@@ -149,8 +151,6 @@ func (m *ManagerImpl) Start(ctx context.Context) error {
 			}
 		}
 	}()
-
-	m.isRunning = true
 
 	return nil
 }

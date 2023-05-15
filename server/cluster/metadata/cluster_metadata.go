@@ -636,6 +636,13 @@ func (c *ClusterMetadata) GetTopologyType() storage.TopologyType {
 	return c.metaData.TopologyType
 }
 
+func (c *ClusterMetadata) GetCreateTime() uint64 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.metaData.CreatedAt
+}
+
 func (c *ClusterMetadata) GetClusterState() storage.ClusterState {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

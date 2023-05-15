@@ -105,6 +105,7 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 		return nil, errors.WithMessagef(err, "cluster manager CreateCluster, clusterName:%s", clusterName)
 	}
 
+	createTime := time.Now().UnixMilli()
 	clusterMetadataStorage := storage.Cluster{
 		ID:                clusterID,
 		Name:              clusterName,
@@ -113,7 +114,8 @@ func (m *managerImpl) CreateCluster(ctx context.Context, clusterName string, opt
 		ShardTotal:        opts.ShardTotal,
 		EnableSchedule:    opts.EnableSchedule,
 		TopologyType:      opts.TopologyType,
-		CreatedAt:         uint64(time.Now().UnixMilli()),
+		CreatedAt:         uint64(createTime),
+		ModifiedAt:        uint64(createTime),
 	}
 	err = m.storage.CreateCluster(ctx, storage.CreateClusterRequest{
 		Cluster: clusterMetadataStorage,
@@ -165,6 +167,7 @@ func (m *managerImpl) UpdateCluster(ctx context.Context, clusterName string, opt
 		ShardTotal:        c.GetMetadata().GetTotalShardNum(),
 		EnableSchedule:    opt.EnableSchedule,
 		TopologyType:      c.GetMetadata().GetTopologyType(),
+		CreatedAt:         c.GetMetadata().GetCreateTime(),
 		ModifiedAt:        uint64(time.Now().UnixMilli()),
 	}})
 	if err != nil {
