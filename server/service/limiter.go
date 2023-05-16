@@ -25,14 +25,14 @@ func NewFlowLimiter(config config.LimiterConfig) *FlowLimiter {
 }
 
 func (f *FlowLimiter) GetThreshold() int {
-	f.lock.RLocker()
+	f.lock.RLock()
 	defer f.lock.RUnlock()
 
 	return f.burst
 }
 
 func (f *FlowLimiter) Allow() bool {
-	f.lock.RLocker()
+	f.lock.RLock()
 	defer f.lock.RUnlock()
 
 	return f.l.Allow()

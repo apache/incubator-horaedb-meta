@@ -556,8 +556,8 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 }
 
 type UpdateFlowLimiterRequest struct {
-	Rate  int `json:"Rate"`
-	Burst int `json:"Burst"`
+	Rate  int `json:"rate"`
+	Burst int `json:"burst"`
 }
 
 func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
