@@ -9,9 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/server/config"
-	"golang.org/x/time/rate"
-
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/commonpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
@@ -33,14 +30,12 @@ type Service struct {
 	// Store as map[string]*grpc.ClientConn
 	// TODO: remove unavailable connection
 	conns sync.Map
-	l     *rate.Limiter
 }
 
-func NewService(opTimeout time.Duration, h Handler, config config.LimiterConfig) *Service {
+func NewService(opTimeout time.Duration, h Handler) *Service {
 	return &Service{
 		opTimeout: opTimeout,
 		h:         h,
-		l:         rate.NewLimiter(rate.Limit(config.Rate), config.Burst),
 	}
 }
 
@@ -53,8 +48,8 @@ type Handler interface {
 
 // NodeHeartbeat implements gRPC CeresmetaServer.
 func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHeartbeatRequest) (*metaservicepb.NodeHeartbeatResponse, error) {
-	if !s.l.Allow() {
-		return nil, ErrGrpcFlowLimiter.WithCausef("request is rejected by flow limiter, flow limit threshold:%v", s.l.Burst())
+	if ok, err := s.allow(ctx); !ok {
+		return nil, err
 	}
 
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
@@ -98,8 +93,8 @@ func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHear
 
 // AllocSchemaID implements gRPC CeresmetaServer.
 func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
-	if !s.l.Allow() {
-		return nil, ErrGrpcFlowLimiter.WithCausef("request is rejected by flow limiter, flow limit threshold:%v", s.l.Burst())
+	if ok, err := s.allow(ctx); !ok {
+		return nil, err
 	}
 
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
@@ -128,8 +123,8 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 
 // GetTablesOfShards implements gRPC CeresmetaServer.
 func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetTablesOfShardsRequest) (*metaservicepb.GetTablesOfShardsResponse, error) {
-	if !s.l.Allow() {
-		return nil, ErrGrpcFlowLimiter.WithCausef("request is rejected by flow limiter, flow limit threshold:%v", s.l.Burst())
+	if ok, err := s.allow(ctx); !ok {
+		return nil, err
 	}
 
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
@@ -160,8 +155,8 @@ func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetT
 
 // CreateTable implements gRPC CeresmetaServer.
 func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTableRequest) (*metaservicepb.CreateTableResponse, error) {
-	if !s.l.Allow() {
-		return nil, ErrGrpcFlowLimiter.WithCausef("request is rejected by flow limiter, flow limit threshold:%v", s.l.Burst())
+	if ok, err := s.allow(ctx); !ok {
+		return nil, err
 	}
 
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
@@ -235,8 +230,8 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 
 // DropTable implements gRPC CeresmetaServer.
 func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
-	if !s.l.Allow() {
-		return nil, ErrGrpcFlowLimiter.WithCausef("request is rejected by flow limiter, flow limit threshold:%v", s.l.Burst())
+	if ok, err := s.allow(ctx); !ok {
+		return nil, err
 	}
 
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
@@ -299,8 +294,8 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 
 // RouteTables implements gRPC CeresmetaServer.
 func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTablesRequest) (*metaservicepb.RouteTablesResponse, error) {
-	if !s.l.Allow() {
-		return nil, ErrGrpcFlowLimiter.WithCausef("request is rejected by flow limiter, flow limit threshold:%v", s.l.Burst())
+	if ok, err := s.allow(ctx); !ok {
+		return nil, err
 	}
 
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
@@ -325,8 +320,8 @@ func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTable
 
 // GetNodes implements gRPC CeresmetaServer.
 func (s *Service) GetNodes(ctx context.Context, req *metaservicepb.GetNodesRequest) (*metaservicepb.GetNodesResponse, error) {
-	if !s.l.Allow() {
-		return nil, ErrGrpcFlowLimiter.WithCausef("request is rejected by flow limiter, flow limit threshold:%v", s.l.Burst())
+	if ok, err := s.allow(ctx); !ok {
+		return nil, err
 	}
 
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
@@ -428,4 +423,12 @@ func responseHeader(err error, msg string) *commonpb.ResponseHeader {
 	}
 
 	return &commonpb.ResponseHeader{Code: coderr.Internal, Error: msg + err.Error()}
+}
+
+func (s *Service) allow(ctx context.Context) (bool, error) {
+	flowLimiter := s.h.GetClusterManager().GetLimiter(ctx)
+	if !flowLimiter.Allow() {
+		return false, ErrGrpcFlowLimiter.WithCausef("request is rejected by flow limiter, flow limit threshold:%v", flowLimiter.GetThreshold())
+	}
+	return true, nil
 }

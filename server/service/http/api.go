@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/http/pprof"
 
+	"github.com/CeresDB/ceresmeta/server/config"
+
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -54,6 +56,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/route", a.route)
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
+	router.Put("/updateFlowLimiter", a.updateFlowLimiter)
 	router.Get("/healthCheck", a.healthCheck)
 
 	// Register cluster API.
@@ -550,6 +553,27 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	a.respond(writer, c.GetMetadata().GetClusterID())
+}
+
+type UpdateFlowLimiterRequest struct {
+	Rate  int `json:"Rate"`
+	Burst int `json:"Burst"`
+}
+
+func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
+	var updateFlowLimiterRequest UpdateFlowLimiterRequest
+	err := json.NewDecoder(req.Body).Decode(&updateFlowLimiterRequest)
+	if err != nil {
+		log.Error("decode request body failed", zap.Error(err))
+		a.respondError(writer, ErrParseRequest, "")
+		return
+	}
+	ctx := context.Background()
+
+	flowLimiter := a.clusterManager.GetLimiter(ctx)
+	flowLimiter.UpdateLimiter(config.LimiterConfig{Rate: updateFlowLimiterRequest.Rate, Burst: updateFlowLimiterRequest.Burst})
+
+	a.respond(writer, nil)
 }
 
 func (a *API) healthCheck(writer http.ResponseWriter, _ *http.Request) {

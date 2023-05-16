@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/server/service"
+
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -67,7 +69,7 @@ func CreateServer(cfg *config.Config) (*Server, error) {
 		etcdCfg: etcdCfg,
 	}
 
-	grpcService := metagrpc.NewService(cfg.GrpcHandleTimeout(), srv, cfg.GrpcFlowLimiter)
+	grpcService := metagrpc.NewService(cfg.GrpcHandleTimeout(), srv)
 	etcdCfg.ServiceRegister = func(grpcSrv *grpc.Server) {
 		grpcSrv.RegisterService(&metaservicepb.CeresmetaRpcService_ServiceDesc, grpcService)
 	}
@@ -159,7 +161,8 @@ func (srv *Server) startServer(_ context.Context) error {
 		MaxScanLimit: srv.cfg.MaxScanLimit, MinScanLimit: srv.cfg.MinScanLimit,
 	})
 
-	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep)
+	flowLimiter := service.NewFlowLimiter(srv.cfg.GrpcFlowLimiter)
+	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep, flowLimiter)
 	if err != nil {
 		return errors.WithMessage(err, "start server")
 	}

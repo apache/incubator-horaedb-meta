@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/server/service"
+
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -42,6 +44,8 @@ type Manager interface {
 	RegisterNode(ctx context.Context, clusterName string, registeredNode metadata.RegisteredNode) error
 	GetRegisteredNode(ctx context.Context, clusterName string, node string) (metadata.RegisteredNode, error)
 	ListRegisterNodes(ctx context.Context, clusterName string) ([]metadata.RegisteredNode, error)
+
+	GetLimiter(ctx context.Context) *service.FlowLimiter
 }
 
 type managerImpl struct {
@@ -56,9 +60,11 @@ type managerImpl struct {
 	alloc           id.Allocator
 	rootPath        string
 	idAllocatorStep uint
+
+	flowLimiter *service.FlowLimiter
 }
 
-func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint) (Manager, error) {
+func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, flowLimiter *service.FlowLimiter) (Manager, error) {
 	alloc := id.NewAllocatorImpl(log.GetLogger(), kv, path.Join(rootPath, AllocClusterIDPrefix), idAllocatorStep)
 
 	manager := &managerImpl{
@@ -69,6 +75,7 @@ func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Cl
 		clusters:        make(map[string]*Cluster, 0),
 		rootPath:        rootPath,
 		idAllocatorStep: idAllocatorStep,
+		flowLimiter:     flowLimiter,
 	}
 
 	return manager, nil
@@ -388,4 +395,8 @@ func (m *managerImpl) GetNodeShards(ctx context.Context, clusterName string) (me
 	}
 
 	return ret, nil
+}
+
+func (m *managerImpl) GetLimiter(_ context.Context) *service.FlowLimiter {
+	return m.flowLimiter
 }
