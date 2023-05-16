@@ -37,3 +37,6 @@ build: check
 
 clean:
 	@ rm -f ceresmeta
+
+integration_test: build
+	@ sh run_integration_test.sh
