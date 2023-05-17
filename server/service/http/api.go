@@ -556,8 +556,9 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 }
 
 type UpdateFlowLimiterRequest struct {
-	Rate  int `json:"rate"`
-	Burst int `json:"burst"`
+	TokenBucketFillRate           int  `json:"tokenBucketFillRate"`
+	TokenBucketBurstEventCapacity int  `json:"tokenBucketBurstEventCapacity"`
+	Enable                        bool `json:"enable"`
 }
 
 func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
@@ -568,10 +569,14 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, "")
 		return
 	}
-	ctx := context.Background()
 
-	flowLimiter := a.clusterManager.GetLimiter(ctx)
-	flowLimiter.UpdateLimiter(config.LimiterConfig{Rate: updateFlowLimiterRequest.Rate, Burst: updateFlowLimiterRequest.Burst})
+	flowLimiter := a.clusterManager.GetLimiter(req.Context())
+	newLimiterConfig := config.LimiterConfig{
+		TokenBucketFillRate:           updateFlowLimiterRequest.TokenBucketFillRate,
+		TokenBucketBurstEventCapacity: updateFlowLimiterRequest.TokenBucketBurstEventCapacity,
+		Enable:                        updateFlowLimiterRequest.Enable,
+	}
+	flowLimiter.UpdateLimiter(newLimiterConfig)
 
 	a.respond(writer, nil)
 }

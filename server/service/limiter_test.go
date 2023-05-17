@@ -11,17 +11,18 @@ import (
 )
 
 const (
-	defaultGrpcOperationRate0  = 10
-	defaultGrpcOperationBurst0 = 1000
-	defaultGrpcOperationRate1  = 100
-	defaultGrpcOperationBurst1 = 100
+	defaultInitialLimiterRate0     = 10
+	defaultInitialLimiterCapacity0 = 1000
+	defaultEnableLimiter           = true
+	defaultInitialLimiterRate1     = 100
+	defaultInitialLimiterCapacity1 = 100
 )
 
 func TestFlowLimiter(t *testing.T) {
 	re := require.New(t)
-	flowLimiter := NewFlowLimiter(config.LimiterConfig{Rate: defaultGrpcOperationRate0, Burst: defaultGrpcOperationBurst0})
+	flowLimiter := NewFlowLimiter(config.LimiterConfig{TokenBucketFillRate: defaultInitialLimiterRate0, TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity0, Enable: defaultEnableLimiter})
 
-	for i := 0; i < defaultGrpcOperationBurst0; i++ {
+	for i := 0; i < defaultInitialLimiterCapacity0; i++ {
 		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}
@@ -30,7 +31,7 @@ func TestFlowLimiter(t *testing.T) {
 	re.Equal(false, flag)
 
 	time.Sleep(time.Second)
-	for i := 0; i < defaultGrpcOperationRate0; i++ {
+	for i := 0; i < defaultInitialLimiterRate0; i++ {
 		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}
@@ -39,14 +40,18 @@ func TestFlowLimiter(t *testing.T) {
 	re.Equal(false, flag)
 
 	value := flowLimiter.GetThreshold()
-	re.Equal(defaultGrpcOperationBurst0, value)
+	re.Equal(defaultInitialLimiterCapacity0, value)
 
-	flowLimiter.UpdateLimiter(config.LimiterConfig{Rate: defaultGrpcOperationRate1, Burst: defaultGrpcOperationBurst1})
+	flowLimiter.UpdateLimiter(config.LimiterConfig{
+		TokenBucketFillRate:           defaultInitialLimiterRate1,
+		TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity1,
+		Enable:                        defaultEnableLimiter,
+	})
 	value = flowLimiter.GetThreshold()
-	re.Equal(defaultGrpcOperationBurst1, value)
+	re.Equal(defaultInitialLimiterCapacity1, value)
 
 	time.Sleep(time.Second * 2)
-	for i := 0; i < defaultGrpcOperationBurst1; i++ {
+	for i := 0; i < defaultInitialLimiterCapacity1; i++ {
 		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}
@@ -55,7 +60,7 @@ func TestFlowLimiter(t *testing.T) {
 	re.Equal(false, flag)
 
 	time.Sleep(time.Second)
-	for i := 0; i < defaultGrpcOperationRate1; i++ {
+	for i := 0; i < defaultInitialLimiterRate1; i++ {
 		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}

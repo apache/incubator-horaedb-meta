@@ -10,17 +10,21 @@ import (
 )
 
 type FlowLimiter struct {
-	lock  sync.RWMutex
-	l     *rate.Limiter
-	rate  int
-	burst int
+	l *rate.Limiter
+	// RWMutex is used to protect following fields.
+	lock                          sync.RWMutex
+	tokenBucketFillRate           int
+	tokenBucketBurstEventCapacity int
+	enable                        bool
 }
 
 func NewFlowLimiter(config config.LimiterConfig) *FlowLimiter {
+	newLimiter := rate.NewLimiter(rate.Limit(config.TokenBucketFillRate), config.TokenBucketBurstEventCapacity)
 	return &FlowLimiter{
-		l:     rate.NewLimiter(rate.Limit(config.Rate), config.Burst),
-		rate:  config.Rate,
-		burst: config.Burst,
+		l:                             newLimiter,
+		tokenBucketFillRate:           config.TokenBucketFillRate,
+		tokenBucketBurstEventCapacity: config.TokenBucketBurstEventCapacity,
+		enable:                        config.Enable,
 	}
 }
 
@@ -28,13 +32,13 @@ func (f *FlowLimiter) GetThreshold() int {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
-	return f.burst
+	return f.tokenBucketBurstEventCapacity
 }
 
 func (f *FlowLimiter) Allow() bool {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-
+	if !f.enable {
+		return true
+	}
 	return f.l.Allow()
 }
 
@@ -42,8 +46,9 @@ func (f *FlowLimiter) UpdateLimiter(config config.LimiterConfig) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	f.l.SetLimit(rate.Limit(config.Rate))
-	f.l.SetBurst(config.Burst)
-	f.rate = config.Rate
-	f.burst = config.Burst
+	f.l.SetLimit(rate.Limit(config.TokenBucketFillRate))
+	f.l.SetBurst(config.TokenBucketBurstEventCapacity)
+	f.tokenBucketFillRate = config.TokenBucketFillRate
+	f.tokenBucketBurstEventCapacity = config.TokenBucketBurstEventCapacity
+	f.enable = config.Enable
 }

@@ -18,15 +18,14 @@ import (
 )
 
 const (
-	defaultGrpcHandleTimeoutMs int64 = 60 * 1000
-	// grpc operation burst count is used to set burst of grpc flow limiter.
-	defaultGrpcOperationBurst int = 100 * 1000
-	// grpc operation rate count is used to set rate of grpc flow limiter.
-	defaultGrpcOperationRate  int   = 10 * 1000
-	defaultEtcdStartTimeoutMs int64 = 60 * 1000
-	defaultCallTimeoutMs            = 5 * 1000
-	defaultMaxTxnOps                = 128
-	defaultEtcdLeaseTTLSec          = 10
+	defaultGrpcHandleTimeoutMs    int64 = 60 * 1000
+	defaultInitialLimiterCapacity int   = 100 * 1000
+	defaultInitialLimiterRate     int   = 10 * 1000
+	defaultEnableLimiter          bool  = false
+	defaultEtcdStartTimeoutMs     int64 = 60 * 1000
+	defaultCallTimeoutMs                = 5 * 1000
+	defaultMaxTxnOps                    = 128
+	defaultEtcdLeaseTTLSec              = 10
 
 	defaultNodeNamePrefix          = "ceresmeta"
 	defaultRootPath                = "/ceresdb"
@@ -67,8 +66,12 @@ const (
 )
 
 type LimiterConfig struct {
-	Rate  int
-	Burst int
+	// TokenBucketFillRate is the rate at which the limiter tokens are updated
+	TokenBucketFillRate int
+	// TokenBucketBurstEventCapacity is the Capacity of the limiter token bucket
+	TokenBucketBurstEventCapacity int
+	// Enable is used to control the switch of the limiter
+	Enable bool
 }
 
 // Config is server start config, it has three input modes:
@@ -251,8 +254,9 @@ func MakeConfigParser() (*Parser, error) {
 			File:  log.DefaultLogFile,
 		},
 		GrpcFlowLimiter: LimiterConfig{
-			Rate:  defaultGrpcOperationRate,
-			Burst: defaultGrpcOperationBurst,
+			TokenBucketFillRate:           defaultInitialLimiterRate,
+			TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity,
+			Enable:                        defaultEnableLimiter,
 		},
 
 		GrpcHandleTimeoutMs: defaultGrpcHandleTimeoutMs,
