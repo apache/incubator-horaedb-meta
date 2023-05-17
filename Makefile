@@ -5,7 +5,6 @@ default: build
 GO_TOOLS_BIN_PATH := $(shell pwd)/.tools/bin
 PATH := $(GO_TOOLS_BIN_PATH):$(PATH)
 SHELL := env PATH='$(PATH)' GOBIN='$(GO_TOOLS_BIN_PATH)' $(shell which bash)
-export INTEGRATION_TEST_PATH = /tmp/ceresmeta_integration_tests
 
 install-tools:
 	@mkdir -p $(GO_TOOLS_BIN_PATH)
@@ -36,9 +35,5 @@ check-license:
 build: check
 	@ go build -o ceresmeta ./cmd/meta/...
 
-clean:
-	@ rm -f ceresmeta
-	@ rm -rf $(INTEGRATION_TEST_PATH)
-
-integration_test: clean build
+integration_test: build
 	@ sh ./scripts/run_integration_test.sh

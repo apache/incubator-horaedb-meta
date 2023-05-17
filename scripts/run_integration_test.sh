@@ -2,22 +2,26 @@
 
 set -exo
 
+INTEGRATION_TEST_PATH=/tmp/ceresmeta_integration_test
+CERESDB_INTEGRATION_PATH=${INTEGRATION_TEST_PATH}"/ceresdb/integration_tests"
+CERESMETA_INTEGRATION_TEST_PATH=${CERESDB_INTEGRATION_PATH}"/ceresmeta"
+CERESMETA_DIR_PATH=$(pwd)
+
+rm -rf $INTEGRATION_TEST_PATH
+
 mkdir -p $INTEGRATION_TEST_PATH
 
-# Copy Meta Binary
-cp ./ceresmeta $INTEGRATION_TEST_PATH
-
-# Download CeresDB Code
+# Download CeresDB Code.
 cd $INTEGRATION_TEST_PATH
 git clone --depth 1 https://github.com/ceresdb/ceresdb.git --branch main
 
-# Replace Build Meta Script
-echo > $INTEGRATION_TEST_PATH/ceresdb/integration_tests/build_meta.sh
+# Make Build Meta Script Blank.
+echo > $CERESDB_INTEGRATION_PATH/build_meta.sh
 
-# Copy Meta Binary to CeresDB Execution Directory
-cd ./ceresdb/integration_tests
+# Copy Meta Binary to CeresDB Execution Directory.
+cd $CERESDB_INTEGRATION_PATH
 mkdir ceresmeta
-cp ../../ceresmeta ./ceresmeta/ceresmeta
+cp $CERESMETA_DIR_PATH/ceresmeta $CERESMETA_INTEGRATION_TEST_PATH/ceresmeta
 
-# Run integration_tests
+# Run integration_test.
 make run-cluster
