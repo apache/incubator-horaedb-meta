@@ -45,7 +45,7 @@ type Manager interface {
 	GetRegisteredNode(ctx context.Context, clusterName string, node string) (metadata.RegisteredNode, error)
 	ListRegisterNodes(ctx context.Context, clusterName string) ([]metadata.RegisteredNode, error)
 
-	GetLimiter(ctx context.Context) *service.FlowLimiter
+	GetFlowLimiter(ctx context.Context) (*service.FlowLimiter, error)
 }
 
 type managerImpl struct {
@@ -397,6 +397,6 @@ func (m *managerImpl) GetNodeShards(ctx context.Context, clusterName string) (me
 	return ret, nil
 }
 
-func (m *managerImpl) GetLimiter(_ context.Context) *service.FlowLimiter {
-	return m.flowLimiter
+func (m *managerImpl) GetFlowLimiter(_ context.Context) (*service.FlowLimiter, error) {
+	return m.flowLimiter, nil
 }

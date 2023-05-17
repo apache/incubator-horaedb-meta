@@ -42,7 +42,7 @@ func (f *FlowLimiter) Allow() bool {
 	return f.l.Allow()
 }
 
-func (f *FlowLimiter) UpdateLimiter(config config.LimiterConfig) {
+func (f *FlowLimiter) UpdateLimiter(config config.LimiterConfig) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -51,4 +51,5 @@ func (f *FlowLimiter) UpdateLimiter(config config.LimiterConfig) {
 	f.tokenBucketFillRate = config.TokenBucketFillRate
 	f.tokenBucketBurstEventCapacity = config.TokenBucketBurstEventCapacity
 	f.enable = config.Enable
+	return nil
 }

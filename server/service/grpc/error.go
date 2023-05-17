@@ -11,5 +11,5 @@ var (
 	ErrBindHeartbeatStream   = coderr.NewCodeError(coderr.Internal, "bind heartbeat sender")
 	ErrUnbindHeartbeatStream = coderr.NewCodeError(coderr.Internal, "unbind heartbeat sender")
 	ErrForward               = coderr.NewCodeError(coderr.Internal, "grpc forward")
-	ErrGrpcFlowLimiter       = coderr.NewCodeError(coderr.Internal, "grpc request volume reaches the threshold")
+	ErrFlowLimit             = coderr.NewCodeError(coderr.Internal, "flow limit")
 )

@@ -42,11 +42,12 @@ func TestFlowLimiter(t *testing.T) {
 	value := flowLimiter.GetThreshold()
 	re.Equal(defaultInitialLimiterCapacity0, value)
 
-	flowLimiter.UpdateLimiter(config.LimiterConfig{
+	err := flowLimiter.UpdateLimiter(config.LimiterConfig{
 		TokenBucketFillRate:           defaultInitialLimiterRate1,
 		TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity1,
 		Enable:                        defaultEnableLimiter,
 	})
+	re.NoError(err)
 	value = flowLimiter.GetThreshold()
 	re.Equal(defaultInitialLimiterCapacity1, value)
 

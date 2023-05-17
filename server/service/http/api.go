@@ -570,13 +570,24 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	flowLimiter := a.clusterManager.GetLimiter(req.Context())
+	flowLimiter, err := a.clusterManager.GetFlowLimiter(req.Context())
+	if err != nil {
+		log.Error("get flow limiter when update flow limiter", zap.Error(err))
+		a.respondError(writer, ErrFlowLimiterNotFound, "")
+		return
+	}
+
 	newLimiterConfig := config.LimiterConfig{
 		TokenBucketFillRate:           updateFlowLimiterRequest.TokenBucketFillRate,
 		TokenBucketBurstEventCapacity: updateFlowLimiterRequest.TokenBucketBurstEventCapacity,
 		Enable:                        updateFlowLimiterRequest.Enable,
 	}
-	flowLimiter.UpdateLimiter(newLimiterConfig)
+
+	if err := flowLimiter.UpdateLimiter(newLimiterConfig); err != nil {
+		log.Error("update flow limiter", zap.Error(err))
+		a.respondError(writer, ErrUpdateFlowLimiter, "update flow limiter failed")
+		return
+	}
 
 	a.respond(writer, nil)
 }
