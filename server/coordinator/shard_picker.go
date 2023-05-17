@@ -41,26 +41,14 @@ func (p *RandomBalancedShardPicker) PickShards(_ context.Context, snapshot metad
 
 	// Try to make shards on different nodes.
 	result := make([]storage.ShardNode, 0, expectShardNum)
-	totalShardLength := len(shardNodes)
-	tempNodeShardMapping := make(map[string][]storage.ShardNode, len(nodeShardsMapping))
 	nodeNames := make([]string, 0, len(nodeShardsMapping))
+	tempNodeShardMapping := copyNodeShardMapping(nodeShardsMapping)
 
 	for i := 0; i < expectShardNum; i++ {
 		// Initialize nodeNames.
 		if len(nodeNames) == 0 {
 			for nodeName := range nodeShardsMapping {
 				nodeNames = append(nodeNames, nodeName)
-			}
-		}
-
-		// Initialize tempNodeShardMapping in following cases:
-		// 1. First time to pick shards.
-		// 2. All shards are already picked.
-		if len(result) == 0 || len(result) == totalShardLength {
-			for nodeName, shardNode := range nodeShardsMapping {
-				tempShardNode := make([]storage.ShardNode, len(shardNode))
-				copy(tempShardNode, shardNode)
-				tempNodeShardMapping[nodeName] = tempShardNode
 			}
 		}
 
@@ -71,19 +59,24 @@ func (p *RandomBalancedShardPicker) PickShards(_ context.Context, snapshot metad
 		}
 		nodeShards := tempNodeShardMapping[nodeNames[selectNodeIndex.Int64()]]
 
+		// When node shards is empty, copy from nodeShardsMapping and get shards again.
+		if len(nodeShards) == 0 {
+			tempNodeShardMapping = copyNodeShardMapping(nodeShardsMapping)
+
+			nodeShards = tempNodeShardMapping[nodeNames[selectNodeIndex.Int64()]]
+		}
+
 		// Get random shard.
 		selectNodeShardsIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(nodeShards))))
 		if err != nil {
 			return nil, errors.WithMessage(err, "generate random node shard index")
 		}
 
-		if len(nodeShards) > 0 {
-			result = append(result, nodeShards[selectNodeShardsIndex.Int64()])
+		result = append(result, nodeShards[selectNodeShardsIndex.Int64()])
 
-			// Remove select shard.
-			nodeShards[selectNodeShardsIndex.Int64()] = nodeShards[len(nodeShards)-1]
-			tempNodeShardMapping[nodeNames[selectNodeIndex.Int64()]] = nodeShards[:len(nodeShards)-1]
-		}
+		// Remove select shard.
+		nodeShards[selectNodeShardsIndex.Int64()] = nodeShards[len(nodeShards)-1]
+		tempNodeShardMapping[nodeNames[selectNodeIndex.Int64()]] = nodeShards[:len(nodeShards)-1]
 
 		// Remove select node.
 		nodeNames[selectNodeIndex.Int64()] = nodeNames[len(nodeNames)-1]
@@ -91,4 +84,14 @@ func (p *RandomBalancedShardPicker) PickShards(_ context.Context, snapshot metad
 	}
 
 	return result, nil
+}
+
+func copyNodeShardMapping(nodeShardsMapping map[string][]storage.ShardNode) map[string][]storage.ShardNode {
+	tempNodeShardMapping := make(map[string][]storage.ShardNode, len(nodeShardsMapping))
+	for nodeName, shardNode := range nodeShardsMapping {
+		tempShardNode := make([]storage.ShardNode, len(shardNode))
+		copy(tempShardNode, shardNode)
+		tempNodeShardMapping[nodeName] = tempShardNode
+	}
+	return tempNodeShardMapping
 }

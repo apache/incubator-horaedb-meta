@@ -20,7 +20,6 @@ func TestRandomShardPicker(t *testing.T) {
 
 	shardPicker := coordinator.NewRandomBalancedShardPicker()
 
-	// ExpectShardNum is bigger than node number and enableDuplicateNode is true, it should return correct shards.
 	shardNodes, err := shardPicker.PickShards(ctx, snapshot, 3)
 	re.NoError(err)
 	re.Equal(len(shardNodes), 3)
@@ -28,6 +27,11 @@ func TestRandomShardPicker(t *testing.T) {
 	re.NoError(err)
 	re.Equal(len(shardNodes), 4)
 	// ExpectShardNum is bigger than shard number.
-	_, err = shardPicker.PickShards(ctx, snapshot, 5)
+	shardNodes, err = shardPicker.PickShards(ctx, snapshot, 5)
 	re.NoError(err)
+	re.Equal(len(shardNodes), 5)
+	// TODO: Ensure that the shardNodes is average distributed on nodes and shards.
+	shardNodes, err = shardPicker.PickShards(ctx, snapshot, 9)
+	re.NoError(err)
+	re.Equal(len(shardNodes), 9)
 }
