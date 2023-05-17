@@ -161,7 +161,7 @@ func (srv *Server) startServer(_ context.Context) error {
 		MaxScanLimit: srv.cfg.MaxScanLimit, MinScanLimit: srv.cfg.MinScanLimit,
 	})
 
-	flowLimiter := service.NewFlowLimiter(srv.cfg.GrpcFlowLimiter)
+	flowLimiter := service.NewFlowLimiter(srv.cfg.FlowLimiter)
 	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep, flowLimiter)
 	if err != nil {
 		return errors.WithMessage(err, "start server")

@@ -5,10 +5,11 @@ package metadata_test
 
 import (
 	"context"
-	"github.com/CeresDB/ceresmeta/server/config"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/CeresDB/ceresmeta/server/config"
 
 	"github.com/CeresDB/ceresmeta/server/service"
 

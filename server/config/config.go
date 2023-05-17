@@ -80,9 +80,9 @@ type LimiterConfig struct {
 // Their loading has priority, and low priority configurations will be overwritten by high priority configurations.
 // The priority from high to low is: env variables > toml config file.
 type Config struct {
-	Log             log.Config    `toml:"log" env:"LOG"`
-	EtcdLog         log.Config    `toml:"etcd-log" env:"ETCD_LOG"`
-	GrpcFlowLimiter LimiterConfig `toml:"grpc-flow-limiter" env:"GRPC_FLOW_LIMITER"`
+	Log         log.Config    `toml:"log" env:"LOG"`
+	EtcdLog     log.Config    `toml:"etcd-log" env:"ETCD_LOG"`
+	FlowLimiter LimiterConfig `toml:"flow-limiter" env:"FLOW_LIMITER"`
 
 	GrpcHandleTimeoutMs int64 `toml:"grpc-handle-timeout-ms" env:"GRPC_HANDLER_TIMEOUT_MS"`
 	EtcdStartTimeoutMs  int64 `toml:"etcd-start-timeout-ms" env:"ETCD_START_TIMEOUT_MS"`
@@ -253,7 +253,7 @@ func MakeConfigParser() (*Parser, error) {
 			Level: log.DefaultLogLevel,
 			File:  log.DefaultLogFile,
 		},
-		GrpcFlowLimiter: LimiterConfig{
+		FlowLimiter: LimiterConfig{
 			TokenBucketFillRate:           defaultInitialLimiterRate,
 			TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity,
 			Enable:                        defaultEnableLimiter,
