@@ -4,8 +4,9 @@ package test
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"go.uber.org/zap"
+	"math/big"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 const (
@@ -77,11 +79,11 @@ func NewTestStorage(_ *testing.T) procedure.Storage {
 
 type MockIDAllocator struct{}
 
-func (m MockIDAllocator) Alloc(ctx context.Context) (uint64, error) {
+func (m MockIDAllocator) Alloc(_ context.Context) (uint64, error) {
 	return 0, nil
 }
 
-func (m MockIDAllocator) Collect(ctx context.Context, id uint64) error {
+func (m MockIDAllocator) Collect(_ context.Context, _ uint64) error {
 	return nil
 }
 

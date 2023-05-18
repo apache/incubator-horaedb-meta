@@ -1,14 +1,16 @@
+// Copyright 2023 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package scheduler_test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/test"
 	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler"
-	"go.uber.org/zap"
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestRebalancedScheduler(t *testing.T) {
