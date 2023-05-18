@@ -19,32 +19,29 @@ import (
 )
 
 const (
-	defaultTimeout                       = time.Second * 10
-	cluster1                             = "ceresdbCluster1"
-	cluster2                             = "ceresdbCluster2"
-	defaultSchema                        = "ceresdbSchema"
-	defaultNodeCount                     = 2
-	defaultReplicationFactor             = 1
-	defaultShardTotal                    = 8
-	defaultEnableSchedule                = true
-	defaultTopologyType                  = "static"
-	defaultInitialLimiterRate            = 1000
-	defaultInitialLimiterCapacity        = 1000
-	defaultEnableLimiter                 = false
-	node1                                = "127.0.0.1:8081"
-	node2                                = "127.0.0.2:8081"
-	table1                               = "table1"
-	table2                               = "table2"
-	table3                               = "table3"
-	table4                               = "table4"
-	defaultSchemaID               uint32 = 0
-	tableID1                      uint64 = 0
-	tableID2                      uint64 = 1
-	tableID3                      uint64 = 2
-	tableID4                      uint64 = 3
-	testRootPath                         = "/rootPath"
-	defaultIDAllocatorStep               = 20
-	defaultThreadNum                     = 20
+	defaultTimeout                  = time.Second * 10
+	cluster1                        = "ceresdbCluster1"
+	cluster2                        = "ceresdbCluster2"
+	defaultSchema                   = "ceresdbSchema"
+	defaultNodeCount                = 2
+	defaultReplicationFactor        = 1
+	defaultShardTotal               = 8
+	defaultEnableSchedule           = true
+	defaultTopologyType             = "static"
+	node1                           = "127.0.0.1:8081"
+	node2                           = "127.0.0.2:8081"
+	table1                          = "table1"
+	table2                          = "table2"
+	table3                          = "table3"
+	table4                          = "table4"
+	defaultSchemaID          uint32 = 0
+	tableID1                 uint64 = 0
+	tableID2                 uint64 = 1
+	tableID3                 uint64 = 2
+	tableID4                 uint64 = 3
+	testRootPath                    = "/rootPath"
+	defaultIDAllocatorStep          = 20
+	defaultThreadNum                = 20
 )
 
 func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, *clientv3.Client, etcdutil.CloseFn) {
