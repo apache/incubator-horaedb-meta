@@ -9,10 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/server/config"
-
-	"github.com/CeresDB/ceresmeta/server/service"
-
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
@@ -60,8 +56,7 @@ func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, *clientv3.Clien
 }
 
 func newClusterManagerWithStorage(storage storage.Storage, kv clientv3.KV, client *clientv3.Client) (cluster.Manager, error) {
-	flowLimiter := service.NewFlowLimiter(config.LimiterConfig{TokenBucketFillRate: defaultInitialLimiterRate, TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity, Enable: defaultEnableLimiter})
-	return cluster.NewManagerImpl(storage, kv, client, testRootPath, defaultIDAllocatorStep, flowLimiter)
+	return cluster.NewManagerImpl(storage, kv, client, testRootPath, defaultIDAllocatorStep)
 }
 
 func newTestClusterManager(t *testing.T) (cluster.Manager, etcdutil.CloseFn) {

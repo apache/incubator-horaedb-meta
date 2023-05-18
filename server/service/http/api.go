@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/http/pprof"
 
+	"github.com/CeresDB/ceresmeta/server/service/grpc"
+
 	"github.com/CeresDB/ceresmeta/server/config"
 
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
@@ -36,13 +38,15 @@ type API struct {
 	serverStatus *status.ServerStatus
 
 	forwardClient *ForwardClient
+	h             grpc.Handler
 }
 
-func NewAPI(clusterManager cluster.Manager, serverStatus *status.ServerStatus, forwardClient *ForwardClient) *API {
+func NewAPI(clusterManager cluster.Manager, serverStatus *status.ServerStatus, forwardClient *ForwardClient, h grpc.Handler) *API {
 	return &API{
 		clusterManager: clusterManager,
 		serverStatus:   serverStatus,
 		forwardClient:  forwardClient,
+		h:              h,
 	}
 }
 
@@ -570,7 +574,7 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	flowLimiter, err := a.clusterManager.GetFlowLimiter(req.Context())
+	flowLimiter, err := a.h.GetFlowLimiter(req.Context())
 	if err != nil {
 		log.Error("get flow limiter when update flow limiter", zap.Error(err))
 		a.respondError(writer, ErrFlowLimiterNotFound, "")

@@ -11,6 +11,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/CeresDB/ceresmeta/server/service"
+
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/commonpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
@@ -45,6 +47,7 @@ func NewService(opTimeout time.Duration, h Handler) *Service {
 type Handler interface {
 	GetClusterManager() cluster.Manager
 	GetLeader(ctx context.Context) (member.GetLeaderAddrResp, error)
+	GetFlowLimiter(ctx context.Context) (*service.FlowLimiter, error)
 	// TODO: define the methods for handling other grpc requests.
 }
 
@@ -428,7 +431,7 @@ func responseHeader(err error, msg string) *commonpb.ResponseHeader {
 }
 
 func (s *Service) allow(ctx context.Context) (bool, error) {
-	flowLimiter, err := s.h.GetClusterManager().GetFlowLimiter(ctx)
+	flowLimiter, err := s.h.GetFlowLimiter(ctx)
 	if err != nil {
 		return false, errors.WithMessage(err, "get flow limiter failed")
 	}

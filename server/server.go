@@ -39,6 +39,7 @@ type Server struct {
 
 	// The fields below are initialized after Run of server is called.
 	clusterManager cluster.Manager
+	flowLimiter    *service.FlowLimiter
 
 	// member describes membership in ceresmeta cluster.
 	member  *member.Member
@@ -161,14 +162,14 @@ func (srv *Server) startServer(_ context.Context) error {
 		MaxScanLimit: srv.cfg.MaxScanLimit, MinScanLimit: srv.cfg.MinScanLimit,
 	})
 
-	flowLimiter := service.NewFlowLimiter(srv.cfg.FlowLimiter)
-	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep, flowLimiter)
+	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep)
 	if err != nil {
 		return errors.WithMessage(err, "start server")
 	}
 	srv.clusterManager = manager
+	srv.flowLimiter = service.NewFlowLimiter(srv.cfg.FlowLimiter)
 
-	api := http.NewAPI(manager, srv.status, http.NewForwardClient(srv.member, srv.cfg.HTTPPort))
+	api := http.NewAPI(manager, srv.status, http.NewForwardClient(srv.member, srv.cfg.HTTPPort), srv)
 	httpService := http.NewHTTPService(srv.cfg.HTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())
 	go func() {
 		err := httpService.Start()
@@ -272,6 +273,10 @@ func (srv *Server) GetClusterManager() cluster.Manager {
 func (srv *Server) GetLeader(ctx context.Context) (member.GetLeaderAddrResp, error) {
 	// Get leader with cache.
 	return srv.member.GetLeaderAddr(ctx)
+}
+
+func (srv *Server) GetFlowLimiter(_ context.Context) (*service.FlowLimiter, error) {
+	return srv.flowLimiter, nil
 }
 
 type leadershipEventCallbacks struct {
