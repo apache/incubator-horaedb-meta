@@ -9,10 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
-	"github.com/CeresDB/ceresmeta/server/service"
-
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/commonpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
@@ -22,7 +18,9 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/member"
+	"github.com/CeresDB/ceresmeta/server/service"
 	"github.com/CeresDB/ceresmeta/server/storage"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 

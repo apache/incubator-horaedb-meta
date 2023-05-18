@@ -11,15 +11,13 @@ import (
 	"net/http"
 	"net/http/pprof"
 
-	"github.com/CeresDB/ceresmeta/server/service/grpc"
-
-	"github.com/CeresDB/ceresmeta/server/config"
-
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
+	"github.com/CeresDB/ceresmeta/server/config"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
+	"github.com/CeresDB/ceresmeta/server/service/grpc"
 	"github.com/CeresDB/ceresmeta/server/status"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"go.uber.org/zap"
