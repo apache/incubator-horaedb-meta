@@ -526,8 +526,16 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	topologyType, err := metadata.ParseTopologyType(updateClusterRequest.TopologyType)
+	if err != nil {
+		log.Error("parse topology type", zap.Error(err))
+		a.respondError(writer, metadata.ErrParseTopologyType, "parse topology type")
+		return
+	}
+
 	if err := a.clusterManager.UpdateCluster(req.Context(), updateClusterRequest.ClusterName, metadata.UpdateClusterOpts{
 		EnableSchedule: updateClusterRequest.EnableSchedule,
+		TopologyType:   topologyType,
 	}); err != nil {
 		log.Error("update cluster failed", zap.Error(err))
 		a.respondError(writer, metadata.ErrUpdateCluster, fmt.Sprintf("update cluster failed, cause: %s", err.Error()))
