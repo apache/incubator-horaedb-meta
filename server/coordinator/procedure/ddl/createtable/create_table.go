@@ -15,6 +15,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
@@ -49,15 +50,34 @@ func prepareCallback(event *fsm.Event) {
 	}
 	params := req.p.params
 
-	createTableMetadataRequest := metadata.CreateTableMetadataRequest{
-		SchemaName:    params.SourceReq.GetSchemaName(),
-		TableName:     params.SourceReq.GetName(),
-		PartitionInfo: storage.PartitionInfo{Info: params.SourceReq.PartitionTableInfo.GetPartitionInfo()},
-	}
-	result, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, createTableMetadataRequest)
+	table, exists, err := params.ClusterMetadata.GetTable(params.SourceReq.GetSchemaName(), params.SourceReq.GetName())
 	if err != nil {
-		procedure.CancelEventWithLog(event, err, "create table metadata")
+		procedure.CancelEventWithLog(event, err, "get table metadata")
 		return
+	}
+
+	var result metadata.CreateTableMetadataResult
+	if exists {
+		shardIDs := params.ClusterMetadata.GetShardByTableID([]storage.TableID{table.ID})
+		if _, exists := shardIDs[table.ID]; exists {
+			procedure.CancelEventWithLog(event, procedure.ErrTableAlreadyExists, "table already exists", zap.String("tableName", table.Name), zap.Uint64("tableID", uint64(table.ID)))
+			return
+		}
+		// If table metadata exists but table shard mapping not exists, we need to try to create table again.
+		result = metadata.CreateTableMetadataResult{
+			Table: table,
+		}
+	} else {
+		createTableMetadataRequest := metadata.CreateTableMetadataRequest{
+			SchemaName:    params.SourceReq.GetSchemaName(),
+			TableName:     params.SourceReq.GetName(),
+			PartitionInfo: storage.PartitionInfo{Info: params.SourceReq.PartitionTableInfo.GetPartitionInfo()},
+		}
+		result, err = params.ClusterMetadata.CreateTableMetadata(req.ctx, createTableMetadataRequest)
+		if err != nil {
+			procedure.CancelEventWithLog(event, err, "create table metadata")
+			return
+		}
 	}
 
 	shardVersionUpdate := metadata.ShardVersionUpdate{

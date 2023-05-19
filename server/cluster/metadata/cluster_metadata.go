@@ -131,6 +131,10 @@ func (c *ClusterMetadata) GetShardTables(shardIDs []storage.ShardID) map[storage
 	return result
 }
 
+func (c *ClusterMetadata) GetShardByTableID(tableID []storage.TableID) map[storage.TableID]storage.ShardID {
+	return c.topologyManager.GetShardIDs(tableID)
+}
+
 // DropTable will drop table metadata and all mapping of this table.
 // If the table to be dropped has been opened multiple times, all its mapping will be dropped.
 func (c *ClusterMetadata) DropTable(ctx context.Context, schemaName, tableName string) (DropTableResult, error) {
