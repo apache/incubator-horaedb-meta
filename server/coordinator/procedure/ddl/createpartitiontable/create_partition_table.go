@@ -219,36 +219,49 @@ func createDataTablesCallback(event *fsm.Event) {
 	}
 
 	shardVersions := req.p.relatedVersionInfo.ShardWithVersion
+	shardTableMetaDatas := make(map[storage.ShardID][]metadata.CreateTableMetadataRequest, 0)
 	for i, subTableShard := range params.SubTablesShards {
-		result, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, metadata.CreateTableMetadataRequest{
+		tableMetaData := metadata.CreateTableMetadataRequest{
 			SchemaName:    params.SourceReq.GetSchemaName(),
 			TableName:     params.SourceReq.GetPartitionTableInfo().SubTableNames[i],
 			PartitionInfo: storage.PartitionInfo{},
-		})
-		if err != nil {
-			procedure.CancelEventWithLog(event, err, "create table metadata")
-			return
 		}
-
-		shardVersionUpdate := metadata.ShardVersionUpdate{
-			ShardID:     subTableShard.ShardInfo.ID,
-			CurrVersion: req.p.relatedVersionInfo.ShardWithVersion[subTableShard.ShardInfo.ID] + 1,
-			PrevVersion: req.p.relatedVersionInfo.ShardWithVersion[subTableShard.ShardInfo.ID],
-		}
-
-		if err := ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, subTableShard.ShardInfo.ID, ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq)); err != nil {
-			procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
-			return
-		}
-
-		_, err = params.ClusterMetadata.AddTableTopology(req.ctx, subTableShard.ShardInfo.ID, result.Table)
-		if err != nil {
-			procedure.CancelEventWithLog(event, err, "create table metadata")
-			return
-		}
-
-		shardVersions[shardVersionUpdate.ShardID]++
+		shardTableMetaDatas[subTableShard.ShardInfo.ID] = append(shardTableMetaDatas[subTableShard.ShardInfo.ID], tableMetaData)
 	}
+	wg := sync.WaitGroup{}
+	wg.Add(len(shardTableMetaDatas))
+	for shardID, tableMetaDatas := range shardTableMetaDatas {
+		shardVersion := shardVersions[shardID]
+		go func(shardID storage.ShardID, tableMetaDatas []metadata.CreateTableMetadataRequest, shardVersion uint64) {
+			defer wg.Done()
+			for _, tableMetaData := range tableMetaDatas {
+				result, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, tableMetaData)
+				if err != nil {
+					procedure.CancelEventWithLog(event, err, "create table metadata")
+					return
+				}
+
+				shardVersionUpdate := metadata.ShardVersionUpdate{
+					ShardID:     shardID,
+					CurrVersion: shardVersion + 1,
+					PrevVersion: shardVersion,
+				}
+
+				if err := ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, shardID, ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq)); err != nil {
+					procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
+					return
+				}
+
+				_, err = params.ClusterMetadata.AddTableTopology(req.ctx, shardID, result.Table)
+				if err != nil {
+					procedure.CancelEventWithLog(event, err, "create table metadata")
+					return
+				}
+				shardVersion++
+			}
+		}(shardID, tableMetaDatas, shardVersion)
+	}
+	wg.Wait()
 }
 
 func finishCallback(event *fsm.Event) {
