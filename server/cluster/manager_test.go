@@ -5,12 +5,13 @@ package cluster_test
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"github.com/CeresDB/ceresmeta/server/cluster"
-	"sync"
+	"math/big"
 	"testing"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -21,27 +22,16 @@ import (
 const (
 	defaultTimeout                  = time.Second * 10
 	cluster1                        = "ceresdbCluster1"
-	cluster2                        = "ceresdbCluster2"
 	defaultSchema                   = "ceresdbSchema"
 	defaultNodeCount                = 2
 	defaultReplicationFactor        = 1
 	defaultShardTotal               = 8
-	defaultEnableSchedule           = true
-	defaultTopologyType             = "static"
+	defaultTopologyType             = storage.TopologyTypeStatic
 	node1                           = "127.0.0.1:8081"
 	node2                           = "127.0.0.2:8081"
-	table1                          = "table1"
-	table2                          = "table2"
-	table3                          = "table3"
-	table4                          = "table4"
 	defaultSchemaID          uint32 = 0
-	tableID1                 uint64 = 0
-	tableID2                 uint64 = 1
-	tableID3                 uint64 = 2
-	tableID4                 uint64 = 3
 	testRootPath                    = "/rootPath"
 	defaultIDAllocatorStep          = 20
-	defaultThreadNum                = 20
 )
 
 func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, *clientv3.Client, etcdutil.CloseFn) {
@@ -71,9 +61,7 @@ func newTestClusterManager(t *testing.T) (cluster.Manager, etcdutil.CloseFn) {
 	return manager, closeSrv
 }
 
-func TestManagerSingleThread(t *testing.T) {
-	t.Skip("Current this test is broken because of changes about cluster initialization")
-
+func TestClusterManager(t *testing.T) {
 	re := require.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
@@ -90,72 +78,61 @@ func TestManagerSingleThread(t *testing.T) {
 	testRegisterNode(ctx, re, manager, cluster1, node1)
 	testRegisterNode(ctx, re, manager, cluster1, node2)
 
+	testInitShardView(ctx, re, manager, cluster1)
+
+	testGetNodeAndShard(ctx, re, manager, cluster1)
+
 	testGetTables(re, manager, node1, cluster1, 0)
 
 	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
 	testAllocSchemaID(ctx, re, manager, cluster1, defaultSchema, defaultSchemaID)
 
+	var testTableNames []string
 	for i := uint64(0); i < 5; i++ {
-		testCreateTable(ctx, re, manager, node1, cluster1, defaultSchema, storage.ShardID(i), tableID1)
+		testTableName := fmt.Sprintf("testTable%d", i)
+		testTableNames = append(testTableNames, testTableName)
+		testCreateTable(ctx, re, manager, cluster1, defaultSchema, testTableName, storage.ShardID(i))
 	}
 
-	testRouteTables(ctx, re, manager, cluster1, defaultSchema, []string{table1, table2, table3, table4})
+	testRouteTables(ctx, re, manager, cluster1, defaultSchema, testTableNames)
 
-	testDropTable(ctx, re, manager, cluster1, defaultSchema, table1)
-	testDropTable(ctx, re, manager, cluster1, defaultSchema, table3)
-
-	testGetTables(re, manager, node1, cluster1, 1)
-	testGetTables(re, manager, node2, cluster1, 1)
-	testGetNodes(ctx, re, manager, cluster1)
+	for _, tableName := range testTableNames {
+		testDropTable(ctx, re, manager, cluster1, defaultSchema, tableName)
+	}
 
 	re.NoError(manager.Stop(ctx))
+}
 
-	manager, err = newClusterManagerWithStorage(s, kv, client)
+func testGetNodeAndShard(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string) {
+	c, err := manager.GetCluster(ctx, clusterName)
 	re.NoError(err)
-
-	re.NoError(manager.Start(ctx))
-
-	testGetTables(re, manager, node1, cluster1, 1)
-	testGetTables(re, manager, node2, cluster1, 1)
-
-	re.NoError(manager.Stop(ctx))
+	nodes, err := manager.ListRegisterNodes(ctx, cluster1)
+	re.NoError(err)
+	re.Equal(2, len(nodes))
+	node, err := manager.GetRegisteredNode(ctx, cluster1, node1)
+	re.NoError(err)
+	re.Equal(node1, node.Node.Name)
+	nodShards, err := manager.GetNodeShards(ctx, cluster1)
+	re.NoError(err)
+	re.Equal(int(c.GetMetadata().GetTotalShardNum()), len(nodShards.NodeShards))
 }
 
-func TestManagerMultiThread(t *testing.T) {
-	t.Skip("Current this test is broken because of changes about cluster initialization")
-
-	wg := sync.WaitGroup{}
-	re := require.New(t)
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	manager, closeMgr := newTestClusterManager(t)
-	defer closeMgr()
-	defer re.NoError(manager.Stop(ctx))
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		testCluster(ctx, re, manager, cluster1)
-	}()
-	testCluster(ctx, re, manager, cluster2)
-
-	wg.Wait()
-}
-
-func testCluster(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string) {
-	testCreateCluster(ctx, re, manager, clusterName)
-
-	testRegisterNode(ctx, re, manager, clusterName, node1)
-	testRegisterNode(ctx, re, manager, clusterName, node2)
-
-	testAllocSchemaIDMultiThread(ctx, re, manager, clusterName, defaultSchema, defaultSchemaID)
-
-	testAllocTableIDMultiThread(ctx, re, manager, clusterName, tableID1)
-
-	testDropTable(ctx, re, manager, clusterName, defaultSchema, table1)
-
-	testAllocTableIDMultiThread(ctx, re, manager, clusterName, tableID2)
+func testInitShardView(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string) {
+	c, err := manager.GetCluster(ctx, clusterName)
+	re.NoError(err)
+	snapshot := c.GetMetadata().GetClusterSnapshot()
+	shardNodes := make([]storage.ShardNode, 0, c.GetMetadata().GetTotalShardNum())
+	for _, shardView := range snapshot.Topology.ShardViewsMapping {
+		selectNodeIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(snapshot.RegisteredNodes))))
+		re.NoError(err)
+		shardNodes = append(shardNodes, storage.ShardNode{
+			ID:        shardView.ShardID,
+			ShardRole: storage.ShardRoleLeader,
+			NodeName:  snapshot.RegisteredNodes[selectNodeIdx.Int64()].Node.Name,
+		})
+	}
+	err = c.GetMetadata().UpdateClusterView(ctx, storage.ClusterStateStable, shardNodes)
+	re.NoError(err)
 }
 
 func testCreateCluster(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string) {
@@ -163,6 +140,7 @@ func testCreateCluster(ctx context.Context, re *require.Assertions, manager clus
 		NodeCount:         defaultNodeCount,
 		ReplicationFactor: defaultReplicationFactor,
 		ShardTotal:        defaultShardTotal,
+		TopologyType:      defaultTopologyType,
 	})
 	re.NoError(err)
 }
@@ -185,22 +163,21 @@ func testAllocSchemaID(ctx context.Context, re *require.Assertions, manager clus
 ) {
 	id, _, err := manager.AllocSchemaID(ctx, cluster, schema)
 	re.NoError(err)
-	re.Equal(schemaID, id)
+	re.Equal(storage.SchemaID(schemaID), id)
 }
 
 func testCreateTable(ctx context.Context, re *require.Assertions, manager cluster.Manager,
-	clusterName, schema, tableName string, shardID storage.ShardID, tableID uint64,
+	clusterName, schema, tableName string, shardID storage.ShardID,
 ) {
 	c, err := manager.GetCluster(ctx, clusterName)
 	re.NoError(err)
-	table, err := c.GetMetadata().CreateTable(ctx, metadata.CreateTableRequest{
+	_, err = c.GetMetadata().CreateTable(ctx, metadata.CreateTableRequest{
 		ShardID:       shardID,
 		SchemaName:    schema,
 		TableName:     tableName,
 		PartitionInfo: storage.PartitionInfo{},
 	})
 	re.NoError(err)
-	re.Equal(tableID, table.Table.ID)
 }
 
 func testGetTables(re *require.Assertions, manager cluster.Manager, node, cluster string, num int) {
@@ -210,11 +187,11 @@ func testGetTables(re *require.Assertions, manager cluster.Manager, node, cluste
 	}
 	shardTables, err := manager.GetTables(cluster, node, shardIDs)
 	re.NoError(err)
-	re.Equal(4, len(shardTables))
+	re.Equal(defaultShardTotal, len(shardTables))
 
 	tableNum := 0
 	for _, tables := range shardTables {
-		re.Equal(clusterpb.ShardRole_LEADER, tables.Shard.Role)
+		re.Equal(storage.ShardRoleLeader, tables.Shard.Role)
 		tableNum += len(tables.Tables)
 	}
 	re.Equal(num, tableNum)
@@ -223,7 +200,6 @@ func testGetTables(re *require.Assertions, manager cluster.Manager, node, cluste
 func testRouteTables(ctx context.Context, re *require.Assertions, manager cluster.Manager, cluster, schema string, tableNames []string) {
 	ret, err := manager.RouteTables(ctx, cluster, schema, tableNames)
 	re.NoError(err)
-	re.Equal(uint64(0), ret.ClusterViewVersion)
 	re.Equal(len(tableNames), len(ret.RouteEntries))
 	for _, entry := range ret.RouteEntries {
 		re.Equal(1, len(entry.NodeShards))
@@ -234,33 +210,6 @@ func testRouteTables(ctx context.Context, re *require.Assertions, manager cluste
 func testDropTable(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string, schemaName string, tableName string) {
 	err := manager.DropTable(ctx, clusterName, schemaName, tableName)
 	re.NoError(err)
-}
-
-func testAllocSchemaIDMultiThread(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string, schemaName string, schemaID uint32) {
-	wg := sync.WaitGroup{}
-	for i := 0; i < defaultThreadNum; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			testAllocSchemaID(ctx, re, manager, clusterName, schemaName, schemaID)
-		}()
-	}
-
-	wg.Wait()
-}
-
-func testAllocTableIDMultiThread(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string, tableID uint64) {
-	wg := sync.WaitGroup{}
-	for i := 0; i < defaultThreadNum; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			testCreateTable(ctx, re, manager, clusterName, defaultSchema, table1, 0, tableID)
-		}()
-	}
-
-	testCreateTable(ctx, re, manager, clusterName, defaultSchema, table1, 1, tableID)
-	wg.Wait()
 }
 
 func testGetNodes(ctx context.Context, re *require.Assertions, manager cluster.Manager, cluster string) {
