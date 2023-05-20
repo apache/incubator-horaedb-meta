@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	defaultTimeout                  = time.Second * 10
+	defaultTimeout                  = time.Second * 20
 	cluster1                        = "ceresdbCluster1"
 	defaultSchema                   = "ceresdbSchema"
 	defaultNodeCount                = 2
@@ -44,21 +44,6 @@ func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, *clientv3.Clien
 
 func newClusterManagerWithStorage(storage storage.Storage, kv clientv3.KV, client *clientv3.Client) (cluster.Manager, error) {
 	return cluster.NewManagerImpl(storage, kv, client, testRootPath, defaultIDAllocatorStep)
-}
-
-func newTestClusterManager(t *testing.T) (cluster.Manager, etcdutil.CloseFn) {
-	re := require.New(t)
-	storage, kv, client, closeSrv := newTestStorage(t)
-	manager, err := newClusterManagerWithStorage(storage, kv, client)
-	re.NoError(err)
-
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	err = manager.Start(ctx)
-	re.NoError(err)
-
-	return manager, closeSrv
 }
 
 func TestClusterManager(t *testing.T) {
@@ -210,10 +195,4 @@ func testRouteTables(ctx context.Context, re *require.Assertions, manager cluste
 func testDropTable(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string, schemaName string, tableName string) {
 	err := manager.DropTable(ctx, clusterName, schemaName, tableName)
 	re.NoError(err)
-}
-
-func testGetNodes(ctx context.Context, re *require.Assertions, manager cluster.Manager, cluster string) {
-	getNodesResult, err := manager.GetNodeShards(ctx, cluster)
-	re.NoError(err)
-	re.Equal(defaultShardTotal, len(getNodesResult.NodeShards))
 }

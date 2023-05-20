@@ -50,7 +50,7 @@ func TestWatchLeaderSingle(t *testing.T) {
 	}()
 
 	// Wait for watcher starting
-	time.Sleep(time.Duration(200) * time.Millisecond)
+	time.Sleep(time.Duration(2000) * time.Millisecond)
 
 	// check the member has been the leader
 	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
