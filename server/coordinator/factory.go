@@ -166,7 +166,7 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 				},
 				ShardNode: subTableShard,
 			})
-			if len(shardNodesWithVersion) == subTableLength {
+			if len(shardNodesWithVersion) >= subTableLength {
 				return createpartitiontable.NewProcedure(createpartitiontable.ProcedureParams{
 					ID:              id,
 					ClusterMetadata: request.ClusterMetadata,
