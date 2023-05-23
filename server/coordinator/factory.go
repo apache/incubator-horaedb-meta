@@ -143,44 +143,43 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 
 	snapshot := request.ClusterMetadata.GetClusterSnapshot()
 
-	shardLength := len(snapshot.Topology.ClusterView.ShardNodes)
-	subTableLength := len(request.SourceReq.PartitionTableInfo.SubTableNames)
+	nodeNames := make(map[string]int, len(snapshot.Topology.ClusterView.ShardNodes))
+	for _, shardNode := range snapshot.Topology.ClusterView.ShardNodes {
+		nodeNames[shardNode.NodeName] = 1
+	}
 
-	subTableShards, err := f.shardPicker.PickShards(ctx, snapshot, shardLength)
+	subTableShards, err := f.shardPicker.PickShards(ctx, snapshot, len(request.SourceReq.PartitionTableInfo.SubTableNames))
 	if err != nil {
 		return nil, errors.WithMessage(err, "pick sub table shards")
 	}
 
-	shardNodesWithVersion := make([]metadata.ShardNodeWithVersion, 0, subTableLength)
-	for {
-		for _, subTableShard := range subTableShards {
-			shardView, exists := snapshot.Topology.ShardViewsMapping[subTableShard.ID]
-			if !exists {
-				return nil, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found, shardID:%d", subTableShard.ID)
-			}
-			shardNodesWithVersion = append(shardNodesWithVersion, metadata.ShardNodeWithVersion{
-				ShardInfo: metadata.ShardInfo{
-					ID:      shardView.ShardID,
-					Role:    subTableShard.ShardRole,
-					Version: shardView.Version,
-				},
-				ShardNode: subTableShard,
-			})
-			if len(shardNodesWithVersion) >= subTableLength {
-				return createpartitiontable.NewProcedure(createpartitiontable.ProcedureParams{
-					ID:              id,
-					ClusterMetadata: request.ClusterMetadata,
-					ClusterSnapshot: snapshot,
-					Dispatch:        f.dispatch,
-					Storage:         f.storage,
-					SourceReq:       request.SourceReq,
-					SubTablesShards: shardNodesWithVersion,
-					OnSucceeded:     request.OnSucceeded,
-					OnFailed:        request.OnFailed,
-				})
-			}
+	shardNodesWithVersion := make([]metadata.ShardNodeWithVersion, 0, len(subTableShards))
+	for _, subTableShard := range subTableShards {
+		shardView, exists := snapshot.Topology.ShardViewsMapping[subTableShard.ID]
+		if !exists {
+			return nil, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found, shardID:%d", subTableShard.ID)
 		}
+		shardNodesWithVersion = append(shardNodesWithVersion, metadata.ShardNodeWithVersion{
+			ShardInfo: metadata.ShardInfo{
+				ID:      shardView.ShardID,
+				Role:    subTableShard.ShardRole,
+				Version: shardView.Version,
+			},
+			ShardNode: subTableShard,
+		})
 	}
+
+	return createpartitiontable.NewProcedure(createpartitiontable.ProcedureParams{
+		ID:              id,
+		ClusterMetadata: request.ClusterMetadata,
+		ClusterSnapshot: snapshot,
+		Dispatch:        f.dispatch,
+		Storage:         f.storage,
+		SourceReq:       request.SourceReq,
+		SubTablesShards: shardNodesWithVersion,
+		OnSucceeded:     request.OnSucceeded,
+		OnFailed:        request.OnFailed,
+	})
 }
 
 func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTableRequest) (procedure.Procedure, error) {
