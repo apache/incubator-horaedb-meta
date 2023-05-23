@@ -53,12 +53,12 @@ func (s *Service) getForwardedGrpcClient(ctx context.Context, forwardedAddr stri
 }
 
 func (s *Service) getForwardedAddr(ctx context.Context) (string, bool, error) {
-	member, err := s.h.GetLeader(ctx)
+	member, isLocal, err := s.h.GetLeader(ctx)
 	if err != nil {
 		return "", false, errors.WithMessage(err, "get forwarded addr")
 	}
-	if member.IsLocal {
+	if isLocal {
 		return "", true, nil
 	}
-	return member.Leader.GetEndpoint(), false, nil
+	return member.GetEndpoint(), false, nil
 }

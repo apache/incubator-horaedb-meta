@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"github.com/CeresDB/ceresdbproto/golang/pkg/metastoragepb"
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
@@ -216,13 +217,13 @@ func (srv *Server) watchEtcdLeaderPriority(_ context.Context) {
 }
 
 func (srv *Server) createDefaultCluster(ctx context.Context) error {
-	leaderResp, err := srv.member.GetLeader(ctx)
+	_, isLocal, err := srv.member.GetLeader(ctx)
 	if err != nil {
 		log.Warn("get leader failed", zap.Error(err))
 	}
 
 	// Create default cluster by the leader.
-	if leaderResp.IsLocal {
+	if isLocal {
 		topologyType, err := metadata.ParseTopologyType(srv.cfg.TopologyType)
 		if err != nil {
 			return err
@@ -266,7 +267,8 @@ func (srv *Server) GetClusterManager() cluster.Manager {
 	return srv.clusterManager
 }
 
-func (srv *Server) GetLeader(ctx context.Context) (*member.GetLeaderResp, error) {
+func (srv *Server) GetLeader(ctx context.Context) (*metastoragepb.Member, bool, error) {
+	// Get leader with cache.
 	return srv.member.GetLeader(ctx)
 }
 
