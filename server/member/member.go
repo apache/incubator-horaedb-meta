@@ -80,13 +80,19 @@ func (m *Member) getLeader(ctx context.Context) (*getLeaderResp, error) {
 	return &getLeaderResp{Leader: leader, Revision: leaderKv.ModRevision, IsLocal: leader.GetId() == m.ID}, nil
 }
 
-// GetLeader gets the leader of the cluster with memory cache.
+// GetLeaderAddr gets the leader address of the cluster with memory cache.
 // return error if no leader found.
-func (m *Member) GetLeader(_ context.Context) (*metastoragepb.Member, bool, error) {
+func (m *Member) GetLeaderAddr(_ context.Context) (GetLeaderAddrResp, error) {
 	if m.leader == nil {
-		return nil, false, errors.WithMessage(ErrGetLeader, "no leader found")
+		return GetLeaderAddrResp{
+			LeaderEndpoint: "",
+			IsLocal:        false,
+		}, errors.WithMessage(ErrGetLeader, "no leader found")
 	}
-	return m.leader, m.leader.GetId() == m.ID, nil
+	return GetLeaderAddrResp{
+		LeaderEndpoint: m.leader.Endpoint,
+		IsLocal:        m.leader.GetId() == m.ID,
+	}, nil
 }
 
 func (m *Member) ResetLeader(ctx context.Context) error {
@@ -249,4 +255,9 @@ type getLeaderResp struct {
 	Leader   *metastoragepb.Member
 	Revision int64
 	IsLocal  bool
+}
+
+type GetLeaderAddrResp struct {
+	LeaderEndpoint string
+	IsLocal        bool
 }

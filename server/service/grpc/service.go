@@ -12,12 +12,12 @@ import (
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/commonpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metastoragepb"
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
+	"github.com/CeresDB/ceresmeta/server/member"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"go.uber.org/zap"
 )
@@ -42,7 +42,7 @@ func NewService(opTimeout time.Duration, h Handler) *Service {
 // Handler is needed by grpc service to process the requests.
 type Handler interface {
 	GetClusterManager() cluster.Manager
-	GetLeader(ctx context.Context) (*metastoragepb.Member, bool, error)
+	GetLeader(ctx context.Context) (member.GetLeaderAddrResp, error)
 	// TODO: define the methods for handling other grpc requests.
 }
 

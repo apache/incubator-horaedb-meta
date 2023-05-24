@@ -46,14 +46,14 @@ func getForwardedHTTPClient() *http.Client {
 }
 
 func (s *ForwardClient) getForwardedAddr(ctx context.Context) (string, bool, error) {
-	member, isLocal, err := s.member.GetLeader(ctx)
+	resp, err := s.member.GetLeaderAddr(ctx)
 	if err != nil {
 		return "", false, errors.WithMessage(err, "get forwarded addr")
 	}
-	if isLocal {
+	if resp.IsLocal {
 		return "", true, nil
 	}
-	httpAddr, err := formatHTTPAddr(member.Endpoint, s.port)
+	httpAddr, err := formatHTTPAddr(resp.LeaderEndpoint, s.port)
 	if err != nil {
 		return "", false, errors.WithMessage(err, "format http addr")
 	}
