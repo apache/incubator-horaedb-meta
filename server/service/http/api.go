@@ -54,10 +54,12 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/route", a.route)
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
-	router.Get("/listClusters", a.listClusters)
-	router.Put("/createCluster", a.createCluster)
-	router.Post("/updateCluster", a.updateCluster)
 	router.Get("/healthCheck", a.healthCheck)
+
+	// Register cluster API.
+	router.Get("/clusters", a.listClusters)
+	router.Put("/cluster", a.createCluster)
+	router.Post("/cluster", a.updateCluster)
 
 	// Register pprof API.
 	router.Get("/debug/pprof/profile", pprof.Profile)
