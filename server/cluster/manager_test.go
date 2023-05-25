@@ -7,11 +7,11 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/CeresDB/ceresmeta/server/cluster"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -20,18 +20,18 @@ import (
 )
 
 const (
-	defaultTimeout                  = time.Second * 20
-	cluster1                        = "ceresdbCluster1"
-	defaultSchema                   = "ceresdbSchema"
-	defaultNodeCount                = 2
-	defaultReplicationFactor        = 1
-	defaultShardTotal               = 8
-	defaultTopologyType             = storage.TopologyTypeStatic
-	node1                           = "127.0.0.1:8081"
-	node2                           = "127.0.0.2:8081"
-	defaultSchemaID          uint32 = 0
-	testRootPath                    = "/rootPath"
-	defaultIDAllocatorStep          = 20
+	defaultTimeout           = time.Second * 20
+	cluster1                 = "ceresdbCluster1"
+	defaultSchema            = "ceresdbSchema"
+	defaultNodeCount         = 2
+	defaultReplicationFactor = 1
+	defaultShardTotal        = 8
+	defaultTopologyType      = storage.TopologyTypeStatic
+	node1                    = "127.0.0.1:8081"
+	node2                    = "127.0.0.2:8081"
+	defaultSchemaID          = 0
+	testRootPath             = "/rootPath"
+	defaultIDAllocatorStep   = 20
 )
 
 func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, *clientv3.Client, etcdutil.CloseFn) {
