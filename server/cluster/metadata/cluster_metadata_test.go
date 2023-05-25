@@ -21,6 +21,8 @@ func TestClusterMetadata(t *testing.T) {
 	testUpdateClusterView(ctx, re, metadata)
 	testRegisterNode(ctx, re, metadata)
 	testTableOperation(ctx, re, metadata)
+	testShardOperation(ctx, re, metadata)
+	testMetadataOperation(ctx, re, metadata)
 }
 
 func testUpdateClusterView(ctx context.Context, re *require.Assertions, m *metadata.ClusterMetadata) {
@@ -136,4 +138,52 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 	re.NoError(err)
 	re.Equal(1, len(routeResult.RouteEntries))
 	re.Equal(storage.ShardID(1), routeResult.RouteEntries[testTableName].NodeShards[0].ShardInfo.ID)
+
+	dropResult, err := m.DropTable(ctx, testSchema, testTableName)
+	re.NoError(err)
+	re.Equal(storage.ShardID(1), dropResult.ShardVersionUpdate[0].ShardID)
+}
+
+func testShardOperation(ctx context.Context, re *require.Assertions, m *metadata.ClusterMetadata) {
+	newID, err := m.AllocShardID(ctx)
+	re.NoError(err)
+
+	err = m.CreateShardViews(ctx, []metadata.CreateShardView{{
+		ShardID: storage.ShardID(newID),
+		Tables:  nil,
+	}})
+	re.NoError(err)
+
+	shardNodeResult, err := m.GetNodeShards(ctx)
+	re.NoError(err)
+
+	shardNodes, err := m.GetShardNodesByShardID(shardNodeResult.NodeShards[0].ShardInfo.ID)
+	re.NoError(err)
+	re.Equal(1, len(shardNodes))
+
+	shardTables := m.GetShardTables([]storage.ShardID{shardNodeResult.NodeShards[0].ShardInfo.ID})
+	re.Equal(1, len(shardTables))
+
+	_, err = m.GetShardNodeByTableIDs([]storage.TableID{})
+	re.NoError(err)
+
+	err = m.DropShardNode(ctx, []storage.ShardNode{{
+		ID:        shardNodeResult.NodeShards[0].ShardNode.ID,
+		ShardRole: shardNodeResult.NodeShards[0].ShardNode.ShardRole,
+		NodeName:  shardNodeResult.NodeShards[0].ShardNode.NodeName,
+	}})
+	re.NoError(err)
+}
+
+func testMetadataOperation(ctx context.Context, re *require.Assertions, m *metadata.ClusterMetadata) {
+	// Init cluster metadata, it will throw error because it has been init.
+	err := m.Init(ctx)
+	re.Error(err)
+
+	err = m.Load(ctx)
+	re.NoError(err)
+
+	// Load metadata from storage, it will throw error because it is not persisted。
+	err = m.LoadMetadata(ctx)
+	re.Error(err)
 }
