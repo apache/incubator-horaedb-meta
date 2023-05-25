@@ -11,13 +11,14 @@ import (
 	"net/http"
 	"net/http/pprof"
 
+	"github.com/CeresDB/ceresmeta/server/limiter"
+
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/config"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
-	"github.com/CeresDB/ceresmeta/server/service/grpc"
 	"github.com/CeresDB/ceresmeta/server/status"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"go.uber.org/zap"
@@ -36,15 +37,15 @@ type API struct {
 	serverStatus *status.ServerStatus
 
 	forwardClient *ForwardClient
-	h             grpc.Handler
+	flowLimiter   *limiter.FlowLimiter
 }
 
-func NewAPI(clusterManager cluster.Manager, serverStatus *status.ServerStatus, forwardClient *ForwardClient, h grpc.Handler) *API {
+func NewAPI(clusterManager cluster.Manager, serverStatus *status.ServerStatus, forwardClient *ForwardClient, flowLimiter *limiter.FlowLimiter) *API {
 	return &API{
 		clusterManager: clusterManager,
 		serverStatus:   serverStatus,
 		forwardClient:  forwardClient,
-		h:              h,
+		flowLimiter:    flowLimiter,
 	}
 }
 
@@ -564,18 +565,23 @@ type UpdateFlowLimiterRequest struct {
 }
 
 func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
-	var updateFlowLimiterRequest UpdateFlowLimiterRequest
-	err := json.NewDecoder(req.Body).Decode(&updateFlowLimiterRequest)
+	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
 	if err != nil {
-		log.Error("decode request body failed", zap.Error(err))
-		a.respondError(writer, ErrParseRequest, "")
+		log.Error("forward to leader failed", zap.Error(err))
+		a.respondError(writer, ErrForwardToLeader, fmt.Sprintf("forward to leader failed, cause: %s", err.Error()))
 		return
 	}
 
-	flowLimiter, err := a.h.GetFlowLimiter(req.Context())
+	if !isLeader {
+		a.respondForward(writer, resp)
+		return
+	}
+
+	var updateFlowLimiterRequest UpdateFlowLimiterRequest
+	err = json.NewDecoder(req.Body).Decode(&updateFlowLimiterRequest)
 	if err != nil {
-		log.Error("get flow limiter when update flow limiter", zap.Error(err))
-		a.respondError(writer, ErrFlowLimiterNotFound, "")
+		log.Error("decode request body failed", zap.Error(err))
+		a.respondError(writer, ErrParseRequest, fmt.Sprintf("decode request body failed, cause: %s", err.Error()))
 		return
 	}
 
@@ -585,9 +591,9 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 		Enable:                        updateFlowLimiterRequest.Enable,
 	}
 
-	if err := flowLimiter.UpdateLimiter(newLimiterConfig); err != nil {
-		log.Error("update flow limiter", zap.Error(err))
-		a.respondError(writer, ErrUpdateFlowLimiter, "update flow limiter failed")
+	if err := a.flowLimiter.UpdateLimiter(newLimiterConfig); err != nil {
+		log.Error("update flow limiter failed", zap.Error(err))
+		a.respondError(writer, ErrUpdateFlowLimiter, fmt.Sprintf("update flow limiter failed, cause: %s", err.Error()))
 		return
 	}
 

@@ -1,6 +1,6 @@
 // Copyright 2023 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package service
+package limiter
 
 import (
 	"sync"
@@ -26,13 +26,6 @@ func NewFlowLimiter(config config.LimiterConfig) *FlowLimiter {
 		tokenBucketBurstEventCapacity: config.TokenBucketBurstEventCapacity,
 		enable:                        config.Enable,
 	}
-}
-
-func (f *FlowLimiter) GetThreshold() int {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-
-	return f.tokenBucketBurstEventCapacity
 }
 
 func (f *FlowLimiter) Allow() bool {

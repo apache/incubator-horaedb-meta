@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/server/limiter"
+
 	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/commonpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
@@ -18,7 +20,6 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/member"
-	"github.com/CeresDB/ceresmeta/server/service"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -45,13 +46,13 @@ func NewService(opTimeout time.Duration, h Handler) *Service {
 type Handler interface {
 	GetClusterManager() cluster.Manager
 	GetLeader(ctx context.Context) (member.GetLeaderAddrResp, error)
-	GetFlowLimiter(ctx context.Context) (*service.FlowLimiter, error)
+	GetFlowLimiter() (*limiter.FlowLimiter, error)
 	// TODO: define the methods for handling other grpc requests.
 }
 
 // NodeHeartbeat implements gRPC CeresmetaServer.
 func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHeartbeatRequest) (*metaservicepb.NodeHeartbeatResponse, error) {
-	if ok, err := s.allow(ctx); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.NodeHeartbeatResponse{Header: responseHeader(err, "heartbeat grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -96,7 +97,7 @@ func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHear
 
 // AllocSchemaID implements gRPC CeresmetaServer.
 func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
-	if ok, err := s.allow(ctx); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "alloc schema id grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -126,7 +127,7 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 
 // GetTablesOfShards implements gRPC CeresmetaServer.
 func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetTablesOfShardsRequest) (*metaservicepb.GetTablesOfShardsResponse, error) {
-	if ok, err := s.allow(ctx); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.GetTablesOfShardsResponse{Header: responseHeader(err, "get tables of shards grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -158,7 +159,7 @@ func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetT
 
 // CreateTable implements gRPC CeresmetaServer.
 func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTableRequest) (*metaservicepb.CreateTableResponse, error) {
-	if ok, err := s.allow(ctx); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -233,7 +234,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 
 // DropTable implements gRPC CeresmetaServer.
 func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
-	if ok, err := s.allow(ctx); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "drop table grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -297,7 +298,7 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 
 // RouteTables implements gRPC CeresmetaServer.
 func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTablesRequest) (*metaservicepb.RouteTablesResponse, error) {
-	if ok, err := s.allow(ctx); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.RouteTablesResponse{Header: responseHeader(err, "routeTables grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -323,7 +324,7 @@ func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTable
 
 // GetNodes implements gRPC CeresmetaServer.
 func (s *Service) GetNodes(ctx context.Context, req *metaservicepb.GetNodesRequest) (*metaservicepb.GetNodesResponse, error) {
-	if ok, err := s.allow(ctx); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.GetNodesResponse{Header: responseHeader(err, "get nodes grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -428,13 +429,13 @@ func responseHeader(err error, msg string) *commonpb.ResponseHeader {
 	return &commonpb.ResponseHeader{Code: coderr.Internal, Error: msg + err.Error()}
 }
 
-func (s *Service) allow(ctx context.Context) (bool, error) {
-	flowLimiter, err := s.h.GetFlowLimiter(ctx)
+func (s *Service) allow() (bool, error) {
+	flowLimiter, err := s.h.GetFlowLimiter()
 	if err != nil {
 		return false, errors.WithMessage(err, "get flow limiter failed")
 	}
 	if !flowLimiter.Allow() {
-		return false, ErrFlowLimit.WithCausef("the current flow has reached the threshold:%v", flowLimiter.GetThreshold())
+		return false, ErrFlowLimit.WithCausef("the current flow has reached the threshold")
 	}
 	return true, nil
 }

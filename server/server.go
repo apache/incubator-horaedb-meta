@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/server/limiter"
+
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -17,7 +19,6 @@ import (
 	"github.com/CeresDB/ceresmeta/server/config"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/member"
-	"github.com/CeresDB/ceresmeta/server/service"
 	metagrpc "github.com/CeresDB/ceresmeta/server/service/grpc"
 	"github.com/CeresDB/ceresmeta/server/service/http"
 	"github.com/CeresDB/ceresmeta/server/status"
@@ -38,7 +39,7 @@ type Server struct {
 
 	// The fields below are initialized after Run of server is called.
 	clusterManager cluster.Manager
-	flowLimiter    *service.FlowLimiter
+	flowLimiter    *limiter.FlowLimiter
 
 	// member describes membership in ceresmeta cluster.
 	member  *member.Member
@@ -166,9 +167,9 @@ func (srv *Server) startServer(_ context.Context) error {
 		return errors.WithMessage(err, "start server")
 	}
 	srv.clusterManager = manager
-	srv.flowLimiter = service.NewFlowLimiter(srv.cfg.FlowLimiter)
+	srv.flowLimiter = limiter.NewFlowLimiter(srv.cfg.FlowLimiter)
 
-	api := http.NewAPI(manager, srv.status, http.NewForwardClient(srv.member, srv.cfg.HTTPPort), srv)
+	api := http.NewAPI(manager, srv.status, http.NewForwardClient(srv.member, srv.cfg.HTTPPort), srv.flowLimiter)
 	httpService := http.NewHTTPService(srv.cfg.HTTPPort, time.Second*10, time.Second*10, api.NewAPIRouter())
 	go func() {
 		err := httpService.Start()
@@ -274,7 +275,10 @@ func (srv *Server) GetLeader(ctx context.Context) (member.GetLeaderAddrResp, err
 	return srv.member.GetLeaderAddr(ctx)
 }
 
-func (srv *Server) GetFlowLimiter(_ context.Context) (*service.FlowLimiter, error) {
+func (srv *Server) GetFlowLimiter() (*limiter.FlowLimiter, error) {
+	if srv.flowLimiter == nil {
+		return nil, ErrFlowLimiterNotFound
+	}
 	return srv.flowLimiter, nil
 }
 

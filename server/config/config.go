@@ -66,11 +66,11 @@ const (
 )
 
 type LimiterConfig struct {
-	// TokenBucketFillRate is the rate at which the limiter tokens are updated
+	// TokenBucketFillRate is the rate at which the limiter tokens are updated.
 	TokenBucketFillRate int
-	// TokenBucketBurstEventCapacity is the Capacity of the limiter token bucket
+	// TokenBucketBurstEventCapacity is the Capacity of the limiter token bucket.
 	TokenBucketBurstEventCapacity int
-	// Enable is used to control the switch of the limiter
+	// Enable is used to control the switch of the limiter.
 	Enable bool
 }
 
