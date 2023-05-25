@@ -16,6 +16,8 @@ const (
 	defaultEnableLimiter          = true
 	defaultUpdateLimiterRate      = 100
 	defaultUpdateLimiterCapacity  = 100
+	defaultUnLimitMethod          = "aaa"
+	defaultLimitMethod            = "bbb"
 )
 
 func TestFlowLimiter(t *testing.T) {
@@ -24,26 +26,35 @@ func TestFlowLimiter(t *testing.T) {
 		TokenBucketFillRate:           defaultInitialLimiterRate,
 		TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity,
 		Enable:                        defaultEnableLimiter,
+		UnLimitList:                   make([]string, 0),
 	})
 
 	for i := 0; i < defaultInitialLimiterCapacity; i++ {
-		flag := flowLimiter.Allow()
+		flag := flowLimiter.Allow(defaultLimitMethod)
 		re.Equal(true, flag)
 	}
 
-	flag := flowLimiter.Allow()
+	flag := flowLimiter.Allow(defaultLimitMethod)
 	re.Equal(false, flag)
 
 	time.Sleep(time.Second)
 	for i := 0; i < defaultInitialLimiterRate; i++ {
-		flag := flowLimiter.Allow()
+		flag := flowLimiter.Allow(defaultLimitMethod)
 		re.Equal(true, flag)
 	}
 
-	flag = flowLimiter.Allow()
+	flag = flowLimiter.Allow(defaultLimitMethod)
 	re.Equal(false, flag)
 
-	err := flowLimiter.UpdateLimiter(config.LimiterConfig{
+	unLimitMethods := make([]string, 1)
+	unLimitMethods = append(unLimitMethods, defaultUnLimitMethod)
+	limitMethods := make([]string, 1)
+	limitMethods = append(limitMethods, defaultLimitMethod)
+
+	err := flowLimiter.UpdateUnLimitList(unLimitMethods, limitMethods)
+	re.NoError(err)
+
+	err = flowLimiter.UpdateLimiter(config.LimiterConfig{
 		TokenBucketFillRate:           defaultUpdateLimiterRate,
 		TokenBucketBurstEventCapacity: defaultUpdateLimiterCapacity,
 		Enable:                        defaultEnableLimiter,
@@ -52,10 +63,15 @@ func TestFlowLimiter(t *testing.T) {
 
 	time.Sleep(time.Second)
 	for i := 0; i < defaultUpdateLimiterRate; i++ {
-		flag := flowLimiter.Allow()
+		flag := flowLimiter.Allow(defaultLimitMethod)
 		re.Equal(true, flag)
 	}
 
-	flag = flowLimiter.Allow()
+	flag = flowLimiter.Allow(defaultLimitMethod)
 	re.Equal(false, flag)
+
+	for i := 0; i < defaultUpdateLimiterCapacity*2; i++ {
+		flag := flowLimiter.Allow(defaultUnLimitMethod)
+		re.Equal(true, flag)
+	}
 }

@@ -16,20 +16,29 @@ type FlowLimiter struct {
 	tokenBucketFillRate           int
 	tokenBucketBurstEventCapacity int
 	enable                        bool
+	unLimitList                   map[string]string
 }
 
 func NewFlowLimiter(config config.LimiterConfig) *FlowLimiter {
 	newLimiter := rate.NewLimiter(rate.Limit(config.TokenBucketFillRate), config.TokenBucketBurstEventCapacity)
+	unLimitList := make(map[string]string)
+	for _, method := range config.UnLimitList {
+		unLimitList[method] = method
+	}
 	return &FlowLimiter{
 		l:                             newLimiter,
 		tokenBucketFillRate:           config.TokenBucketFillRate,
 		tokenBucketBurstEventCapacity: config.TokenBucketBurstEventCapacity,
 		enable:                        config.Enable,
+		unLimitList:                   unLimitList,
 	}
 }
 
-func (f *FlowLimiter) Allow() bool {
+func (f *FlowLimiter) Allow(method string) bool {
 	if !f.enable {
+		return true
+	}
+	if _, ok := f.unLimitList[method]; ok {
 		return true
 	}
 	return f.l.Allow()
@@ -44,5 +53,20 @@ func (f *FlowLimiter) UpdateLimiter(config config.LimiterConfig) error {
 	f.tokenBucketFillRate = config.TokenBucketFillRate
 	f.tokenBucketBurstEventCapacity = config.TokenBucketBurstEventCapacity
 	f.enable = config.Enable
+	return nil
+}
+
+func (f *FlowLimiter) UpdateUnLimitList(unLimitMethods []string, limitMethods []string) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	for _, unLimitMethod := range unLimitMethods {
+		f.unLimitList[unLimitMethod] = unLimitMethod
+	}
+
+	for _, limitMethod := range limitMethods {
+		delete(f.unLimitList, limitMethod)
+	}
+
 	return nil
 }

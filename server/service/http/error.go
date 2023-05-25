@@ -18,4 +18,5 @@ var (
 	ErrHealthCheck       = coderr.NewCodeError(coderr.Internal, "server health check")
 	ErrParseTopology     = coderr.NewCodeError(coderr.Internal, "parse topology type")
 	ErrUpdateFlowLimiter = coderr.NewCodeError(coderr.Internal, "update flow limiter")
+	ErrUpdateUnLimitList = coderr.NewCodeError(coderr.Internal, "update unlimit list")
 )
