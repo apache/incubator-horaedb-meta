@@ -58,8 +58,8 @@ func (a *API) NewAPIRouter() *Router {
 
 	// Register cluster API.
 	router.Get("/clusters", a.listClusters)
-	router.Put("/cluster", a.createCluster)
-	router.Post("/cluster", a.updateCluster)
+	router.Put("/clusters/:clusterName", a.createCluster)
+	router.Post("/clusters/:clusterName", a.updateCluster)
 
 	// Register pprof API.
 	router.Get("/debug/pprof/profile", pprof.Profile)
@@ -436,7 +436,6 @@ func (a *API) listClusters(writer http.ResponseWriter, req *http.Request) {
 }
 
 type CreateClusterRequest struct {
-	ClusterName       string `json:"clusterName"`
 	ClusterNodeCount  uint32 `json:"clusterNodeCount"`
 	ClusterShardTotal uint32 `json:"clusterShardTotal"`
 	EnableSchedule    bool   `json:"enableSchedule"`
@@ -456,6 +455,12 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	clusterName := Param(req.Context(), "clusterName")
+	if len(clusterName) == 0 {
+		a.respondError(writer, ErrParseRequest, "clusterName cloud not be empty")
+		return
+	}
+
 	var createClusterRequest CreateClusterRequest
 	err = json.NewDecoder(req.Body).Decode(&createClusterRequest)
 	if err != nil {
@@ -464,9 +469,9 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if _, err := a.clusterManager.GetCluster(req.Context(), createClusterRequest.ClusterName); err == nil {
-		log.Error("cluster already exists", zap.String("clusterName", createClusterRequest.ClusterName))
-		a.respondError(writer, ErrGetCluster, fmt.Sprintf("cluster: %s already exists", createClusterRequest.ClusterName))
+	if _, err := a.clusterManager.GetCluster(req.Context(), clusterName); err == nil {
+		log.Error("cluster already exists", zap.String("clusterName", clusterName))
+		a.respondError(writer, ErrGetCluster, fmt.Sprintf("cluster: %s already exists", clusterName))
 		return
 	}
 
@@ -476,7 +481,7 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseTopology, fmt.Sprintf("parse topology type failed, cause: %s", err.Error()))
 		return
 	}
-	c, err := a.clusterManager.CreateCluster(req.Context(), createClusterRequest.ClusterName, metadata.CreateClusterOpts{
+	c, err := a.clusterManager.CreateCluster(req.Context(), clusterName, metadata.CreateClusterOpts{
 		NodeCount:         createClusterRequest.ClusterNodeCount,
 		ReplicationFactor: 1,
 		ShardTotal:        createClusterRequest.ClusterShardTotal,
@@ -493,7 +498,6 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 }
 
 type UpdateClusterRequest struct {
-	ClusterName       string `json:"clusterName"`
 	ClusterNodeCount  uint32 `json:"clusterNodeCount"`
 	ClusterShardTotal uint32 `json:"clusterShardTotal"`
 	EnableSchedule    bool   `json:"enableSchedule"`
@@ -513,6 +517,12 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	clusterName := Param(req.Context(), "clusterName")
+	if len(clusterName) == 0 {
+		a.respondError(writer, ErrParseRequest, "clusterName cloud not be empty")
+		return
+	}
+
 	var updateClusterRequest UpdateClusterRequest
 	err = json.NewDecoder(req.Body).Decode(&updateClusterRequest)
 	if err != nil {
@@ -521,10 +531,10 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c, err := a.clusterManager.GetCluster(req.Context(), updateClusterRequest.ClusterName)
+	c, err := a.clusterManager.GetCluster(req.Context(), clusterName)
 	if err != nil {
 		log.Error("get cluster failed", zap.Error(err))
-		a.respondError(writer, ErrGetCluster, fmt.Sprintf("get cluster failed, clusterName: %s, cause: %s", updateClusterRequest.ClusterName, err.Error()))
+		a.respondError(writer, ErrGetCluster, fmt.Sprintf("get cluster failed, clusterName: %s, cause: %s", clusterName, err.Error()))
 		return
 	}
 
@@ -535,7 +545,7 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := a.clusterManager.UpdateCluster(req.Context(), updateClusterRequest.ClusterName, metadata.UpdateClusterOpts{
+	if err := a.clusterManager.UpdateCluster(req.Context(), clusterName, metadata.UpdateClusterOpts{
 		EnableSchedule: updateClusterRequest.EnableSchedule,
 		TopologyType:   topologyType,
 	}); err != nil {
