@@ -1,4 +1,4 @@
-// Copyright 2023 CeresDB Project Authors. Licensed under Apache-2.0.
+// Copyright 2022-2023 CeresDB Project Authors. Licensed under Apache-2.0.
 
 package metadata_test
 
@@ -47,17 +47,17 @@ func TestTableManager(t *testing.T) {
 
 func testSchema(ctx context.Context, re *require.Assertions, manager metadata.TableManager) {
 	_, exists := manager.GetSchemaByName(TestSchemaName)
-	re.Equal(false, exists)
+	re.False(exists)
 	schema, exists, err := manager.GetOrCreateSchema(ctx, TestSchemaName)
 	re.NoError(err)
-	re.Equal(false, exists)
+	re.False(exists)
 	re.Equal(TestSchemaName, schema.Name)
 }
 
 func testCreateAndDropTable(ctx context.Context, re *require.Assertions, manager metadata.TableManager) {
 	_, exists, err := manager.GetTable(TestSchemaName, TestTableName)
 	re.NoError(err)
-	re.Equal(false, exists)
+	re.False(exists)
 
 	t, err := manager.CreateTable(ctx, TestSchemaName, TestTableName, storage.PartitionInfo{})
 	re.NoError(err)
@@ -65,7 +65,7 @@ func testCreateAndDropTable(ctx context.Context, re *require.Assertions, manager
 
 	t, exists, err = manager.GetTable(TestSchemaName, TestTableName)
 	re.NoError(err)
-	re.Equal(true, exists)
+	re.True(exists)
 	re.Equal(TestTableName, t.Name)
 
 	err = manager.DropTable(ctx, TestSchemaName, TestTableName)
@@ -73,5 +73,5 @@ func testCreateAndDropTable(ctx context.Context, re *require.Assertions, manager
 
 	_, exists, err = manager.GetTable(TestSchemaName, TestTableName)
 	re.NoError(err)
-	re.Equal(false, exists)
+	re.False(exists)
 }

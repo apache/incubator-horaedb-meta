@@ -1,6 +1,5 @@
-// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+// Copyright 2022-2023 CeresDB Project Authors. Licensed under Apache-2.0.
 
-// nolint
 package cluster_test
 
 import (
@@ -91,12 +90,15 @@ func TestClusterManager(t *testing.T) {
 func testGetNodeAndShard(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string) {
 	c, err := manager.GetCluster(ctx, clusterName)
 	re.NoError(err)
+
 	nodes, err := manager.ListRegisterNodes(ctx, cluster1)
 	re.NoError(err)
 	re.Equal(2, len(nodes))
+
 	node, err := manager.GetRegisteredNode(ctx, cluster1, node1)
 	re.NoError(err)
 	re.Equal(node1, node.Node.Name)
+
 	nodShards, err := manager.GetNodeShards(ctx, cluster1)
 	re.NoError(err)
 	re.Equal(int(c.GetMetadata().GetTotalShardNum()), len(nodShards.NodeShards))
@@ -134,11 +136,11 @@ func testRegisterNode(ctx context.Context, re *require.Assertions, manager clust
 	clusterName, nodeName string,
 ) {
 	err := manager.RegisterNode(ctx, clusterName, metadata.RegisteredNode{
-		storage.Node{
+		Node: storage.Node{
 			Name:          nodeName,
 			LastTouchTime: uint64(time.Now().UnixMilli()),
 			State:         storage.NodeStateOnline,
-		}, []metadata.ShardInfo{},
+		}, ShardInfos: []metadata.ShardInfo{},
 	})
 	re.NoError(err)
 }

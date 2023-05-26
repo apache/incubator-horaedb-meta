@@ -31,6 +31,7 @@ func (m *MockProcedure) Typ() procedure.Typ {
 
 func (m *MockProcedure) Start(_ context.Context) error {
 	m.state = procedure.StateRunning
+	// Mock procedure execute time.
 	time.Sleep(m.execTime)
 	m.state = procedure.StateFinished
 	return nil

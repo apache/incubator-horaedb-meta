@@ -68,7 +68,7 @@ func testRegisterNode(ctx context.Context, re *require.Assertions, m *metadata.C
 	re.NoError(err)
 	re.Equal(len(currentRegisterNodes)+1, len(m.GetRegisteredNodes()))
 	node, exists := m.GetRegisteredNodeByName(newNodeName)
-	re.Equal(true, exists)
+	re.True(exists)
 	re.Equal(lastTouchTime, node.Node.LastTouchTime)
 
 	// Update lastTouchTime.
@@ -78,7 +78,7 @@ func testRegisterNode(ctx context.Context, re *require.Assertions, m *metadata.C
 	re.NoError(err)
 	re.Equal(len(currentRegisterNodes)+1, len(m.GetRegisteredNodes()))
 	node, exists = m.GetRegisteredNodeByName(newNodeName)
-	re.Equal(true, exists)
+	re.True(exists)
 	re.Equal(lastTouchTime, node.Node.LastTouchTime)
 
 	// Reset shardNodes.
@@ -89,9 +89,12 @@ func testRegisterNode(ctx context.Context, re *require.Assertions, m *metadata.C
 func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata.ClusterMetadata) {
 	testSchema := "testSchemaName"
 	testTableName := "testTableName0"
+	// Test create schema.
 	schema, _, err := m.GetOrCreateSchema(ctx, testSchema)
 	re.NoError(err)
 	re.Equal(testSchema, schema.Name)
+
+	// Test create table metadata.
 	createMetadataResult, err := m.CreateTableMetadata(ctx, metadata.CreateTableMetadataRequest{
 		SchemaName:    testSchema,
 		TableName:     testTableName,
@@ -99,21 +102,29 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 	})
 	re.NoError(err)
 	re.Equal(createMetadataResult.Table.Name, testTableName)
+
+	// Table metadata is exists.
 	t, exists, err := m.GetTable(testSchema, testTableName)
 	re.NoError(err)
-	re.Equal(true, exists)
+	re.True(exists)
 	re.Equal(testTableName, t.Name)
 
+	// Route table should return error when table metadata is not exists in any shard.
 	_, err = m.RouteTables(ctx, testSchema, []string{testTableName})
 	re.Error(err)
 
+	// Test drop table metadata.
 	dropMetadataResult, err := m.DropTableMetadata(ctx, testSchema, testTableName)
 	re.NoError(err)
 	re.Equal(testTableName, dropMetadataResult.Table.Name)
+
+	// Table metadata is not exists.
 	t, exists, err = m.GetTable(testSchema, testTableName)
 	re.NoError(err)
-	re.Equal(false, exists)
+	re.False(exists)
+	re.False(exists)
 
+	// Test create table.
 	createResult, err := m.CreateTable(ctx, metadata.CreateTableRequest{
 		ShardID:       0,
 		SchemaName:    testSchema,
@@ -123,10 +134,12 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 	re.NoError(err)
 	re.Equal(testTableName, createResult.Table.Name)
 
+	// Test route table, it should return shardNode.
 	routeResult, err := m.RouteTables(ctx, testSchema, []string{testTableName})
 	re.NoError(err)
 	re.Equal(1, len(routeResult.RouteEntries))
 
+	// Migrate this table to another shard.
 	err = m.MigrateTable(ctx, metadata.MigrateTableRequest{
 		SchemaName: testSchema,
 		TableNames: []string{testTableName},
@@ -134,11 +147,14 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 		NewShardID: 1,
 	})
 	re.NoError(err)
+
+	// Check migrate result, route table should return another shard.
 	routeResult, err = m.RouteTables(ctx, testSchema, []string{testTableName})
 	re.NoError(err)
 	re.Equal(1, len(routeResult.RouteEntries))
 	re.Equal(storage.ShardID(1), routeResult.RouteEntries[testTableName].NodeShards[0].ShardInfo.ID)
 
+	// Drop table already created.
 	dropResult, err := m.DropTable(ctx, testSchema, testTableName)
 	re.NoError(err)
 	re.Equal(storage.ShardID(1), dropResult.ShardVersionUpdate[0].ShardID)
