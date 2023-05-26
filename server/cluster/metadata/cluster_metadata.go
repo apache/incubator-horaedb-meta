@@ -131,8 +131,8 @@ func (c *ClusterMetadata) GetShardTables(shardIDs []storage.ShardID) map[storage
 	return result
 }
 
-func (c *ClusterMetadata) GetShardByTableID(tableID []storage.TableID) map[storage.TableID]storage.ShardID {
-	return c.topologyManager.GetShardIDs(tableID)
+func (c *ClusterMetadata) GetShardByTableID(tableIDs []storage.TableID) map[storage.TableID]storage.ShardID {
+	return c.topologyManager.GetShardIDs(tableIDs)
 }
 
 // DropTable will drop table metadata and all mapping of this table.

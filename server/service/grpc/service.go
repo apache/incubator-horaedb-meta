@@ -153,7 +153,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 		return ceresmetaClient.CreateTable(ctx, req)
 	}
 
-	log.Debug("[CreateTable]", zap.String("schemaName", req.SchemaName), zap.String("clusterName", req.GetHeader().ClusterName), zap.String("tableName", req.GetName()))
+	log.Info("[CreateTable]", zap.String("schemaName", req.SchemaName), zap.String("clusterName", req.GetHeader().ClusterName), zap.String("tableName", req.GetName()))
 
 	clusterManager := s.h.GetClusterManager()
 	c, err := clusterManager.GetCluster(ctx, req.GetHeader().GetClusterName())
@@ -224,7 +224,7 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 		return ceresmetaClient.DropTable(ctx, req)
 	}
 
-	log.Debug("[DropTable]", zap.String("schemaName", req.SchemaName), zap.String("clusterName", req.GetHeader().ClusterName), zap.String("tableName", req.Name))
+	log.Info("[DropTable]", zap.String("schemaName", req.SchemaName), zap.String("clusterName", req.GetHeader().ClusterName), zap.String("tableName", req.Name))
 
 	clusterManager := s.h.GetClusterManager()
 	c, err := clusterManager.GetCluster(ctx, req.GetHeader().GetClusterName())
