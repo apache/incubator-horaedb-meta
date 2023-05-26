@@ -58,8 +58,8 @@ func (a *API) NewAPIRouter() *Router {
 
 	// Register cluster API.
 	router.Get("/clusters", a.listClusters)
-	router.Put("/clusters/:clusterName", a.createCluster)
-	router.Post("/clusters/:clusterName", a.updateCluster)
+	router.Post("/clusters/:name", a.createCluster)
+	router.Put("/clusters/:name", a.updateCluster)
 
 	// Register pprof API.
 	router.Get("/debug/pprof/profile", pprof.Profile)
@@ -436,10 +436,10 @@ func (a *API) listClusters(writer http.ResponseWriter, req *http.Request) {
 }
 
 type CreateClusterRequest struct {
-	ClusterNodeCount  uint32 `json:"clusterNodeCount"`
-	ClusterShardTotal uint32 `json:"clusterShardTotal"`
-	EnableSchedule    bool   `json:"enableSchedule"`
-	TopologyType      string `json:"topologyType"`
+	NodeCount      uint32 `json:"NodeCount"`
+	ShardTotal     uint32 `json:"ShardTotal"`
+	EnableSchedule bool   `json:"enableSchedule"`
+	TopologyType   string `json:"topologyType"`
 }
 
 func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
@@ -455,7 +455,7 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	clusterName := Param(req.Context(), "clusterName")
+	clusterName := Param(req.Context(), "name")
 	if len(clusterName) == 0 {
 		a.respondError(writer, ErrParseRequest, "clusterName cloud not be empty")
 		return
@@ -482,9 +482,9 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 	c, err := a.clusterManager.CreateCluster(req.Context(), clusterName, metadata.CreateClusterOpts{
-		NodeCount:         createClusterRequest.ClusterNodeCount,
+		NodeCount:         createClusterRequest.NodeCount,
 		ReplicationFactor: 1,
-		ShardTotal:        createClusterRequest.ClusterShardTotal,
+		ShardTotal:        createClusterRequest.ShardTotal,
 		EnableSchedule:    createClusterRequest.EnableSchedule,
 		TopologyType:      topologyType,
 	})
@@ -498,10 +498,10 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 }
 
 type UpdateClusterRequest struct {
-	ClusterNodeCount  uint32 `json:"clusterNodeCount"`
-	ClusterShardTotal uint32 `json:"clusterShardTotal"`
-	EnableSchedule    bool   `json:"enableSchedule"`
-	TopologyType      string `json:"topologyType"`
+	NodeCount      uint32 `json:"NodeCount"`
+	ShardTotal     uint32 `json:"ShardTotal"`
+	EnableSchedule bool   `json:"enableSchedule"`
+	TopologyType   string `json:"topologyType"`
 }
 
 func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
@@ -517,7 +517,7 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	clusterName := Param(req.Context(), "clusterName")
+	clusterName := Param(req.Context(), "name")
 	if len(clusterName) == 0 {
 		a.respondError(writer, ErrParseRequest, "clusterName cloud not be empty")
 		return
