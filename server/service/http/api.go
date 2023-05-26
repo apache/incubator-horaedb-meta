@@ -58,7 +58,7 @@ func (a *API) NewAPIRouter() *Router {
 
 	// Register cluster API.
 	router.Get("/clusters", a.listClusters)
-	router.Post("/clusters/:name", a.createCluster)
+	router.Post("/clusters", a.createCluster)
 	router.Put("/clusters/:name", a.updateCluster)
 
 	// Register pprof API.
@@ -436,6 +436,7 @@ func (a *API) listClusters(writer http.ResponseWriter, req *http.Request) {
 }
 
 type CreateClusterRequest struct {
+	Name           string `json:"Name"`
 	NodeCount      uint32 `json:"NodeCount"`
 	ShardTotal     uint32 `json:"ShardTotal"`
 	EnableSchedule bool   `json:"enableSchedule"`
@@ -455,12 +456,6 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	clusterName := Param(req.Context(), "name")
-	if len(clusterName) == 0 {
-		a.respondError(writer, ErrParseRequest, "clusterName cloud not be empty")
-		return
-	}
-
 	var createClusterRequest CreateClusterRequest
 	err = json.NewDecoder(req.Body).Decode(&createClusterRequest)
 	if err != nil {
@@ -469,9 +464,9 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if _, err := a.clusterManager.GetCluster(req.Context(), clusterName); err == nil {
-		log.Error("cluster already exists", zap.String("clusterName", clusterName))
-		a.respondError(writer, ErrGetCluster, fmt.Sprintf("cluster: %s already exists", clusterName))
+	if _, err := a.clusterManager.GetCluster(req.Context(), createClusterRequest.Name); err == nil {
+		log.Error("cluster already exists", zap.String("clusterName", createClusterRequest.Name))
+		a.respondError(writer, ErrGetCluster, fmt.Sprintf("cluster: %s already exists", createClusterRequest.Name))
 		return
 	}
 
@@ -481,7 +476,7 @@ func (a *API) createCluster(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseTopology, fmt.Sprintf("parse topology type failed, cause: %s", err.Error()))
 		return
 	}
-	c, err := a.clusterManager.CreateCluster(req.Context(), clusterName, metadata.CreateClusterOpts{
+	c, err := a.clusterManager.CreateCluster(req.Context(), createClusterRequest.Name, metadata.CreateClusterOpts{
 		NodeCount:         createClusterRequest.NodeCount,
 		ReplicationFactor: 1,
 		ShardTotal:        createClusterRequest.ShardTotal,
