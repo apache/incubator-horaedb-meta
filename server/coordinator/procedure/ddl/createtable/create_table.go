@@ -58,8 +58,8 @@ func prepareCallback(event *fsm.Event) {
 
 	var result metadata.CreateTableMetadataResult
 	if exists {
-		shardIDs := params.ClusterMetadata.GetShardByTableID([]storage.TableID{table.ID})
-		if _, exists := shardIDs[table.ID]; exists {
+		getShardIDResult := params.ClusterMetadata.GetShardByTableID([]storage.TableID{table.ID})
+		if _, exists := getShardIDResult.TableShardIDs[table.ID]; exists {
 			procedure.CancelEventWithLog(event, procedure.ErrTableAlreadyExists, "table already exists", zap.String("tableName", table.Name), zap.Uint64("tableID", uint64(table.ID)))
 			return
 		}

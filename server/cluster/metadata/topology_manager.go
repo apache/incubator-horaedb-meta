@@ -24,7 +24,7 @@ type TopologyManager interface {
 	// GetTableIDs get shardNode and tablesIDs with shardID and nodeName.
 	GetTableIDs(shardIDs []storage.ShardID) map[storage.ShardID]ShardTableIDs
 	// GetShardIDs get the assigned shardID by tableID.
-	GetShardIDs(tableIDs []storage.TableID) map[storage.TableID]storage.ShardID
+	GetShardIDs(tableIDs []storage.TableID) GetShardIDResult
 	// AddTable add table to cluster topology.
 	AddTable(ctx context.Context, shardID storage.ShardID, tables []storage.Table) (ShardVersionUpdate, error)
 	// RemoveTable remove table on target shards from cluster topology.
@@ -178,19 +178,32 @@ func (m *TopologyManagerImpl) GetTableIDs(shardIDs []storage.ShardID) map[storag
 	return shardTableIDs
 }
 
-func (m *TopologyManagerImpl) GetShardIDs(tableIDs []storage.TableID) map[storage.TableID]storage.ShardID {
+func (m *TopologyManagerImpl) GetShardIDs(tableIDs []storage.TableID) GetShardIDResult {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	tableShardMapping := make(map[storage.TableID]storage.ShardID, len(tableIDs))
+	var tableIDsNotAssigned []storage.TableID
 	for _, tableID := range tableIDs {
 		shardID, exists := m.tableShardMapping[tableID]
 		if exists {
 			tableShardMapping[tableID] = shardID
+		} else {
+			tableIDsNotAssigned = append(tableIDsNotAssigned, tableID)
 		}
 	}
 
-	return tableShardMapping
+	result := GetShardIDResult{
+		TableShardIDs:       tableShardMapping,
+		TableIDsNotAssigned: tableIDsNotAssigned,
+		Err:                 nil,
+	}
+
+	if len(tableIDsNotAssigned) != 0 {
+		result.Err = errors.WithMessagef(ErrShardNotFound, "%d tables ard not assigned to any shard", len(tableIDsNotAssigned))
+	}
+
+	return result
 }
 
 func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.ShardID, tables []storage.Table) (ShardVersionUpdate, error) {

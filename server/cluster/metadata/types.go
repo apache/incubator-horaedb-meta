@@ -109,6 +109,13 @@ type MigrateTableRequest struct {
 	NewShardID storage.ShardID
 }
 
+type GetShardIDResult struct {
+	TableShardIDs       map[storage.TableID]storage.ShardID
+	TableIDsNotAssigned []storage.TableID
+	// When err is not nil, it means some tables are not assigned to any shard, you can find them in TableIDsNotAssigned.
+	Err error
+}
+
 type ShardVersionUpdate struct {
 	ShardID     storage.ShardID
 	CurrVersion uint64

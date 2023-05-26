@@ -131,7 +131,7 @@ func (c *ClusterMetadata) GetShardTables(shardIDs []storage.ShardID) map[storage
 	return result
 }
 
-func (c *ClusterMetadata) GetShardByTableID(tableIDs []storage.TableID) map[storage.TableID]storage.ShardID {
+func (c *ClusterMetadata) GetShardByTableID(tableIDs []storage.TableID) GetShardIDResult {
 	return c.topologyManager.GetShardIDs(tableIDs)
 }
 
