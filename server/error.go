@@ -9,5 +9,5 @@ var (
 	ErrStartEtcd           = coderr.NewCodeError(coderr.Internal, "start embed etcd")
 	ErrStartEtcdTimeout    = coderr.NewCodeError(coderr.Internal, "start etcd server timeout")
 	ErrStartServer         = coderr.NewCodeError(coderr.Internal, "start server")
-	ErrFlowLimiterNotFound = coderr.NewCodeError(coderr.NotFound, "flow limiter not found")
+	ErrFlowLimiterNotFound = coderr.NewCodeError(coderr.Internal, "flow limiter not found")
 )

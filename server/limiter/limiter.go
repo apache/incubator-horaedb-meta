@@ -9,6 +9,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
+var defaultUnLimitMethods = []string{"NodeHeartbeat"}
+
 type FlowLimiter struct {
 	l *rate.Limiter
 	// RWMutex is used to protect following fields.
@@ -16,21 +18,22 @@ type FlowLimiter struct {
 	tokenBucketFillRate           int
 	tokenBucketBurstEventCapacity int
 	enable                        bool
-	unLimitList                   map[string]string
+	limitBlacklist                map[string]string
 }
 
 func NewFlowLimiter(config config.LimiterConfig) *FlowLimiter {
 	newLimiter := rate.NewLimiter(rate.Limit(config.TokenBucketFillRate), config.TokenBucketBurstEventCapacity)
-	unLimitList := make(map[string]string)
-	for _, method := range config.UnLimitList {
-		unLimitList[method] = method
+	limitBlacklist := make(map[string]string)
+	for _, method := range defaultUnLimitMethods {
+		limitBlacklist[method] = method
 	}
+
 	return &FlowLimiter{
 		l:                             newLimiter,
 		tokenBucketFillRate:           config.TokenBucketFillRate,
 		tokenBucketBurstEventCapacity: config.TokenBucketBurstEventCapacity,
 		enable:                        config.Enable,
-		unLimitList:                   unLimitList,
+		limitBlacklist:                limitBlacklist,
 	}
 }
 
@@ -38,7 +41,7 @@ func (f *FlowLimiter) Allow(method string) bool {
 	if !f.enable {
 		return true
 	}
-	if _, ok := f.unLimitList[method]; ok {
+	if _, ok := f.limitBlacklist[method]; ok {
 		return true
 	}
 	return f.l.Allow()
@@ -56,16 +59,16 @@ func (f *FlowLimiter) UpdateLimiter(config config.LimiterConfig) error {
 	return nil
 }
 
-func (f *FlowLimiter) UpdateUnLimitList(unLimitMethods []string, limitMethods []string) error {
+func (f *FlowLimiter) UpdateLimitBlacklist(unLimitMethods []string, limitMethods []string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	for _, unLimitMethod := range unLimitMethods {
-		f.unLimitList[unLimitMethod] = unLimitMethod
+		f.limitBlacklist[unLimitMethod] = unLimitMethod
 	}
 
 	for _, limitMethod := range limitMethods {
-		delete(f.unLimitList, limitMethod)
+		delete(f.limitBlacklist, limitMethod)
 	}
 
 	return nil

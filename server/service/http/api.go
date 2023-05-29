@@ -59,7 +59,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
 	router.Put("/updateFlowLimiter", a.updateFlowLimiter)
-	router.Put("/updateUnLimitList", a.updateUnLimitList)
+	router.Put("/updateUnLimitList", a.UpdateLimitBlacklist)
 	router.Get("/healthCheck", a.healthCheck)
 
 	// Register cluster API.
@@ -600,12 +600,12 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 	a.respond(writer, nil)
 }
 
-type UpdateUnLimitListRequest struct {
+type UpdateLimitBlacklistRequest struct {
 	UnLimitMethods []string `json:"unLimitMethods"`
 	LimitMethods   []string `json:"limitMethods"`
 }
 
-func (a *API) updateUnLimitList(writer http.ResponseWriter, req *http.Request) {
+func (a *API) UpdateLimitBlacklist(writer http.ResponseWriter, req *http.Request) {
 	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
 	if err != nil {
 		log.Error("forward to leader failed", zap.Error(err))
@@ -618,17 +618,17 @@ func (a *API) updateUnLimitList(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var updateUnLimitListRequest UpdateUnLimitListRequest
-	err = json.NewDecoder(req.Body).Decode(&updateUnLimitListRequest)
+	var updateLimitBlacklistRequest UpdateLimitBlacklistRequest
+	err = json.NewDecoder(req.Body).Decode(&updateLimitBlacklistRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
 		a.respondError(writer, ErrParseRequest, fmt.Sprintf("decode request body failed, cause: %s", err.Error()))
 		return
 	}
 
-	if err := a.flowLimiter.UpdateUnLimitList(updateUnLimitListRequest.UnLimitMethods, updateUnLimitListRequest.LimitMethods); err != nil {
-		log.Error("update unlimit list failed", zap.Error(err))
-		a.respondError(writer, ErrUpdateUnLimitList, fmt.Sprintf("update unlimit list failed, cause: %s", err.Error()))
+	if err := a.flowLimiter.UpdateLimitBlacklist(updateLimitBlacklistRequest.UnLimitMethods, updateLimitBlacklistRequest.LimitMethods); err != nil {
+		log.Error("update limit blacklist failed", zap.Error(err))
+		a.respondError(writer, ErrUpdateUnLimitList, fmt.Sprintf("update limit blacklist failed, cause: %s", err.Error()))
 		return
 	}
 

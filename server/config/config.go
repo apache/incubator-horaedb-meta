@@ -67,13 +67,11 @@ const (
 
 type LimiterConfig struct {
 	// TokenBucketFillRate is the rate at which the limiter tokens are updated.
-	TokenBucketFillRate int
+	TokenBucketFillRate int `toml:"token-bucket-fill-rate" env:"TOKEN_BUCKET_FILL_RATE"`
 	// TokenBucketBurstEventCapacity is the Capacity of the limiter token bucket.
-	TokenBucketBurstEventCapacity int
+	TokenBucketBurstEventCapacity int `toml:"token-bucket-burst-event-capacity" env:"TOKEN_BUCKET_BURST_EVENT_CAPACITY"`
 	// Enable is used to control the switch of the limiter.
-	Enable bool
-	// unLimiterList is used to filter out methods that are not restricted.
-	UnLimitList []string
+	Enable bool `toml:"enable" env:"ENABLE"`
 }
 
 // Config is server start config, it has three input modes:
@@ -259,7 +257,6 @@ func MakeConfigParser() (*Parser, error) {
 			TokenBucketFillRate:           defaultInitialLimiterRate,
 			TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity,
 			Enable:                        defaultEnableLimiter,
-			UnLimitList:                   make([]string, 0),
 		},
 
 		GrpcHandleTimeoutMs: defaultGrpcHandleTimeoutMs,

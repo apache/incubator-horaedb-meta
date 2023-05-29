@@ -26,7 +26,6 @@ func TestFlowLimiter(t *testing.T) {
 		TokenBucketFillRate:           defaultInitialLimiterRate,
 		TokenBucketBurstEventCapacity: defaultInitialLimiterCapacity,
 		Enable:                        defaultEnableLimiter,
-		UnLimitList:                   make([]string, 0),
 	})
 
 	for i := 0; i < defaultInitialLimiterCapacity; i++ {
@@ -51,7 +50,7 @@ func TestFlowLimiter(t *testing.T) {
 	limitMethods := make([]string, 1)
 	limitMethods = append(limitMethods, defaultLimitMethod)
 
-	err := flowLimiter.UpdateUnLimitList(unLimitMethods, limitMethods)
+	err := flowLimiter.UpdateLimitBlacklist(unLimitMethods, limitMethods)
 	re.NoError(err)
 
 	err = flowLimiter.UpdateLimiter(config.LimiterConfig{
