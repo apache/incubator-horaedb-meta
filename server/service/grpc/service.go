@@ -118,10 +118,6 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 
 // GetTablesOfShards implements gRPC CeresmetaServer.
 func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetTablesOfShardsRequest) (*metaservicepb.GetTablesOfShardsResponse, error) {
-	if ok, err := s.allow(); !ok {
-		return &metaservicepb.GetTablesOfShardsResponse{Header: responseHeader(err, "get tables of shards grpc request is rejected by flow limiter")}, nil
-	}
-
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.GetTablesOfShardsResponse{Header: responseHeader(err, "grpc get tables of shards")}, nil

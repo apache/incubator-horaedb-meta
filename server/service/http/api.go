@@ -567,7 +567,7 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
 	if err != nil {
 		log.Error("forward to leader failed", zap.Error(err))
-		a.respondError(writer, ErrForwardToLeader, fmt.Sprintf("forward to leader failed, err: %s", err.Error()))
+		a.respondError(writer, ErrForwardToLeader, fmt.Sprintf("err: %s", err.Error()))
 		return
 	}
 
