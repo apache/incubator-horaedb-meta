@@ -59,7 +59,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
 	router.Put("/updateFlowLimiter", a.updateFlowLimiter)
-	router.Put("/updateUnLimitList", a.UpdateLimitBlacklist)
+	router.Put("/updateLimitBlacklist", a.updateLimitBlacklist)
 	router.Get("/healthCheck", a.healthCheck)
 
 	// Register cluster API.
@@ -605,7 +605,7 @@ type UpdateLimitBlacklistRequest struct {
 	LimitMethods   []string `json:"limitMethods"`
 }
 
-func (a *API) UpdateLimitBlacklist(writer http.ResponseWriter, req *http.Request) {
+func (a *API) updateLimitBlacklist(writer http.ResponseWriter, req *http.Request) {
 	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
 	if err != nil {
 		log.Error("forward to leader failed", zap.Error(err))
@@ -628,7 +628,7 @@ func (a *API) UpdateLimitBlacklist(writer http.ResponseWriter, req *http.Request
 
 	if err := a.flowLimiter.UpdateLimitBlacklist(updateLimitBlacklistRequest.UnLimitMethods, updateLimitBlacklistRequest.LimitMethods); err != nil {
 		log.Error("update limit blacklist failed", zap.Error(err))
-		a.respondError(writer, ErrUpdateUnLimitList, fmt.Sprintf("update limit blacklist failed, cause: %s", err.Error()))
+		a.respondError(writer, ErrUpdateLimitBlacklist, fmt.Sprintf("update limit blacklist failed, cause: %s", err.Error()))
 		return
 	}
 
