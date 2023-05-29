@@ -33,7 +33,7 @@ func TestStaticTopologyScheduler(t *testing.T) {
 	re.NoError(err)
 	re.NotNil(result.Procedure)
 
-	// StableCluster with all shards assigned would be scheduled a .
+	// StableCluster with all shards assigned would be scheduled a transfer leader procedure by hash rule.
 	stableCluster := test.InitStableCluster(ctx, t)
 	result, err = s.Schedule(ctx, stableCluster.GetMetadata().GetClusterSnapshot())
 	re.NoError(err)

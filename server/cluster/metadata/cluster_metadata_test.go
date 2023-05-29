@@ -32,7 +32,9 @@ func testUpdateClusterView(ctx context.Context, re *require.Assertions, m *metad
 	newShardNodes := make(map[string][]storage.ShardNode)
 	for i := 1; i < len(currentShardNodes); i++ {
 		if removeTarget.NodeName == currentShardNodes[i].NodeName {
-			newShardNodes[currentShardNodes[i].NodeName] = append(newShardNodes[currentShardNodes[i].NodeName], currentShardNodes[i])
+			if removeTarget.ID != currentShardNodes[i].ID {
+				newShardNodes[currentShardNodes[i].NodeName] = append(newShardNodes[currentShardNodes[i].NodeName], currentShardNodes[i])
+			}
 		}
 	}
 	err := m.UpdateClusterViewByNode(ctx, newShardNodes)

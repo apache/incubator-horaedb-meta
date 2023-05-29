@@ -46,7 +46,7 @@ func TestSchedulerManager(t *testing.T) {
 	err = schedulerManager.Stop(ctx)
 	re.NoError(err)
 
-	// Create scheduler manager with dynamic topology
+	// Create scheduler manager with dynamic topology.
 	schedulerManager = scheduler.NewManager(zap.NewNop(), procedureManager, f, c.GetMetadata(), client, "/rootPath", true, storage.TopologyTypeDynamic)
 	err = schedulerManager.Start(ctx)
 	re.NoError(err)
