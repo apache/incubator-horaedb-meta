@@ -174,21 +174,24 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 		return nil
 	}
 
-	p, err := c.GetProcedureFactory().MakeCreateTableProcedure(ctx, coordinator.CreateTableRequest{
-		ClusterMetadata: c.GetMetadata(),
-		SourceReq:       req,
-		OnSucceeded:     onSucceeded,
-		OnFailed:        onFailed,
-	})
-	if err != nil {
-		log.Error("fail to create table, factory create procedure", zap.Error(err))
-		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
-	}
+	topology := c.GetMetadata().GetClusterSnapshot().Topology
+	if topology.IsStable() {
+		p, err := c.GetProcedureFactory().MakeCreateTableProcedure(ctx, coordinator.CreateTableRequest{
+			ClusterMetadata: c.GetMetadata(),
+			SourceReq:       req,
+			OnSucceeded:     onSucceeded,
+			OnFailed:        onFailed,
+		})
+		if err != nil {
+			log.Error("fail to create table, factory create procedure", zap.Error(err))
+			return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
+		}
 
-	err = c.GetProcedureManager().Submit(ctx, p)
-	if err != nil {
-		log.Error("fail to create table, manager submit procedure", zap.Error(err))
-		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
+		err = c.GetProcedureManager().Submit(ctx, p)
+		if err != nil {
+			log.Error("fail to create table, manager submit procedure", zap.Error(err))
+			return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
+		}
 	}
 
 	select {

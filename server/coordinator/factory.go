@@ -112,9 +112,6 @@ func (f *Factory) makeCreateTableProcedure(ctx context.Context, request CreateTa
 		return nil, err
 	}
 	snapshot := request.ClusterMetadata.GetClusterSnapshot()
-	if !snapshot.Topology.IsStable() {
-		return nil, ErrClusterNotStable
-	}
 
 	shards, err := f.shardPicker.PickShards(ctx, snapshot, 1)
 	if err != nil {
@@ -145,9 +142,6 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 	}
 
 	snapshot := request.ClusterMetadata.GetClusterSnapshot()
-	if !snapshot.Topology.IsStable() {
-		return nil, ErrClusterNotStable
-	}
 
 	nodeNames := make(map[string]int, len(snapshot.Topology.ClusterView.ShardNodes))
 	for _, shardNode := range snapshot.Topology.ClusterView.ShardNodes {
