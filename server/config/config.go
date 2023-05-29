@@ -67,11 +67,11 @@ const (
 
 type LimiterConfig struct {
 	// TokenBucketFillRate is the rate at which the limiter tokens are updated.
-	TokenBucketFillRate int `toml:"token-bucket-fill-rate" env:"TOKEN_BUCKET_FILL_RATE"`
+	TokenBucketFillRate int `toml:"token-bucket-fill-rate" env:"FLOW_LIMITER_TOKEN_BUCKET_FILL_RATE"`
 	// TokenBucketBurstEventCapacity is the Capacity of the limiter token bucket.
-	TokenBucketBurstEventCapacity int `toml:"token-bucket-burst-event-capacity" env:"TOKEN_BUCKET_BURST_EVENT_CAPACITY"`
+	TokenBucketBurstEventCapacity int `toml:"token-bucket-burst-event-capacity" env:"FLOW_LIMITER_TOKEN_BUCKET_BURST_EVENT_CAPACITY"`
 	// Enable is used to control the switch of the limiter.
-	Enable bool `toml:"enable-limiter" env:"ENABLE_LIMITER"`
+	Enable bool `toml:"enable" env:"FLOW_LIMITER_ENABLE"`
 }
 
 // Config is server start config, it has three input modes:

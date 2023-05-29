@@ -92,10 +92,6 @@ func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHear
 
 // AllocSchemaID implements gRPC CeresmetaServer.
 func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
-	if ok, err := s.allow(); !ok {
-		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "alloc schema id grpc request is rejected by flow limiter")}, nil
-	}
-
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "grpc alloc schema id")}, nil
@@ -154,6 +150,7 @@ func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetT
 
 // CreateTable implements gRPC CeresmetaServer.
 func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTableRequest) (*metaservicepb.CreateTableResponse, error) {
+	// Since there may be too many table creation requests, a flow limiter is added here.
 	if ok, err := s.allow(); !ok {
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table grpc request is rejected by flow limiter")}, nil
 	}
@@ -229,6 +226,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 
 // DropTable implements gRPC CeresmetaServer.
 func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
+	// Since there may be too many table dropping requests, a flow limiter is added here.
 	if ok, err := s.allow(); !ok {
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "drop table grpc request is rejected by flow limiter")}, nil
 	}
@@ -293,6 +291,7 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 
 // RouteTables implements gRPC CeresmetaServer.
 func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTablesRequest) (*metaservicepb.RouteTablesResponse, error) {
+	// Since there may be too many table routing requests, a flow limiter is added here.
 	if ok, err := s.allow(); !ok {
 		return &metaservicepb.RouteTablesResponse{Header: responseHeader(err, "routeTables grpc request is rejected by flow limiter")}, nil
 	}
@@ -319,10 +318,6 @@ func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTable
 
 // GetNodes implements gRPC CeresmetaServer.
 func (s *Service) GetNodes(ctx context.Context, req *metaservicepb.GetNodesRequest) (*metaservicepb.GetNodesResponse, error) {
-	if ok, err := s.allow(); !ok {
-		return &metaservicepb.GetNodesResponse{Header: responseHeader(err, "get nodes grpc request is rejected by flow limiter")}, nil
-	}
-
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.GetNodesResponse{Header: responseHeader(err, "grpc get nodes")}, nil

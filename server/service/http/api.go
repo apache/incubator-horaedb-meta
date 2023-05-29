@@ -567,7 +567,7 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
 	if err != nil {
 		log.Error("forward to leader failed", zap.Error(err))
-		a.respondError(writer, ErrForwardToLeader, fmt.Sprintf("forward to leader failed, cause: %s", err.Error()))
+		a.respondError(writer, ErrForwardToLeader, fmt.Sprintf("forward to leader failed, err: %s", err.Error()))
 		return
 	}
 
@@ -580,7 +580,7 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 	err = json.NewDecoder(req.Body).Decode(&updateFlowLimiterRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
-		a.respondError(writer, ErrParseRequest, fmt.Sprintf("decode request body failed, cause: %s", err.Error()))
+		a.respondError(writer, ErrParseRequest, fmt.Sprintf("decode request body failed, err: %s", err.Error()))
 		return
 	}
 
@@ -592,7 +592,7 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 
 	if err := a.flowLimiter.UpdateLimiter(newLimiterConfig); err != nil {
 		log.Error("update flow limiter failed", zap.Error(err))
-		a.respondError(writer, ErrUpdateFlowLimiter, fmt.Sprintf("update flow limiter failed, cause: %s", err.Error()))
+		a.respondError(writer, ErrUpdateFlowLimiter, fmt.Sprintf("err: %s", err.Error()))
 		return
 	}
 

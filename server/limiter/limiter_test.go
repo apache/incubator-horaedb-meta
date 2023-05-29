@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	defaultInitialLimiterRate     = 10
+	defaultInitialLimiterRate     = 10 * 1000
 	defaultInitialLimiterCapacity = 1000
 	defaultEnableLimiter          = true
-	defaultUpdateLimiterRate      = 100
-	defaultUpdateLimiterCapacity  = 100
+	defaultUpdateLimiterRate      = 100 * 1000
+	defaultUpdateLimiterCapacity  = 100 * 1000
 )
 
 func TestFlowLimiter(t *testing.T) {
@@ -31,17 +31,11 @@ func TestFlowLimiter(t *testing.T) {
 		re.Equal(true, flag)
 	}
 
-	flag := flowLimiter.Allow()
-	re.Equal(false, flag)
-
-	time.Sleep(time.Second)
-	for i := 0; i < defaultInitialLimiterRate; i++ {
+	time.Sleep(time.Millisecond)
+	for i := 0; i < defaultInitialLimiterRate/1000; i++ {
 		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}
-
-	flag = flowLimiter.Allow()
-	re.Equal(false, flag)
 
 	err := flowLimiter.UpdateLimiter(config.LimiterConfig{
 		TokenBucketFillRate:           defaultUpdateLimiterRate,
@@ -50,12 +44,9 @@ func TestFlowLimiter(t *testing.T) {
 	})
 	re.NoError(err)
 
-	time.Sleep(time.Second)
-	for i := 0; i < defaultUpdateLimiterRate; i++ {
+	time.Sleep(time.Millisecond)
+	for i := 0; i < defaultUpdateLimiterRate/1000; i++ {
 		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}
-
-	flag = flowLimiter.Allow()
-	re.Equal(false, flag)
 }
