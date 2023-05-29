@@ -270,30 +270,26 @@ func (c *ClusterMetadata) GetTable(schemaName, tableName string) (storage.Table,
 	return c.tableManager.GetTable(schemaName, tableName)
 }
 
-func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request CreateTableMetadataRequest) (CreateTableMetadataResult, error) {
+func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request CreateTableMetadataRequest) (storage.Table, error) {
 	c.logger.Info("create table start", zap.String("cluster", c.Name()), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
 
 	_, exists, err := c.tableManager.GetTable(request.SchemaName, request.TableName)
 	if err != nil {
-		return CreateTableMetadataResult{}, err
+		return storage.Table{}, err
 	}
 
 	if exists {
-		return CreateTableMetadataResult{}, ErrTableAlreadyExists
+		return storage.Table{}, ErrTableAlreadyExists
 	}
 
 	// Create table in table manager.
 	table, err := c.tableManager.CreateTable(ctx, request.SchemaName, request.TableName, request.PartitionInfo)
 	if err != nil {
-		return CreateTableMetadataResult{}, errors.WithMessage(err, "table manager create table")
+		return storage.Table{}, errors.WithMessage(err, "table manager create table")
 	}
 
-	res := CreateTableMetadataResult{
-		Table: table,
-	}
-
-	c.logger.Info("create table metadata succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", res)))
-	return res, nil
+	c.logger.Info("create table metadata succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", table)))
+	return table, nil
 }
 
 func (c *ClusterMetadata) AddTableTopology(ctx context.Context, shardID storage.ShardID, table storage.Table) (CreateTableResult, error) {

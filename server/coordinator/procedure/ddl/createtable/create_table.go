@@ -56,7 +56,7 @@ func prepareCallback(event *fsm.Event) {
 		return
 	}
 
-	var result metadata.CreateTableMetadataResult
+	var tableMetadata storage.Table
 	if exists {
 		getShardIDResult := params.ClusterMetadata.GetShardByTableID([]storage.TableID{table.ID})
 		if _, exists := getShardIDResult.TableShardIDs[table.ID]; exists {
@@ -64,20 +64,19 @@ func prepareCallback(event *fsm.Event) {
 			return
 		}
 		// If table metadata exists but table shard mapping not exists, we need to try to create table again.
-		result = metadata.CreateTableMetadataResult{
-			Table: table,
-		}
+		tableMetadata = table
 	} else {
 		createTableMetadataRequest := metadata.CreateTableMetadataRequest{
 			SchemaName:    params.SourceReq.GetSchemaName(),
 			TableName:     params.SourceReq.GetName(),
 			PartitionInfo: storage.PartitionInfo{Info: params.SourceReq.PartitionTableInfo.GetPartitionInfo()},
 		}
-		result, err = params.ClusterMetadata.CreateTableMetadata(req.ctx, createTableMetadataRequest)
+		createResult, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, createTableMetadataRequest)
 		if err != nil {
 			procedure.CancelEventWithLog(event, err, "create table metadata")
 			return
 		}
+		tableMetadata = createResult
 	}
 
 	shardVersionUpdate := metadata.ShardVersionUpdate{
@@ -86,13 +85,13 @@ func prepareCallback(event *fsm.Event) {
 		PrevVersion: req.p.relatedVersionInfo.ShardWithVersion[params.ShardID],
 	}
 
-	createTableRequest := ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq)
+	createTableRequest := ddl.BuildCreateTableRequest(tableMetadata, shardVersionUpdate, params.SourceReq)
 	if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.ShardID, createTableRequest); err != nil {
 		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
 		return
 	}
 
-	createTableResult, err := params.ClusterMetadata.AddTableTopology(req.ctx, params.ShardID, result.Table)
+	createTableResult, err := params.ClusterMetadata.AddTableTopology(req.ctx, params.ShardID, tableMetadata)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "create table metadata")
 		return
