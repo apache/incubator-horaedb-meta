@@ -58,7 +58,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/route", a.route)
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
-	router.Put("/updateFlowLimiter", a.updateFlowLimiter)
+	router.Put("/flowLimiter", a.updateFlowLimiter)
 	router.Get("/healthCheck", a.healthCheck)
 
 	// Register cluster API.
