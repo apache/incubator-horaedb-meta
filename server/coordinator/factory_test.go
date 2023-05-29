@@ -14,10 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFactory(t *testing.T) {
-	re := require.New(t)
+func setupFactory(t *testing.T) (*coordinator.Factory, *metadata.ClusterMetadata) {
 	ctx := context.Background()
-
 	c := test.InitStableCluster(ctx, t)
 
 	dispatch := test.MockDispatch{}
@@ -25,16 +23,16 @@ func TestFactory(t *testing.T) {
 	storage := test.NewTestStorage(t)
 	f := coordinator.NewFactory(allocator, dispatch, storage)
 
-	testCreateTable(ctx, re, f, c.GetMetadata())
-	testDropTable(ctx, re, f, c.GetMetadata())
-	testTransferLeader(ctx, re, f, c.GetMetadata())
-	testSplit(ctx, re, f, c.GetMetadata())
+	return f, c.GetMetadata()
 }
 
-func testCreateTable(ctx context.Context, re *require.Assertions, f *coordinator.Factory, metadata *metadata.ClusterMetadata) {
+func TestCreateTable(t *testing.T) {
+	re := require.New(t)
+	ctx := context.Background()
+	f, m := setupFactory(t)
 	// Create normal table procedure.
 	p, err := f.MakeCreateTableProcedure(ctx, coordinator.CreateTableRequest{
-		ClusterMetadata: metadata,
+		ClusterMetadata: m,
 		SourceReq: &metaservicepb.CreateTableRequest{
 			Header:             nil,
 			SchemaName:         test.TestSchemaName,
@@ -54,7 +52,7 @@ func testCreateTable(ctx context.Context, re *require.Assertions, f *coordinator
 
 	// Create partition table procedure.
 	p, err = f.MakeCreateTableProcedure(ctx, coordinator.CreateTableRequest{
-		ClusterMetadata: metadata,
+		ClusterMetadata: m,
 		SourceReq: &metaservicepb.CreateTableRequest{
 			Header:           nil,
 			SchemaName:       test.TestSchemaName,
@@ -76,7 +74,10 @@ func testCreateTable(ctx context.Context, re *require.Assertions, f *coordinator
 	re.Equal(procedure.StateInit, string(p.State()))
 }
 
-func testDropTable(ctx context.Context, re *require.Assertions, f *coordinator.Factory, m *metadata.ClusterMetadata) {
+func TestDropTable(t *testing.T) {
+	re := require.New(t)
+	ctx := context.Background()
+	f, m := setupFactory(t)
 	// Create normal table procedure.
 	p, err := f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
 		ClusterMetadata: m,
@@ -114,8 +115,11 @@ func testDropTable(ctx context.Context, re *require.Assertions, f *coordinator.F
 	re.Error(err)
 }
 
-func testTransferLeader(ctx context.Context, re *require.Assertions, f *coordinator.Factory, metadata *metadata.ClusterMetadata) {
-	snapshot := metadata.GetClusterSnapshot()
+func TestTransferLeader(t *testing.T) {
+	re := require.New(t)
+	ctx := context.Background()
+	f, m := setupFactory(t)
+	snapshot := m.GetClusterSnapshot()
 	p, err := f.CreateTransferLeaderProcedure(ctx, coordinator.TransferLeaderRequest{
 		Snapshot:          snapshot,
 		ShardID:           0,
@@ -127,8 +131,11 @@ func testTransferLeader(ctx context.Context, re *require.Assertions, f *coordina
 	re.Equal(procedure.StateInit, string(p.State()))
 }
 
-func testSplit(ctx context.Context, re *require.Assertions, f *coordinator.Factory, metadata *metadata.ClusterMetadata) {
-	snapshot := metadata.GetClusterSnapshot()
+func TestSplit(t *testing.T) {
+	re := require.New(t)
+	ctx := context.Background()
+	f, m := setupFactory(t)
+	snapshot := m.GetClusterSnapshot()
 	p, err := f.CreateSplitProcedure(ctx, coordinator.SplitRequest{
 		ClusterMetadata: nil,
 		SchemaName:      "",

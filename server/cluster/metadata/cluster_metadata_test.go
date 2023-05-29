@@ -84,6 +84,7 @@ func testRegisterNode(ctx context.Context, re *require.Assertions, m *metadata.C
 	// Reset shardNodes.
 	err = m.UpdateClusterView(ctx, storage.ClusterStateStable, currentShardNodes)
 	re.NoError(err)
+	re.Equal(len(currentShardNodes), len(m.GetClusterSnapshot().Topology.ClusterView.ShardNodes))
 }
 
 func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata.ClusterMetadata) {
