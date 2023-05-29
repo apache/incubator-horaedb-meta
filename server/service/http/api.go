@@ -583,6 +583,7 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 		a.respondError(writer, ErrParseRequest, fmt.Sprintf("decode request body failed, cause: %s", err.Error()))
 		return
 	}
+	log.Info("<<<<<<<<", zap.Int("jjj", updateFlowLimiterRequest.TokenBucketBurstEventCapacity))
 
 	newLimiterConfig := config.LimiterConfig{
 		TokenBucketFillRate:           updateFlowLimiterRequest.TokenBucketFillRate,
