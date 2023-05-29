@@ -51,10 +51,6 @@ type Handler interface {
 
 // NodeHeartbeat implements gRPC CeresmetaServer.
 func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHeartbeatRequest) (*metaservicepb.NodeHeartbeatResponse, error) {
-	if ok, err := s.allow("NodeHeartbeat"); !ok {
-		return &metaservicepb.NodeHeartbeatResponse{Header: responseHeader(err, "heartbeat grpc request is rejected by flow limiter")}, nil
-	}
-
 	ceresmetaClient, err := s.getForwardedCeresmetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.NodeHeartbeatResponse{Header: responseHeader(err, "grpc heartbeat")}, nil
@@ -96,7 +92,7 @@ func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHear
 
 // AllocSchemaID implements gRPC CeresmetaServer.
 func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
-	if ok, err := s.allow("AllocSchemaID"); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "alloc schema id grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -126,7 +122,7 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 
 // GetTablesOfShards implements gRPC CeresmetaServer.
 func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetTablesOfShardsRequest) (*metaservicepb.GetTablesOfShardsResponse, error) {
-	if ok, err := s.allow("GetTablesOfShards"); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.GetTablesOfShardsResponse{Header: responseHeader(err, "get tables of shards grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -158,7 +154,7 @@ func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetT
 
 // CreateTable implements gRPC CeresmetaServer.
 func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTableRequest) (*metaservicepb.CreateTableResponse, error) {
-	if ok, err := s.allow("CreateTable"); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -233,7 +229,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 
 // DropTable implements gRPC CeresmetaServer.
 func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
-	if ok, err := s.allow("DropTable"); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "drop table grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -297,7 +293,7 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 
 // RouteTables implements gRPC CeresmetaServer.
 func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTablesRequest) (*metaservicepb.RouteTablesResponse, error) {
-	if ok, err := s.allow("RouteTables"); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.RouteTablesResponse{Header: responseHeader(err, "routeTables grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -323,7 +319,7 @@ func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTable
 
 // GetNodes implements gRPC CeresmetaServer.
 func (s *Service) GetNodes(ctx context.Context, req *metaservicepb.GetNodesRequest) (*metaservicepb.GetNodesResponse, error) {
-	if ok, err := s.allow("GetNodes"); !ok {
+	if ok, err := s.allow(); !ok {
 		return &metaservicepb.GetNodesResponse{Header: responseHeader(err, "get nodes grpc request is rejected by flow limiter")}, nil
 	}
 
@@ -428,12 +424,12 @@ func responseHeader(err error, msg string) *commonpb.ResponseHeader {
 	return &commonpb.ResponseHeader{Code: coderr.Internal, Error: msg + err.Error()}
 }
 
-func (s *Service) allow(method string) (bool, error) {
+func (s *Service) allow() (bool, error) {
 	flowLimiter, err := s.h.GetFlowLimiter()
 	if err != nil {
 		return false, errors.WithMessage(err, "get flow limiter failed")
 	}
-	if !flowLimiter.Allow(method) {
+	if !flowLimiter.Allow() {
 		return false, ErrFlowLimit.WithCausef("the current flow has reached the threshold")
 	}
 	return true, nil

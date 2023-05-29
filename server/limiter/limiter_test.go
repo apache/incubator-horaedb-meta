@@ -16,8 +16,6 @@ const (
 	defaultEnableLimiter          = true
 	defaultUpdateLimiterRate      = 100
 	defaultUpdateLimiterCapacity  = 100
-	defaultUnLimitMethod          = "aaa"
-	defaultLimitMethod            = "bbb"
 )
 
 func TestFlowLimiter(t *testing.T) {
@@ -29,31 +27,23 @@ func TestFlowLimiter(t *testing.T) {
 	})
 
 	for i := 0; i < defaultInitialLimiterCapacity; i++ {
-		flag := flowLimiter.Allow(defaultLimitMethod)
+		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}
 
-	flag := flowLimiter.Allow(defaultLimitMethod)
+	flag := flowLimiter.Allow()
 	re.Equal(false, flag)
 
 	time.Sleep(time.Second)
 	for i := 0; i < defaultInitialLimiterRate; i++ {
-		flag := flowLimiter.Allow(defaultLimitMethod)
+		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}
 
-	flag = flowLimiter.Allow(defaultLimitMethod)
+	flag = flowLimiter.Allow()
 	re.Equal(false, flag)
 
-	unLimitMethods := make([]string, 1)
-	unLimitMethods = append(unLimitMethods, defaultUnLimitMethod)
-	limitMethods := make([]string, 1)
-	limitMethods = append(limitMethods, defaultLimitMethod)
-
-	err := flowLimiter.UpdateLimitBlacklist(unLimitMethods, limitMethods)
-	re.NoError(err)
-
-	err = flowLimiter.UpdateLimiter(config.LimiterConfig{
+	err := flowLimiter.UpdateLimiter(config.LimiterConfig{
 		TokenBucketFillRate:           defaultUpdateLimiterRate,
 		TokenBucketBurstEventCapacity: defaultUpdateLimiterCapacity,
 		Enable:                        defaultEnableLimiter,
@@ -62,15 +52,10 @@ func TestFlowLimiter(t *testing.T) {
 
 	time.Sleep(time.Second)
 	for i := 0; i < defaultUpdateLimiterRate; i++ {
-		flag := flowLimiter.Allow(defaultLimitMethod)
+		flag := flowLimiter.Allow()
 		re.Equal(true, flag)
 	}
 
-	flag = flowLimiter.Allow(defaultLimitMethod)
+	flag = flowLimiter.Allow()
 	re.Equal(false, flag)
-
-	for i := 0; i < defaultUpdateLimiterCapacity*2; i++ {
-		flag := flowLimiter.Allow(defaultUnLimitMethod)
-		re.Equal(true, flag)
-	}
 }

@@ -59,7 +59,6 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/dropTable", a.dropTable)
 	router.Post("/getNodeShards", a.getNodeShards)
 	router.Put("/updateFlowLimiter", a.updateFlowLimiter)
-	router.Put("/updateLimitBlacklist", a.updateLimitBlacklist)
 	router.Get("/healthCheck", a.healthCheck)
 
 	// Register cluster API.
@@ -594,41 +593,6 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 	if err := a.flowLimiter.UpdateLimiter(newLimiterConfig); err != nil {
 		log.Error("update flow limiter failed", zap.Error(err))
 		a.respondError(writer, ErrUpdateFlowLimiter, fmt.Sprintf("update flow limiter failed, cause: %s", err.Error()))
-		return
-	}
-
-	a.respond(writer, nil)
-}
-
-type UpdateLimitBlacklistRequest struct {
-	UnLimitMethods []string `json:"unLimitMethods"`
-	LimitMethods   []string `json:"limitMethods"`
-}
-
-func (a *API) updateLimitBlacklist(writer http.ResponseWriter, req *http.Request) {
-	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
-	if err != nil {
-		log.Error("forward to leader failed", zap.Error(err))
-		a.respondError(writer, ErrForwardToLeader, fmt.Sprintf("forward to leader failed, cause: %s", err.Error()))
-		return
-	}
-
-	if !isLeader {
-		a.respondForward(writer, resp)
-		return
-	}
-
-	var updateLimitBlacklistRequest UpdateLimitBlacklistRequest
-	err = json.NewDecoder(req.Body).Decode(&updateLimitBlacklistRequest)
-	if err != nil {
-		log.Error("decode request body failed", zap.Error(err))
-		a.respondError(writer, ErrParseRequest, fmt.Sprintf("decode request body failed, cause: %s", err.Error()))
-		return
-	}
-
-	if err := a.flowLimiter.UpdateLimitBlacklist(updateLimitBlacklistRequest.UnLimitMethods, updateLimitBlacklistRequest.LimitMethods); err != nil {
-		log.Error("update limit blacklist failed", zap.Error(err))
-		a.respondError(writer, ErrUpdateLimitBlacklist, fmt.Sprintf("update limit blacklist failed, cause: %s", err.Error()))
 		return
 	}
 
