@@ -56,9 +56,12 @@ type managerImpl struct {
 	alloc           id.Allocator
 	rootPath        string
 	idAllocatorStep uint
+
+	// TODO: topologyType is used to be compatible with cluster data changes and needs to be deleted later.
+	topologyType storage.TopologyType
 }
 
-func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint) (Manager, error) {
+func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, topologyType storage.TopologyType) (Manager, error) {
 	alloc := id.NewAllocatorImpl(log.GetLogger(), kv, path.Join(rootPath, AllocClusterIDPrefix), idAllocatorStep)
 
 	manager := &managerImpl{
@@ -69,6 +72,7 @@ func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Cl
 		clusters:        make(map[string]*Cluster, 0),
 		rootPath:        rootPath,
 		idAllocatorStep: idAllocatorStep,
+		topologyType:    topologyType,
 	}
 
 	return manager, nil
@@ -323,12 +327,34 @@ func (m *managerImpl) Start(ctx context.Context) error {
 			log.Error("fail to load cluster", zap.String("cluster", clusterMetadata.Name()), zap.Error(err))
 			return errors.WithMessage(err, "fail to load cluster")
 		}
+
+		// TODO: topologyType is used to be compatible with cluster data changes and needs to be deleted later
+		if m.topologyType != clusterMetadata.GetStorageMetadata().TopologyType {
+			if err := m.storage.UpdateCluster(ctx, storage.UpdateClusterRequest{
+				Cluster: storage.Cluster{
+					ID:             metadataStorage.ID,
+					Name:           metadataStorage.Name,
+					MinNodeCount:   metadataStorage.MinNodeCount,
+					ShardTotal:     metadataStorage.ShardTotal,
+					EnableSchedule: metadataStorage.EnableSchedule,
+					TopologyType:   m.topologyType,
+					CreatedAt:      metadataStorage.CreatedAt,
+					ModifiedAt:     uint64(time.Now().UnixMilli()),
+				},
+			}); err != nil {
+				return errors.WithMessagef(err, "update cluster topology type failed, clusterName:%s", clusterMetadata.Name())
+			}
+			if err := clusterMetadata.LoadMetadata(ctx); err != nil {
+				log.Error("fail to load cluster", zap.Error(err), zap.String("clusterName", clusterMetadata.Name()))
+				return err
+			}
+		}
+
 		log.Info("open cluster successfully", zap.String("cluster", clusterMetadata.Name()))
 		c, err := NewCluster(logger, clusterMetadata, m.client, m.rootPath)
 		if err != nil {
 			return errors.WithMessage(err, "new cluster")
 		}
-
 		m.clusters[clusterMetadata.Name()] = c
 		if err := c.Start(ctx); err != nil {
 			return errors.WithMessage(err, "start cluster")

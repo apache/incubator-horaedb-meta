@@ -161,7 +161,12 @@ func (srv *Server) startServer(_ context.Context) error {
 		MaxScanLimit: srv.cfg.MaxScanLimit, MinScanLimit: srv.cfg.MinScanLimit,
 	})
 
-	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep)
+	topologyType, err := metadata.ParseTopologyType(srv.cfg.TopologyType)
+	if err != nil {
+		return metadata.ErrParseTopologyType
+	}
+
+	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep, topologyType)
 	if err != nil {
 		return errors.WithMessage(err, "start server")
 	}
