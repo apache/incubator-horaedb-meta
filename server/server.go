@@ -163,7 +163,7 @@ func (srv *Server) startServer(_ context.Context) error {
 
 	topologyType, err := metadata.ParseTopologyType(srv.cfg.TopologyType)
 	if err != nil {
-		return metadata.ErrParseTopologyType
+		return err
 	}
 
 	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep, topologyType)

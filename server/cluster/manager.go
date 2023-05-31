@@ -330,6 +330,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 
 		// TODO: topologyType is used to be compatible with cluster data changes and needs to be deleted later
 		if clusterMetadata.GetStorageMetadata().TopologyType == storage.TopologyTypeUnknown {
+			log.Info("update cluster topology type", zap.String("NewTopologyType", string(m.topologyType)))
 			if err := m.storage.UpdateCluster(ctx, storage.UpdateClusterRequest{
 				Cluster: storage.Cluster{
 					ID:             metadataStorage.ID,
