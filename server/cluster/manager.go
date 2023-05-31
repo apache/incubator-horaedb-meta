@@ -4,6 +4,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"sync"
 	"time"
@@ -323,15 +324,14 @@ func (m *managerImpl) Start(ctx context.Context) error {
 	for _, metadataStorage := range clusters.Clusters {
 		logger := log.With(zap.String("clusterName", metadataStorage.Name))
 		clusterMetadata := metadata.NewClusterMetadata(logger, metadataStorage, m.storage, m.kv, m.rootPath, m.idAllocatorStep)
-		if err := clusterMetadata.Load(ctx); err != nil {
+		if err = clusterMetadata.Load(ctx); err != nil {
 			log.Error("fail to load cluster", zap.String("cluster", clusterMetadata.Name()), zap.Error(err))
 			return errors.WithMessage(err, "fail to load cluster")
 		}
 
 		// TODO: topologyType is used to be compatible with cluster data changes and needs to be deleted later
 		if clusterMetadata.GetStorageMetadata().TopologyType == storage.TopologyTypeUnknown {
-			log.Info("update cluster topology type", zap.String("NewTopologyType", string(m.topologyType)))
-			if err := m.storage.UpdateCluster(ctx, storage.UpdateClusterRequest{
+			req := storage.UpdateClusterRequest{
 				Cluster: storage.Cluster{
 					ID:             metadataStorage.ID,
 					Name:           metadataStorage.Name,
@@ -342,11 +342,13 @@ func (m *managerImpl) Start(ctx context.Context) error {
 					CreatedAt:      metadataStorage.CreatedAt,
 					ModifiedAt:     uint64(time.Now().UnixMilli()),
 				},
-			}); err != nil {
+			}
+			if err := m.storage.UpdateCluster(ctx, req); err != nil {
 				return errors.WithMessagef(err, "update cluster topology type failed, clusterName:%s", clusterMetadata.Name())
 			}
+			log.Info("update cluster topology type", zap.String("request", fmt.Sprintf("%v", req)))
 			if err := clusterMetadata.LoadMetadata(ctx); err != nil {
-				log.Error("fail to load cluster", zap.Error(err), zap.String("clusterName", clusterMetadata.Name()))
+				log.Error("fail to load cluster", zap.String("clusterName", clusterMetadata.Name()), zap.Error(err))
 				return err
 			}
 		}
