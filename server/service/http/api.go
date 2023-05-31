@@ -558,9 +558,9 @@ func (a *API) updateCluster(writer http.ResponseWriter, req *http.Request) {
 }
 
 type UpdateFlowLimiterRequest struct {
-	TokenBucketFillRate           int  `json:"tokenBucketFillRate"`
-	TokenBucketBurstEventCapacity int  `json:"tokenBucketBurstEventCapacity"`
-	Enable                        bool `json:"enable"`
+	AllowedTps int  `json:"allowedTps"`
+	BurstTps   int  `json:"burstTps"`
+	Enable     bool `json:"enable"`
 }
 
 func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
@@ -585,8 +585,8 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	newLimiterConfig := config.LimiterConfig{
-		TokenBucketFillRate:           updateFlowLimiterRequest.TokenBucketFillRate,
-		TokenBucketBurstEventCapacity: updateFlowLimiterRequest.TokenBucketBurstEventCapacity,
+		TokenBucketFillRate:           updateFlowLimiterRequest.AllowedTps,
+		TokenBucketBurstEventCapacity: updateFlowLimiterRequest.BurstTps,
 		Enable:                        updateFlowLimiterRequest.Enable,
 	}
 
