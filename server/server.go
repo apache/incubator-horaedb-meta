@@ -168,7 +168,7 @@ func (srv *Server) startServer(_ context.Context) error {
 
 	manager, err := cluster.NewManagerImpl(storage, srv.etcdCli, srv.etcdCli, srv.cfg.StorageRootPath, srv.cfg.IDAllocatorStep, topologyType)
 	if err != nil {
-		return errors.WithMessage(err, "start server")
+		return err
 	}
 	srv.clusterManager = manager
 	srv.flowLimiter = limiter.NewFlowLimiter(srv.cfg.FlowLimiter)
