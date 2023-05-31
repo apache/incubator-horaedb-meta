@@ -585,9 +585,9 @@ func (a *API) updateFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	newLimiterConfig := config.LimiterConfig{
-		TokenBucketFillRate:           updateFlowLimiterRequest.Limit,
-		TokenBucketBurstEventCapacity: updateFlowLimiterRequest.Burst,
-		Enable:                        updateFlowLimiterRequest.Enable,
+		Limit:  updateFlowLimiterRequest.Limit,
+		Burst:  updateFlowLimiterRequest.Burst,
+		Enable: updateFlowLimiterRequest.Enable,
 	}
 
 	if err := a.flowLimiter.UpdateLimiter(newLimiterConfig); err != nil {
