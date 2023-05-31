@@ -13,11 +13,11 @@ type FlowLimiter struct {
 	l *rate.Limiter
 	// RWMutex is used to protect following fields.
 	lock sync.RWMutex
-	// limit is the rate at which the limiter tokens are updated.
+	// limit is the updated rate of tokens.
 	limit int
-	// burst is the Capacity of the limiter token bucket.
+	// burst is the maximum number of tokens.
 	burst int
-	// Enable is used to control the switch of the limiter.
+	// enable is used to control the switch of the limiter.
 	enable bool
 }
 

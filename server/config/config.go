@@ -66,9 +66,9 @@ const (
 )
 
 type LimiterConfig struct {
-	// limit is the rate at which the limiter tokens are updated.
+	// Limit is the updated rate of tokens.
 	Limit int `toml:"limit" env:"FLOW_LIMITER_LIMIT"`
-	// burst is the Capacity of the limiter token bucket.
+	// Burst is the maximum number of tokens.
 	Burst int `toml:"burst" env:"FLOW_LIMITER_BURST"`
 	// Enable is used to control the switch of the limiter.
 	Enable bool `toml:"enable" env:"FLOW_LIMITER_ENABLE"`
