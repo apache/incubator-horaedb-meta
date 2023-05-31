@@ -346,7 +346,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 			if err := m.storage.UpdateCluster(ctx, req); err != nil {
 				return errors.WithMessagef(err, "update cluster topology type failed, clusterName:%s", clusterMetadata.Name())
 			}
-			log.Info("update cluster topology type", zap.String("request", fmt.Sprintf("%v", req)))
+			log.Info("update cluster topology type successfully", zap.String("request", fmt.Sprintf("%v", req)))
 			if err := clusterMetadata.LoadMetadata(ctx); err != nil {
 				log.Error("fail to load cluster", zap.String("clusterName", clusterMetadata.Name()), zap.Error(err))
 				return err
