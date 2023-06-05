@@ -18,6 +18,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/config"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/limiter"
+	"github.com/CeresDB/ceresmeta/server/member"
 	"github.com/CeresDB/ceresmeta/server/status"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"go.uber.org/zap"
@@ -52,6 +53,7 @@ func (a *API) NewAPIRouter() *Router {
 	router := New().WithPrefix(apiPrefix).WithInstrumentation(printRequestInsmt)
 
 	// Register API.
+	router.Get("/leader", a.getLeaderAddr)
 	router.Post("/getShardTables", a.getShardTables)
 	router.Post("/transferLeader", a.transferLeader)
 	router.Post("/split", a.split)
@@ -159,15 +161,36 @@ func (a *API) respondError(w http.ResponseWriter, apiErr coderr.CodeError, msg s
 	}
 }
 
+func (a *API) getLeaderAddr(writer http.ResponseWriter, req *http.Request) {
+	leaderAddr, err := a.forwardClient.GetLeaderAddr(req.Context())
+	if err != nil {
+		log.Error("get leader addr failed", zap.Error(err))
+		a.respondError(writer, member.ErrGetLeader, fmt.Sprintf("err: %s", err.Error()))
+		return
+	}
+	a.respond(writer, leaderAddr)
+}
+
 type GetShardTables struct {
 	ClusterName string   `json:"clusterName"`
-	NodeName    string   `json:"nodeName"`
 	ShardIDs    []uint32 `json:"shardIDs"`
 }
 
 func (a *API) getShardTables(writer http.ResponseWriter, req *http.Request) {
+	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
+	if err != nil {
+		log.Error("forward to leader failed", zap.Error(err))
+		a.respondError(writer, ErrForwardToLeader, fmt.Sprintf("err: %s", err.Error()))
+		return
+	}
+
+	if !isLeader {
+		a.respondForward(writer, resp)
+		return
+	}
+
 	var getShardTables GetShardTables
-	err := json.NewDecoder(req.Body).Decode(&getShardTables)
+	err = json.NewDecoder(req.Body).Decode(&getShardTables)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
 		a.respondError(writer, ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
@@ -183,8 +206,15 @@ func (a *API) getShardTables(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	shardIDs := make([]storage.ShardID, len(getShardTables.ShardIDs))
-	for _, shardID := range getShardTables.ShardIDs {
-		shardIDs = append(shardIDs, storage.ShardID(shardID))
+	if len(getShardTables.ShardIDs) != 0 {
+		for _, shardID := range getShardTables.ShardIDs {
+			shardIDs = append(shardIDs, storage.ShardID(shardID))
+		}
+	} else {
+		shardViewsMapping := c.GetMetadata().GetClusterSnapshot().Topology.ShardViewsMapping
+		for shardID := range shardViewsMapping {
+			shardIDs = append(shardIDs, shardID)
+		}
 	}
 
 	shardTables := c.GetMetadata().GetShardTables(shardIDs)
@@ -199,8 +229,20 @@ type TransferLeaderRequest struct {
 }
 
 func (a *API) transferLeader(writer http.ResponseWriter, req *http.Request) {
+	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
+	if err != nil {
+		log.Error("forward to leader failed", zap.Error(err))
+		a.respondError(writer, ErrForwardToLeader, fmt.Sprintf("err: %s", err.Error()))
+		return
+	}
+
+	if !isLeader {
+		a.respondForward(writer, resp)
+		return
+	}
+
 	var transferLeaderRequest TransferLeaderRequest
-	err := json.NewDecoder(req.Body).Decode(&transferLeaderRequest)
+	err = json.NewDecoder(req.Body).Decode(&transferLeaderRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
 		a.respondError(writer, ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
