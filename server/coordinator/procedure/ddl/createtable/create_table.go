@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
-	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
@@ -17,31 +16,29 @@ import (
 	"github.com/pkg/errors"
 )
 
+// fsm state change:
+// ┌────────┐     ┌──────────────────────┐
+// │ Begin  ├─────▶ CreateTableFinished  │
+// └────────┘     └──────────────────────┘
 const (
-	eventPrepare = "EventPrepare"
-	eventFailed  = "EventFailed"
-	eventSuccess = "EventSuccess"
+	eventCreateTable = "EventCreateTable"
 
-	stateBegin   = "StateBegin"
-	stateWaiting = "StateWaiting"
-	stateFinish  = "StateFinish"
-	stateFailed  = "StateFailed"
+	stateBegin               = "StateBegin"
+	stateCreateTableFinished = "StateCreateTableFinished"
+
+	leaveStateBegin = "leave_StateBegin"
 )
 
 var (
 	createTableEvents = fsm.Events{
-		{Name: eventPrepare, Src: []string{stateBegin}, Dst: stateWaiting},
-		{Name: eventSuccess, Src: []string{stateWaiting}, Dst: stateFinish},
-		{Name: eventFailed, Src: []string{stateWaiting}, Dst: stateFailed},
+		{Name: eventCreateTable, Src: []string{stateBegin}, Dst: stateCreateTableFinished},
 	}
 	createTableCallbacks = fsm.Callbacks{
-		eventPrepare: prepareCallback,
-		eventFailed:  failedCallback,
-		eventSuccess: successCallback,
+		leaveStateBegin: createTableCallback,
 	}
 )
 
-func prepareCallback(event *fsm.Event) {
+func createTableCallback(event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -81,30 +78,6 @@ func prepareCallback(event *fsm.Event) {
 	req.createTableResult = createTableResult
 }
 
-func successCallback(event *fsm.Event) {
-	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-
-	if err := req.p.params.OnSucceeded(req.createTableResult); err != nil {
-		log.Error("exec success callback failed")
-	}
-}
-
-func failedCallback(event *fsm.Event) {
-	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-
-	if err := req.p.params.OnFailed(event.Err); err != nil {
-		log.Error("exec failed callback failed")
-	}
-}
-
 // callbackRequest is fsm callbacks param.
 type callbackRequest struct {
 	ctx               context.Context
@@ -119,8 +92,8 @@ type ProcedureParams struct {
 	ID              uint64
 	ShardID         storage.ShardID
 	SourceReq       *metaservicepb.CreateTableRequest
-	OnSucceeded     func(metadata.CreateTableResult) error
-	OnFailed        func(error) error
+	OnSucceeded     func(metadata.CreateTableResult)
+	OnFailed        func(error)
 }
 
 func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
@@ -190,21 +163,24 @@ func (p *Procedure) Start(ctx context.Context) error {
 		p:   p,
 	}
 
-	if err := p.fsm.Event(eventPrepare, req); err != nil {
-		err1 := p.fsm.Event(eventFailed, req)
-		p.updateState(procedure.StateFailed)
-		if err1 != nil {
-			err = errors.WithMessagef(err, "send eventFailed, err:%v", err1)
+	for {
+		switch p.fsm.Current() {
+		case stateBegin:
+			if err := p.fsm.Event(eventCreateTable, req); err != nil {
+				p.params.OnFailed(err)
+				if _, ok := err.(fsm.CanceledError); ok {
+					p.updateState(procedure.StateCancelled)
+					return errors.WithMessage(err, "create table canceled")
+				}
+				p.updateState(procedure.StateFailed)
+				return errors.WithMessage(err, "create table")
+			}
+		case stateCreateTableFinished:
+			p.updateState(procedure.StateFinished)
+			p.params.OnSucceeded(req.createTableResult)
+			return nil
 		}
-		return errors.WithMessage(err, "send eventPrepare")
 	}
-
-	if err := p.fsm.Event(eventSuccess, req); err != nil {
-		return errors.WithMessage(err, "send eventSuccess")
-	}
-
-	p.updateState(procedure.StateFinished)
-	return nil
 }
 
 func (p *Procedure) Cancel(_ context.Context) error {

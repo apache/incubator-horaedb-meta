@@ -173,13 +173,11 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 	errorCh := make(chan error, 1)
 	resultCh := make(chan metadata.CreateTableResult, 1)
 
-	onSucceeded := func(ret metadata.CreateTableResult) error {
+	onSucceeded := func(ret metadata.CreateTableResult) {
 		resultCh <- ret
-		return nil
 	}
-	onFailed := func(err error) error {
+	onFailed := func(err error) {
 		errorCh <- err
-		return nil
 	}
 
 	p, err := c.GetProcedureFactory().MakeCreateTableProcedure(ctx, coordinator.CreateTableRequest{

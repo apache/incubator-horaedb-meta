@@ -39,10 +39,9 @@ func TestCreateTable(t *testing.T) {
 			SchemaName: test.TestSchemaName,
 			Name:       test.TestTableName0,
 		},
-		OnSucceeded: func(_ metadata.CreateTableResult) error {
-			return nil
+		OnSucceeded: func(_ metadata.CreateTableResult) {
 		},
-		OnFailed: func(err error) error {
+		OnFailed: func(err error) {
 			panic(fmt.Sprintf("create table failed, err:%v", err))
 		},
 	})

@@ -95,10 +95,9 @@ func testCreateTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.C
 			SchemaName: test.TestSchemaName,
 			Name:       tableName,
 		},
-		OnSucceeded: func(_ metadata.CreateTableResult) error {
-			return nil
+		OnSucceeded: func(_ metadata.CreateTableResult) {
 		},
-		OnFailed: func(err error) error {
+		OnFailed: func(err error) {
 			panic(fmt.Sprintf("create table failed, err:%v", err))
 		},
 	})

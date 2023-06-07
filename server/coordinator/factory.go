@@ -33,8 +33,8 @@ type CreateTableRequest struct {
 	ClusterMetadata *metadata.ClusterMetadata
 	SourceReq       *metaservicepb.CreateTableRequest
 
-	OnSucceeded func(metadata.CreateTableResult) error
-	OnFailed    func(error) error
+	OnSucceeded func(metadata.CreateTableResult)
+	OnFailed    func(error)
 }
 
 func (request *CreateTableRequest) isPartitionTable() bool {
@@ -77,8 +77,8 @@ type CreatePartitionTableRequest struct {
 
 	PartitionTableRatioOfNodes float32
 
-	OnSucceeded func(metadata.CreateTableResult) error
-	OnFailed    func(error) error
+	OnSucceeded func(metadata.CreateTableResult)
+	OnFailed    func(error)
 }
 
 func NewFactory(allocator id.Allocator, dispatch eventdispatch.Dispatch, storage procedure.Storage) *Factory {

@@ -61,11 +61,9 @@ func TestCreatePartitionTable(t *testing.T) {
 		Storage:         s,
 		SourceReq:       request,
 		SubTablesShards: shardNodesWithVersion,
-		OnSucceeded: func(result metadata.CreateTableResult) error {
-			return nil
+		OnSucceeded: func(result metadata.CreateTableResult) {
 		},
-		OnFailed: func(err error) error {
-			return nil
+		OnFailed: func(err error) {
 		},
 	})
 	re.NoError(err)

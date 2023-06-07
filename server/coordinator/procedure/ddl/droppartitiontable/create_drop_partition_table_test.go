@@ -112,11 +112,9 @@ func testCreatePartitionTable(ctx context.Context, t *testing.T, dispatch eventd
 		Storage:         s,
 		SourceReq:       request,
 		SubTablesShards: shardNodesWithVersion,
-		OnSucceeded: func(_ metadata.CreateTableResult) error {
-			return nil
+		OnSucceeded: func(_ metadata.CreateTableResult) {
 		},
-		OnFailed: func(err error) error {
-			return nil
+		OnFailed: func(err error) {
 		},
 	})
 	re.NoError(err)

@@ -66,8 +66,8 @@ type ProcedureParams struct {
 	Storage         procedure.Storage
 	SourceReq       *metaservicepb.CreateTableRequest
 	SubTablesShards []metadata.ShardNodeWithVersion
-	OnSucceeded     func(metadata.CreateTableResult) error
-	OnFailed        func(error) error
+	OnSucceeded     func(metadata.CreateTableResult)
+	OnFailed        func(error)
 }
 
 func NewProcedure(params ProcedureParams) (*Procedure, error) {
@@ -289,13 +289,10 @@ func finishCallback(event *fsm.Event) {
 	}
 	log.Info("create partition table finish", zap.String("tableName", req.p.params.SourceReq.GetName()))
 
-	if err := req.p.params.OnSucceeded(metadata.CreateTableResult{
+	req.p.params.OnSucceeded(metadata.CreateTableResult{
 		Table:              req.p.createPartitionTableResult.Table,
 		ShardVersionUpdate: metadata.ShardVersionUpdate{},
-	}); err != nil {
-		procedure.CancelEventWithLog(event, err, "create partition table on succeeded")
-		return
-	}
+	})
 }
 
 func (p *Procedure) updateStateWithLock(state procedure.State) {
