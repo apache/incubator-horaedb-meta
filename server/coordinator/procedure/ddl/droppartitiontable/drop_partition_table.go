@@ -65,8 +65,8 @@ type ProcedureParams struct {
 	Dispatch        eventdispatch.Dispatch
 	Storage         procedure.Storage
 	SourceReq       *metaservicepb.DropTableRequest
-	OnSucceeded     func(result metadata.TableInfo) error
-	OnFailed        func(error) error
+	OnSucceeded     func(result metadata.TableInfo)
+	OnFailed        func(error)
 }
 
 func NewProcedure(params ProcedureParams) (*Procedure, error) {
@@ -331,8 +331,5 @@ func finishCallback(event *fsm.Event) {
 		SchemaName: request.p.params.SourceReq.GetSchemaName(),
 	}
 
-	if err = request.p.params.OnSucceeded(tableInfo); err != nil {
-		procedure.CancelEventWithLog(event, err, "drop partition table on succeeded")
-		return
-	}
+	request.p.params.OnSucceeded(tableInfo)
 }

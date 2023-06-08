@@ -135,10 +135,8 @@ func testDropPartitionTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cl
 			SchemaName:         test.TestSchemaName,
 			Name:               tableName,
 			PartitionTableInfo: &metaservicepb.PartitionTableInfo{SubTableNames: subTableNames},
-		}, OnSucceeded: func(_ metadata.TableInfo) error {
-			return nil
-		}, OnFailed: func(_ error) error {
-			return nil
+		}, OnSucceeded: func(_ metadata.TableInfo) {
+		}, OnFailed: func(_ error) {
 		}, Storage: s,
 	}
 

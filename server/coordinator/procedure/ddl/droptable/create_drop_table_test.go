@@ -122,11 +122,9 @@ func testDropTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.Clu
 			SchemaName: test.TestSchemaName,
 			Name:       tableName,
 		},
-		OnSucceeded: func(_ metadata.TableInfo) error {
-			return nil
+		OnSucceeded: func(_ metadata.TableInfo) {
 		},
-		OnFailed: func(_ error) error {
-			return nil
+		OnFailed: func(_ error) {
 		},
 	})
 	re.NoError(err)

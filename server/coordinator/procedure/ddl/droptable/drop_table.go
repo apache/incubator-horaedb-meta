@@ -19,31 +19,29 @@ import (
 	"go.uber.org/zap"
 )
 
+// fsm state change:
+// ┌────────┐     ┌──────────────────────┐
+// │ Begin  ├─────▶   dropTableFinished  │
+// └────────┘     └──────────────────────┘
 const (
-	eventPrepare = "EventPrepare"
-	eventFailed  = "EventFailed"
-	eventSuccess = "EventSuccess"
+	eventDropTable = "EventDropTable"
 
-	stateBegin   = "StateBegin"
-	stateWaiting = "StateWaiting"
-	stateFinish  = "StateFinish"
-	stateFailed  = "StateFailed"
+	stateBegin           = "StateBegin"
+	stateDropTableFinish = "StateDropTableFinish"
+
+	leavestateBegin = "leave_StateBegin"
 )
 
 var (
 	dropTableEvents = fsm.Events{
-		{Name: eventPrepare, Src: []string{stateBegin}, Dst: stateWaiting},
-		{Name: eventSuccess, Src: []string{stateWaiting}, Dst: stateFinish},
-		{Name: eventFailed, Src: []string{stateWaiting}, Dst: stateFailed},
+		{Name: eventDropTable, Src: []string{stateBegin}, Dst: stateDropTableFinish},
 	}
 	dropTableCallbacks = fsm.Callbacks{
-		eventPrepare: prepareCallback,
-		eventFailed:  failedCallback,
-		eventSuccess: successCallback,
+		leavestateBegin: dropTableCallback,
 	}
 )
 
-func prepareCallback(event *fsm.Event) {
+func dropTableCallback(event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -83,22 +81,6 @@ func prepareCallback(event *fsm.Event) {
 	}
 }
 
-func successCallback(event *fsm.Event) {
-	req := event.Args[0].(*callbackRequest)
-
-	if err := req.p.params.OnSucceeded(req.ret); err != nil {
-		log.Error("exec success callback failed")
-	}
-}
-
-func failedCallback(event *fsm.Event) {
-	req := event.Args[0].(*callbackRequest)
-
-	if err := req.p.params.OnFailed(event.Err); err != nil {
-		log.Error("exec failed callback failed")
-	}
-}
-
 // callbackRequest is fsm callbacks param.
 type callbackRequest struct {
 	ctx context.Context
@@ -114,8 +96,8 @@ type ProcedureParams struct {
 	ClusterSnapshot metadata.Snapshot
 
 	SourceReq   *metaservicepb.DropTableRequest
-	OnSucceeded func(metadata.TableInfo) error
-	OnFailed    func(error) error
+	OnSucceeded func(metadata.TableInfo)
+	OnFailed    func(error)
 }
 
 func NewDropTableProcedure(params ProcedureParams) (procedure.Procedure, error) {
@@ -214,21 +196,24 @@ func (p *Procedure) Start(ctx context.Context) error {
 		p:   p,
 	}
 
-	if err := p.fsm.Event(eventPrepare, req); err != nil {
-		err1 := p.fsm.Event(eventFailed, req)
-		p.updateState(procedure.StateFailed)
-		if err1 != nil {
-			err = errors.WithMessagef(err, "send eventFailed, err:%v", err1)
+	for {
+		switch p.fsm.Current() {
+		case stateBegin:
+			if err := p.fsm.Event(eventDropTable, req); err != nil {
+				p.params.OnFailed(err)
+				if _, ok := err.(fsm.CanceledError); ok {
+					p.updateState(procedure.StateCancelled)
+					return errors.WithMessage(err, "drop table canceled")
+				}
+				p.updateState(procedure.StateFailed)
+				return errors.WithMessage(err, "drop table")
+			}
+		case stateDropTableFinish:
+			p.updateState(procedure.StateFinished)
+			p.params.OnSucceeded(req.ret)
+			return nil
 		}
-		return errors.WithMessage(err, "send eventPrepare")
 	}
-
-	if err := p.fsm.Event(eventSuccess, req); err != nil {
-		return errors.WithMessage(err, "send eventSuccess")
-	}
-
-	p.updateState(procedure.StateFinished)
-	return nil
 }
 
 func (p *Procedure) Cancel(_ context.Context) error {

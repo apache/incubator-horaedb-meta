@@ -247,13 +247,11 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 	errorCh := make(chan error, 1)
 	resultCh := make(chan metadata.TableInfo, 1)
 
-	onSucceeded := func(ret metadata.TableInfo) error {
+	onSucceeded := func(ret metadata.TableInfo) {
 		resultCh <- ret
-		return nil
 	}
-	onFailed := func(err error) error {
+	onFailed := func(err error) {
 		errorCh <- err
-		return nil
 	}
 	procedure, err := c.GetProcedureFactory().CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
 		ClusterMetadata: c.GetMetadata(),

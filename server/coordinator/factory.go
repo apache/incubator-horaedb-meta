@@ -46,8 +46,8 @@ type DropTableRequest struct {
 	ClusterSnapshot metadata.Snapshot
 	SourceReq       *metaservicepb.DropTableRequest
 
-	OnSucceeded func(metadata.TableInfo) error
-	OnFailed    func(error) error
+	OnSucceeded func(metadata.TableInfo)
+	OnFailed    func(error)
 }
 
 func (d DropTableRequest) IsPartitionTable() bool {
