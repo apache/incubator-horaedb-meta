@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
-	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
@@ -21,30 +20,29 @@ import (
 )
 
 // fsm state change:
-// ┌────────┐     ┌────────────────┐     ┌────────────────────┐      ┌───────────┐
-// │ Begin  ├─────▶  DropDataTable ├─────▶ DropPartitionTable ├──────▶  Finish   │
-// └────────┘     └────────────────┘     └────────────────────┘      └───────────┘
+// ┌────────┐     ┌────────────────────────┐     ┌────────────────────────────┐
+// │ Begin  ├─────▶  DropDataTableFinished ├─────▶ DropPartitionTableFinished │
+// └────────┘     └────────────────────────┘     └────────────────────────────┘
 const (
 	eventDropDataTable      = "EventDropDataTable"
 	eventDropPartitionTable = "EventDropPartitionTable"
-	eventFinish             = "EventFinish"
 
-	stateBegin              = "StateBegin"
-	stateDropDataTable      = "StateDropDataTable"
-	stateDropPartitionTable = "StateDropPartitionTable"
-	stateFinish             = "StateFinish"
+	stateBegin                      = "StateBegin"
+	stateDropDataTableFinished      = "StateDropDataTableFinished"
+	stateDropPartitionTableFinished = "StateDropPartitionTableFinished"
+
+	leaveStateBegin                 = "leave_StateBegin"
+	leaveStateDropDataTableFinished = "leave_StateDropDataTableFinished"
 )
 
 var (
 	createDropPartitionTableEvents = fsm.Events{
-		{Name: eventDropDataTable, Src: []string{stateBegin}, Dst: stateDropDataTable},
-		{Name: eventDropPartitionTable, Src: []string{stateDropDataTable}, Dst: stateDropPartitionTable},
-		{Name: eventFinish, Src: []string{stateDropPartitionTable}, Dst: stateFinish},
+		{Name: eventDropDataTable, Src: []string{stateBegin}, Dst: stateDropDataTableFinished},
+		{Name: eventDropPartitionTable, Src: []string{stateDropDataTableFinished}, Dst: stateDropPartitionTableFinished},
 	}
 	createDropPartitionTableCallbacks = fsm.Callbacks{
-		eventDropDataTable:      dropDataTablesCallback,
-		eventDropPartitionTable: dropPartitionTableCallback,
-		eventFinish:             finishCallback,
+		leaveStateBegin:                 dropDataTablesCallback,
+		leaveStateDropDataTableFinished: dropPartitionTableCallback,
 	}
 )
 
@@ -150,33 +148,44 @@ func (p *Procedure) Start(ctx context.Context) error {
 		switch p.fsm.Current() {
 		case stateBegin:
 			if err := p.persist(ctx); err != nil {
+				p.params.OnFailed(err)
 				return errors.WithMessage(err, "drop partition table procedure persist")
 			}
 			if err := p.fsm.Event(eventDropDataTable, dropPartitionTableRequest); err != nil {
+				p.params.OnFailed(err)
+				if _, ok := err.(fsm.CanceledError); ok {
+					p.updateStateWithLock(procedure.StateCancelled)
+					return errors.WithMessage(err, "drop partition table procedure canceled")
+				}
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "drop partition table procedure")
 			}
-		case stateDropDataTable:
+		case stateDropDataTableFinished:
 			if err := p.persist(ctx); err != nil {
+				p.params.OnFailed(err)
 				return errors.WithMessage(err, "drop partition table procedure persist")
 			}
 			if err := p.fsm.Event(eventDropPartitionTable, dropPartitionTableRequest); err != nil {
+				p.params.OnFailed(err)
+				if _, ok := err.(fsm.CanceledError); ok {
+					p.updateStateWithLock(procedure.StateCancelled)
+					return errors.WithMessage(err, "drop partition table procedure drop data table canceled")
+				}
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "drop partition table procedure drop data table")
 			}
-		case stateDropPartitionTable:
+		case stateDropPartitionTableFinished:
 			if err := p.persist(ctx); err != nil {
+				p.params.OnFailed(err)
 				return errors.WithMessage(err, "drop partition table procedure persist")
 			}
-			if err := p.fsm.Event(eventFinish, dropPartitionTableRequest); err != nil {
-				p.updateStateWithLock(procedure.StateFailed)
-				return errors.WithMessage(err, "drop partition table procedure drop partition table")
-			}
-		case stateFinish:
 			p.updateStateWithLock(procedure.StateFinished)
-			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "drop partition table procedure persist")
-			}
+			p.params.OnSucceeded(metadata.TableInfo{
+				ID:         dropPartitionTableRequest.table.ID,
+				Name:       dropPartitionTableRequest.table.Name,
+				SchemaID:   dropPartitionTableRequest.table.SchemaID,
+				SchemaName: p.params.SourceReq.GetSchemaName(),
+			})
 			return nil
 		}
 	}
@@ -314,22 +323,4 @@ func dropPartitionTableCallback(event *fsm.Event) {
 	}
 
 	req.table = dropTableMetadataResult.Table
-}
-
-func finishCallback(event *fsm.Event) {
-	request, err := procedure.GetRequestFromEvent[*callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-	log.Info("drop partition table finish")
-
-	tableInfo := metadata.TableInfo{
-		ID:         request.table.ID,
-		Name:       request.table.Name,
-		SchemaID:   request.table.SchemaID,
-		SchemaName: request.p.params.SourceReq.GetSchemaName(),
-	}
-
-	request.p.params.OnSucceeded(tableInfo)
 }
