@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
-	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
@@ -17,34 +16,32 @@ import (
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/looplab/fsm"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 )
 
 // fsm state change:
-// ┌────────┐     ┌──────────────────────┐     ┌────────────────────┐     ┌───────────┐
-// │ Begin  ├─────▶ CreatePartitionTable ├─────▶  CreateDataTables  ├──────▶  Finish  │
-// └────────┘     └──────────────────────┘     └────────────────────┘     └───────────┘
+// ┌────────┐     ┌──────────────────────────────┐     ┌────────────────────────────┐
+// │ Begin  ├─────▶ CreatePartitionTableFinished ├─────▶  CreateDataTablesFinished  │
+// └────────┘     └──────────────────────────────┘     └────────────────────────────┘
 const (
 	eventCreatePartitionTable = "EventCreatePartitionTable"
 	eventCreateSubTables      = "EventCreateSubTables"
-	eventFinish               = "EventFinish"
 
-	stateBegin                = "StateBegin"
-	stateCreatePartitionTable = "StateCreatePartitionTable"
-	stateCreateSubTables      = "StateCreateSubTables"
-	stateFinish               = "StateFinish"
+	stateBegin                        = "StateBegin"
+	stateCreatePartitionTableFinished = "StateCreatePartitionTableFinished"
+	stateCreateSubTablesFinished      = "StateCreateSubTablesFinished"
+
+	leaveStateBegin                        = "leave_StateBegin"
+	leaveStateCreatePartitionTableFinished = "leave_StateCreatePartitionTableFinished"
 )
 
 var (
 	createPartitionTableEvents = fsm.Events{
-		{Name: eventCreatePartitionTable, Src: []string{stateBegin}, Dst: stateCreatePartitionTable},
-		{Name: eventCreateSubTables, Src: []string{stateCreatePartitionTable}, Dst: stateCreateSubTables},
-		{Name: eventFinish, Src: []string{stateCreateSubTables}, Dst: stateFinish},
+		{Name: eventCreatePartitionTable, Src: []string{stateBegin}, Dst: stateCreatePartitionTableFinished},
+		{Name: eventCreateSubTables, Src: []string{stateCreatePartitionTableFinished}, Dst: stateCreateSubTablesFinished},
 	}
 	createPartitionTableCallbacks = fsm.Callbacks{
-		eventCreatePartitionTable: createPartitionTableCallback,
-		eventCreateSubTables:      createDataTablesCallback,
-		eventFinish:               finishCallback,
+		leaveStateBegin:                        createPartitionTableCallback,
+		leaveStateCreatePartitionTableFinished: createDataTablesCallback,
 	}
 )
 
@@ -135,34 +132,42 @@ func (p *Procedure) Start(ctx context.Context) error {
 		switch p.fsm.Current() {
 		case stateBegin:
 			if err := p.persist(ctx); err != nil {
+				p.params.OnFailed(err)
 				return errors.WithMessage(err, "persist create partition table procedure")
 			}
 			if err := p.fsm.Event(eventCreatePartitionTable, createPartitionTableRequest); err != nil {
+				p.params.OnFailed(err)
+				if _, ok := err.(fsm.CanceledError); ok {
+					p.updateStateWithLock(procedure.StateCancelled)
+					return errors.WithMessage(err, "create partition table canceled")
+				}
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "create partition table")
 			}
-		case stateCreatePartitionTable:
+		case stateCreatePartitionTableFinished:
 			if err := p.persist(ctx); err != nil {
+				p.params.OnFailed(err)
 				return errors.WithMessage(err, "persist create partition table procedure")
 			}
 			if err := p.fsm.Event(eventCreateSubTables, createPartitionTableRequest); err != nil {
+				p.params.OnFailed(err)
+				if _, ok := err.(fsm.CanceledError); ok {
+					p.updateStateWithLock(procedure.StateCancelled)
+					return errors.WithMessage(err, "create data tables canceled")
+				}
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "create data tables")
 			}
-		case stateCreateSubTables:
+		case stateCreateSubTablesFinished:
 			if err := p.persist(ctx); err != nil {
+				p.params.OnFailed(err)
 				return errors.WithMessage(err, "persist create partition table procedure")
 			}
-			if err := p.fsm.Event(eventFinish, createPartitionTableRequest); err != nil {
-				p.updateStateWithLock(procedure.StateFailed)
-				return errors.WithMessage(err, "update table shard metadata")
-			}
-		case stateFinish:
-			// TODO: The state update sequence here is inconsistent with the previous one. Consider reconstructing the state update logic of the state machine.
 			p.updateStateWithLock(procedure.StateFinished)
-			if err := p.persist(ctx); err != nil {
-				return errors.WithMessage(err, "create partition table procedure persist")
-			}
+			p.params.OnSucceeded(metadata.CreateTableResult{
+				Table:              p.createPartitionTableResult.Table,
+				ShardVersionUpdate: metadata.ShardVersionUpdate{},
+			})
 			return nil
 		}
 	}
@@ -279,20 +284,6 @@ func createDataTables(req *callbackRequest, shardID storage.ShardID, tableMetaDa
 		shardVersion++
 	}
 	succeedCh <- true
-}
-
-func finishCallback(event *fsm.Event) {
-	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-	log.Info("create partition table finish", zap.String("tableName", req.p.params.SourceReq.GetName()))
-
-	req.p.params.OnSucceeded(metadata.CreateTableResult{
-		Table:              req.p.createPartitionTableResult.Table,
-		ShardVersionUpdate: metadata.ShardVersionUpdate{},
-	})
 }
 
 func (p *Procedure) updateStateWithLock(state procedure.State) {

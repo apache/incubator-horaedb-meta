@@ -26,18 +26,18 @@ import (
 const (
 	eventDropTable = "EventDropTable"
 
-	stateBegin           = "StateBegin"
-	stateDropTableFinish = "StateDropTableFinish"
+	stateBegin             = "StateBegin"
+	stateDropTableFinished = "StateDropTableFinished"
 
-	leavestateBegin = "leave_StateBegin"
+	leaveStateBegin = "leave_StateBegin"
 )
 
 var (
 	dropTableEvents = fsm.Events{
-		{Name: eventDropTable, Src: []string{stateBegin}, Dst: stateDropTableFinish},
+		{Name: eventDropTable, Src: []string{stateBegin}, Dst: stateDropTableFinished},
 	}
 	dropTableCallbacks = fsm.Callbacks{
-		leavestateBegin: dropTableCallback,
+		leaveStateBegin: dropTableCallback,
 	}
 )
 
@@ -208,7 +208,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 				p.updateState(procedure.StateFailed)
 				return errors.WithMessage(err, "drop table")
 			}
-		case stateDropTableFinish:
+		case stateDropTableFinished:
 			p.updateState(procedure.StateFinished)
 			p.params.OnSucceeded(req.ret)
 			return nil
