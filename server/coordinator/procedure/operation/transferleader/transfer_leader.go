@@ -247,7 +247,7 @@ func closeOldLeaderCallback(event *fsm.Event) {
 		return
 	}
 
-	log.Info("try to close shard", zap.Uint64("shardID", req.p.params.ID), zap.String("oldLeader", req.p.params.OldLeaderNodeName), zap.Uint64("procedureID", req.p.ID()))
+	log.Info("try to close shard", zap.Uint64("procedureID", req.p.ID()), zap.Uint64("shardID", req.p.params.ID), zap.String("oldLeader", req.p.params.OldLeaderNodeName))
 
 	closeShardRequest := eventdispatch.CloseShardRequest{
 		ShardID: uint32(req.p.params.ShardID),
@@ -257,7 +257,7 @@ func closeOldLeaderCallback(event *fsm.Event) {
 		return
 	}
 
-	log.Info("close shard finish", zap.Uint64("shardID", req.p.params.ID), zap.String("oldLeader", req.p.params.OldLeaderNodeName), zap.Uint64("procedureID", req.p.ID()))
+	log.Info("close shard finish", zap.Uint64("procedureID", req.p.ID()), zap.Uint64("shardID", req.p.params.ID), zap.String("oldLeader", req.p.params.OldLeaderNodeName))
 }
 
 func openNewShardCallback(event *fsm.Event) {
@@ -279,14 +279,14 @@ func openNewShardCallback(event *fsm.Event) {
 		Shard: metadata.ShardInfo{ID: req.p.params.ShardID, Role: storage.ShardRoleLeader, Version: preVersion + 1},
 	}
 
-	log.Info("try to open shard", zap.Uint64("shardID", req.p.params.ID), zap.String("newLeader", req.p.params.NewLeaderNodeName), zap.Uint64("procedureID", req.p.ID()))
+	log.Info("try to open shard", zap.Uint64("procedureID", req.p.ID()), zap.Uint64("shardID", req.p.params.ID), zap.String("newLeader", req.p.params.NewLeaderNodeName))
 
 	if err := req.p.params.Dispatch.OpenShard(ctx, req.p.params.NewLeaderNodeName, openShardRequest); err != nil {
 		procedure.CancelEventWithLog(event, err, "open shard", zap.Uint32("shardID", uint32(req.p.params.ShardID)), zap.String("newLeaderNode", req.p.params.NewLeaderNodeName))
 		return
 	}
 
-	log.Info("open shard finish", zap.Uint64("shardID", req.p.params.ID), zap.String("newLeader", req.p.params.NewLeaderNodeName), zap.Uint64("procedureID", req.p.ID()))
+	log.Info("open shard finish", zap.Uint64("procedureID", req.p.ID()), zap.Uint64("shardID", req.p.params.ID), zap.String("newLeader", req.p.params.NewLeaderNodeName))
 }
 
 func finishCallback(event *fsm.Event) {
@@ -296,7 +296,7 @@ func finishCallback(event *fsm.Event) {
 		return
 	}
 
-	log.Info("transfer leader finish", zap.Uint32("shardID", uint32(req.p.params.ShardID)), zap.String("oldLeaderNode", req.p.params.OldLeaderNodeName), zap.String("newLeaderNode", req.p.params.NewLeaderNodeName), zap.Uint64("procedureID", req.p.ID()))
+	log.Info("transfer leader finish", zap.Uint64("procedureID", req.p.ID()), zap.Uint32("shardID", uint32(req.p.params.ShardID)), zap.String("oldLeaderNode", req.p.params.OldLeaderNodeName), zap.String("newLeaderNode", req.p.params.NewLeaderNodeName))
 }
 
 func (p *Procedure) updateStateWithLock(state procedure.State) {

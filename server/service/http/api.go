@@ -171,7 +171,7 @@ func (a *API) getLeaderAddr(writer http.ResponseWriter, req *http.Request) {
 	a.respond(writer, leaderAddr)
 }
 
-type GetShardTables struct {
+type GetShardTablesRequest struct {
 	ClusterName string   `json:"clusterName"`
 	ShardIDs    []uint32 `json:"shardIDs"`
 }
@@ -189,25 +189,26 @@ func (a *API) getShardTables(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var getShardTables GetShardTables
-	err = json.NewDecoder(req.Body).Decode(&getShardTables)
+	var getShardTablesReq GetShardTablesRequest
+	err = json.NewDecoder(req.Body).Decode(&getShardTablesReq)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
 		a.respondError(writer, ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
 		return
 	}
-	log.Info("get shard tables request", zap.String("request", fmt.Sprintf("%+v", getShardTables)))
+	log.Info("get shard tables request", zap.String("request", fmt.Sprintf("%+v", getShardTablesReq)))
 
-	c, err := a.clusterManager.GetCluster(req.Context(), getShardTables.ClusterName)
+	c, err := a.clusterManager.GetCluster(req.Context(), getShardTablesReq.ClusterName)
 	if err != nil {
-		log.Error("get cluster failed", zap.String("clusterName", getShardTables.ClusterName), zap.Error(err))
-		a.respondError(writer, ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", getShardTables.ClusterName, err.Error()))
+		log.Error("get cluster failed", zap.String("clusterName", getShardTablesReq.ClusterName), zap.Error(err))
+		a.respondError(writer, ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", getShardTablesReq.ClusterName, err.Error()))
 		return
 	}
 
-	shardIDs := make([]storage.ShardID, len(getShardTables.ShardIDs))
-	if len(getShardTables.ShardIDs) != 0 {
-		for _, shardID := range getShardTables.ShardIDs {
+	// If ShardIDs in the request is empty, query with all shardIDs in the cluster.
+	shardIDs := make([]storage.ShardID, len(getShardTablesReq.ShardIDs))
+	if len(getShardTablesReq.ShardIDs) != 0 {
+		for _, shardID := range getShardTablesReq.ShardIDs {
 			shardIDs = append(shardIDs, storage.ShardID(shardID))
 		}
 	} else {
