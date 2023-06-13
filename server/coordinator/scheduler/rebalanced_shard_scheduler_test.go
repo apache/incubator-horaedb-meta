@@ -25,16 +25,16 @@ func TestRebalancedScheduler(t *testing.T) {
 	emptyCluster := test.InitEmptyCluster(ctx, t)
 	result, err := s.Schedule(ctx, emptyCluster.GetMetadata().GetClusterSnapshot())
 	re.NoError(err)
-	re.Nil(result.Procedure)
+	re.Empty(result)
 
 	// PrepareCluster would be scheduled an empty procedure.
 	prepareCluster := test.InitPrepareCluster(ctx, t)
 	result, err = s.Schedule(ctx, prepareCluster.GetMetadata().GetClusterSnapshot())
 	re.NoError(err)
-	re.Nil(result.Procedure)
+	re.Empty(result)
 
 	// StableCluster with all shards assigned would be scheduled a load balance procedure.
 	stableCluster := test.InitStableCluster(ctx, t)
-	result, err = s.Schedule(ctx, stableCluster.GetMetadata().GetClusterSnapshot())
+	_, err = s.Schedule(ctx, stableCluster.GetMetadata().GetClusterSnapshot())
 	re.NoError(err)
 }

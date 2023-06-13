@@ -5,14 +5,12 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/storage"
-)
-
-const (
-	AssignReason = "ShardView exists in metadata but shardNode not exists, assign shard to node"
 )
 
 // AssignShardScheduler used to assigning shards without nodes.
@@ -33,6 +31,8 @@ func (a AssignShardScheduler) Schedule(ctx context.Context, clusterSnapshot meta
 		return ScheduleResult{}, nil
 	}
 
+	var procedures []procedure.Procedure
+	var reasons strings.Builder
 	// Check whether there is a shard without node mapping.
 	for _, shardView := range clusterSnapshot.Topology.ShardViewsMapping {
 		_, exists := findNodeByShard(shardView.ShardID, clusterSnapshot.Topology.ClusterView.ShardNodes)
@@ -53,12 +53,27 @@ func (a AssignShardScheduler) Schedule(ctx context.Context, clusterSnapshot meta
 		if err != nil {
 			return ScheduleResult{}, err
 		}
-		return ScheduleResult{
-			Procedure: p,
-			Reason:    fmt.Sprintf("try to assign shard:%d to node:%s ,reason:%v", shardView.ShardID, newLeaderNode.Node.Name, AssignReason),
-		}, nil
+
+		procedures = append(procedures, p)
+		reasons.WriteString(fmt.Sprintf("the shard:%d is not assigned to any node, try to assign it to node:%s", shardView.ShardID, newLeaderNode.Node.Name))
 	}
-	return ScheduleResult{}, nil
+
+	if len(procedures) == 0 {
+		return ScheduleResult{}, nil
+	}
+
+	batchProcedure, err := a.factory.CreateBatchTransferLeaderProcedure(ctx, coordinator.BatchRequest{
+		Batch:     procedures,
+		BatchType: procedure.TransferLeader,
+	})
+	if err != nil {
+		return ScheduleResult{}, err
+	}
+
+	return ScheduleResult{
+		batchProcedure,
+		reasons.String(),
+	}, nil
 }
 
 func findNodeByShard(shardID storage.ShardID, shardNodes []storage.ShardNode) (storage.ShardNode, bool) {
