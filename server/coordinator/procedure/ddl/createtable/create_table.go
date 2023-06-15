@@ -22,19 +22,29 @@ import (
 // └────────┘     └──────────────────────┘
 const (
 	eventCreateTable = "EventCreateTable"
+	eventSucceeded   = "EventSucceeded "
+	eventFailed      = "EventFailed"
 
 	stateBegin               = "StateBegin"
 	stateCreateTableFinished = "StateCreateTableFinished"
+	stateFailed              = "StateFailed"
+	stateFinished            = "StateFinished"
 
-	leaveStateBegin = "leave_StateBegin"
+	leaveStateBegin               = "leave_StateBegin"
+	enterStateCreateTableFinished = "enter_StateCreateTableFinished"
+	leaveStateFailed              = "leave_StateFailed"
 )
 
 var (
 	createTableEvents = fsm.Events{
 		{Name: eventCreateTable, Src: []string{stateBegin}, Dst: stateCreateTableFinished},
+		{Name: eventFailed, Src: []string{stateFailed}, Dst: stateFinished},
+		{Name: eventSucceeded, Src: []string{stateCreateTableFinished}, Dst: stateFinished},
 	}
 	createTableCallbacks = fsm.Callbacks{
-		leaveStateBegin: createTableCallback,
+		leaveStateBegin:               createTableCallback,
+		enterStateCreateTableFinished: succeededCallback,
+		leaveStateFailed:              failedCallback,
 	}
 )
 
@@ -42,6 +52,8 @@ func createTableCallback(event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
+		event.FSM.SetState(stateFailed)
+		_ = req.p.fsm.Event(eventFailed, req)
 		return
 	}
 	params := req.p.params
@@ -54,6 +66,8 @@ func createTableCallback(event *fsm.Event) {
 	result, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, createTableMetadataRequest)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "create table metadata")
+		event.FSM.SetState(stateFailed)
+		_ = req.p.fsm.Event(eventFailed, req)
 		return
 	}
 
@@ -66,16 +80,40 @@ func createTableCallback(event *fsm.Event) {
 	createTableRequest := ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq)
 	if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.ShardID, createTableRequest); err != nil {
 		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
+		event.FSM.SetState(stateFailed)
+		_ = req.p.fsm.Event(eventFailed, req)
 		return
 	}
 
 	createTableResult, err := params.ClusterMetadata.AddTableTopology(req.ctx, params.ShardID, result.Table)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "create table metadata")
+		event.FSM.SetState(stateFailed)
+		_ = req.p.fsm.Event(eventFailed, req)
 		return
 	}
 
 	req.createTableResult = createTableResult
+}
+
+func succeededCallback(event *fsm.Event) {
+	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
+	if err != nil {
+		procedure.CancelEventWithLog(event, err, "get request from event")
+		return
+	}
+
+	req.p.params.OnSucceeded(req.createTableResult)
+}
+
+func failedCallback(event *fsm.Event) {
+	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
+	if err != nil {
+		procedure.CancelEventWithLog(event, err, "get request from event")
+		return
+	}
+
+	req.p.params.OnFailed(event.Err)
 }
 
 // callbackRequest is fsm callbacks param.
@@ -163,24 +201,13 @@ func (p *Procedure) Start(ctx context.Context) error {
 		p:   p,
 	}
 
-	for {
-		switch p.fsm.Current() {
-		case stateBegin:
-			if err := p.fsm.Event(eventCreateTable, req); err != nil {
-				p.params.OnFailed(err)
-				if _, ok := err.(fsm.CanceledError); ok {
-					p.updateState(procedure.StateCancelled)
-					return errors.WithMessage(err, "create table canceled")
-				}
-				p.updateState(procedure.StateFailed)
-				return errors.WithMessage(err, "create table")
-			}
-		case stateCreateTableFinished:
-			p.updateState(procedure.StateFinished)
-			p.params.OnSucceeded(req.createTableResult)
-			return nil
-		}
+	if err := p.fsm.Event(eventCreateTable, req); err != nil {
+		p.updateState(procedure.StateFailed)
+		return errors.WithMessage(err, "create table")
 	}
+
+	p.updateState(procedure.StateFinished)
+	return nil
 }
 
 func (p *Procedure) Cancel(_ context.Context) error {
