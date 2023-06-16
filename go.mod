@@ -8,7 +8,7 @@ require (
 	github.com/axw/gocov v1.1.0
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/looplab/fsm v0.3.0
+	github.com/looplab/fsm v1.0.1
 	github.com/mgechev/revive v1.2.1
 	github.com/pelletier/go-toml/v2 v2.0.6
 	github.com/pkg/errors v0.9.1

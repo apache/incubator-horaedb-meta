@@ -41,7 +41,7 @@ var (
 	}
 )
 
-func dropTableCallback(event *fsm.Event) {
+func dropTableCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -199,7 +199,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 	for {
 		switch p.fsm.Current() {
 		case stateBegin:
-			if err := p.fsm.Event(eventDropTable, req); err != nil {
+			if err := p.fsm.Event(ctx, eventDropTable, req); err != nil {
 				p.params.OnFailed(err)
 				if _, ok := err.(fsm.CanceledError); ok {
 					p.updateState(procedure.StateCancelled)

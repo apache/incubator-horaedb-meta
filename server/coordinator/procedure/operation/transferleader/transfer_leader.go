@@ -181,7 +181,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
-			if err := p.fsm.Event(eventCloseOldLeader, transferLeaderRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventCloseOldLeader, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "transferLeader procedure close old leader")
 			}
@@ -189,7 +189,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
-			if err := p.fsm.Event(eventOpenNewLeader, transferLeaderRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventOpenNewLeader, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "transferLeader procedure open new leader")
 			}
@@ -197,7 +197,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "transferLeader procedure persist")
 			}
-			if err := p.fsm.Event(eventFinish, transferLeaderRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventFinish, transferLeaderRequest); err != nil {
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "transferLeader procedure finish")
 			}
@@ -235,7 +235,7 @@ func (p *Procedure) State() procedure.State {
 	return p.state
 }
 
-func closeOldLeaderCallback(event *fsm.Event) {
+func closeOldLeaderCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -256,7 +256,7 @@ func closeOldLeaderCallback(event *fsm.Event) {
 	}
 }
 
-func openNewShardCallback(event *fsm.Event) {
+func openNewShardCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -281,7 +281,7 @@ func openNewShardCallback(event *fsm.Event) {
 	}
 }
 
-func finishCallback(event *fsm.Event) {
+func finishCallback(_ context.Context, event *fsm.Event) {
 	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")

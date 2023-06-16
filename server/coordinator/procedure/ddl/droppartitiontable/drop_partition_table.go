@@ -151,7 +151,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 				p.params.OnFailed(err)
 				return errors.WithMessage(err, "drop partition table procedure persist")
 			}
-			if err := p.fsm.Event(eventDropDataTable, dropPartitionTableRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventDropDataTable, dropPartitionTableRequest); err != nil {
 				p.params.OnFailed(err)
 				if _, ok := err.(fsm.CanceledError); ok {
 					p.updateStateWithLock(procedure.StateCancelled)
@@ -165,7 +165,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 				p.params.OnFailed(err)
 				return errors.WithMessage(err, "drop partition table procedure persist")
 			}
-			if err := p.fsm.Event(eventDropPartitionTable, dropPartitionTableRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventDropPartitionTable, dropPartitionTableRequest); err != nil {
 				p.params.OnFailed(err)
 				if _, ok := err.(fsm.CanceledError); ok {
 					p.updateStateWithLock(procedure.StateCancelled)
@@ -272,7 +272,7 @@ func (d *callbackRequest) tableName() string {
 }
 
 // 1. Drop data tables in target nodes.
-func dropDataTablesCallback(event *fsm.Event) {
+func dropDataTablesCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -309,7 +309,7 @@ func dropDataTablesCallback(event *fsm.Event) {
 }
 
 // 2. Drop partition table in target node.
-func dropPartitionTableCallback(event *fsm.Event) {
+func dropPartitionTableCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")

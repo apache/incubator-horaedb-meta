@@ -181,7 +181,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "split procedure persist")
 			}
-			if err := p.fsm.Event(eventCreateNewShardView, splitCallbackRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventCreateNewShardView, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "split procedure create new shard view")
 			}
@@ -189,7 +189,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "split procedure persist")
 			}
-			if err := p.fsm.Event(eventUpdateShardTables, splitCallbackRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventUpdateShardTables, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "split procedure create new shard")
 			}
@@ -197,7 +197,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "split procedure persist")
 			}
-			if err := p.fsm.Event(eventOpenNewShard, splitCallbackRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventOpenNewShard, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "split procedure create shard tables")
 			}
@@ -205,7 +205,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 			if err := p.persist(ctx); err != nil {
 				return errors.WithMessage(err, "split procedure persist")
 			}
-			if err := p.fsm.Event(eventFinish, splitCallbackRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventFinish, splitCallbackRequest); err != nil {
 				p.updateStateWithLock(procedure.StateFailed)
 				return errors.WithMessage(err, "split procedure delete shard tables")
 			}
@@ -238,7 +238,7 @@ func (p *Procedure) updateStateWithLock(state procedure.State) {
 	p.state = state
 }
 
-func createShardViewCallback(event *fsm.Event) {
+func createShardViewCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -254,7 +254,7 @@ func createShardViewCallback(event *fsm.Event) {
 	}
 }
 
-func updateShardTablesCallback(event *fsm.Event) {
+func updateShardTablesCallback(_ context.Context, event *fsm.Event) {
 	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -272,7 +272,7 @@ func updateShardTablesCallback(event *fsm.Event) {
 	}
 }
 
-func openShardCallback(event *fsm.Event) {
+func openShardCallback(_ context.Context, event *fsm.Event) {
 	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -293,7 +293,7 @@ func openShardCallback(event *fsm.Event) {
 	}
 }
 
-func finishCallback(event *fsm.Event) {
+func finishCallback(_ context.Context, event *fsm.Event) {
 	request, err := procedure.GetRequestFromEvent[callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")

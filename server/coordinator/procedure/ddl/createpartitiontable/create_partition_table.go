@@ -135,7 +135,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 				p.params.OnFailed(err)
 				return errors.WithMessage(err, "persist create partition table procedure")
 			}
-			if err := p.fsm.Event(eventCreatePartitionTable, createPartitionTableRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventCreatePartitionTable, createPartitionTableRequest); err != nil {
 				p.params.OnFailed(err)
 				if _, ok := err.(fsm.CanceledError); ok {
 					p.updateStateWithLock(procedure.StateCancelled)
@@ -149,7 +149,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 				p.params.OnFailed(err)
 				return errors.WithMessage(err, "persist create partition table procedure")
 			}
-			if err := p.fsm.Event(eventCreateSubTables, createPartitionTableRequest); err != nil {
+			if err := p.fsm.Event(ctx, eventCreateSubTables, createPartitionTableRequest); err != nil {
 				p.params.OnFailed(err)
 				if _, ok := err.(fsm.CanceledError); ok {
 					p.updateStateWithLock(procedure.StateCancelled)
@@ -191,7 +191,7 @@ type callbackRequest struct {
 }
 
 // 1. Create partition table in target node.
-func createPartitionTableCallback(event *fsm.Event) {
+func createPartitionTableCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")
@@ -212,7 +212,7 @@ func createPartitionTableCallback(event *fsm.Event) {
 }
 
 // 2. Create data tables in target nodes.
-func createDataTablesCallback(event *fsm.Event) {
+func createDataTablesCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "get request from event")

@@ -23,37 +23,27 @@ import (
 const (
 	eventCreateTable = "EventCreateTable"
 	eventSucceeded   = "EventSucceeded "
-	eventFailed      = "EventFailed"
 
-	stateBegin               = "StateBegin"
-	stateCreateTableFinished = "StateCreateTableFinished"
-	stateFailed              = "StateFailed"
-	stateFinished            = "StateFinished"
-
-	leaveStateBegin               = "leave_StateBegin"
-	enterStateCreateTableFinished = "enter_StateCreateTableFinished"
-	leaveStateFailed              = "leave_StateFailed"
+	stateBegin       = "StateBegin"
+	stateCreateTable = "StateCreateTable"
+	stateFinished    = "StateFinished"
 )
 
 var (
 	createTableEvents = fsm.Events{
-		{Name: eventCreateTable, Src: []string{stateBegin}, Dst: stateCreateTableFinished},
-		{Name: eventFailed, Src: []string{stateFailed}, Dst: stateFinished},
-		{Name: eventSucceeded, Src: []string{stateCreateTableFinished}, Dst: stateFinished},
+		{Name: eventCreateTable, Src: []string{stateBegin}, Dst: stateCreateTable},
+		{Name: eventSucceeded, Src: []string{stateCreateTable}, Dst: stateFinished},
 	}
 	createTableCallbacks = fsm.Callbacks{
-		leaveStateBegin:               createTableCallback,
-		enterStateCreateTableFinished: succeededCallback,
-		leaveStateFailed:              failedCallback,
+		eventCreateTable: createTableCallback,
+		eventSucceeded:   succeededCallback,
 	}
 )
 
-func createTableCallback(event *fsm.Event) {
+func createTableCallback(ctx context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		event.FSM.SetState(stateFailed)
-		_ = req.p.fsm.Event(eventFailed, req)
+		procedure.CancelEventWithLog(event, procedure.FSMError{Err: err}, "get request from event")
 		return
 	}
 	params := req.p.params
@@ -65,9 +55,7 @@ func createTableCallback(event *fsm.Event) {
 	}
 	result, err := params.ClusterMetadata.CreateTableMetadata(req.ctx, createTableMetadataRequest)
 	if err != nil {
-		procedure.CancelEventWithLog(event, err, "create table metadata")
-		event.FSM.SetState(stateFailed)
-		_ = req.p.fsm.Event(eventFailed, req)
+		procedure.CancelEventWithLog(event, procedure.FSMError{Err: err}, "create table metadata")
 		return
 	}
 
@@ -79,41 +67,32 @@ func createTableCallback(event *fsm.Event) {
 
 	createTableRequest := ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq)
 	if err = ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.ShardID, createTableRequest); err != nil {
-		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
-		event.FSM.SetState(stateFailed)
-		_ = req.p.fsm.Event(eventFailed, req)
+		procedure.CancelEventWithLog(event, procedure.FSMError{Err: err}, "dispatch create table on shard")
 		return
 	}
 
 	createTableResult, err := params.ClusterMetadata.AddTableTopology(req.ctx, params.ShardID, result.Table)
 	if err != nil {
-		procedure.CancelEventWithLog(event, err, "create table metadata")
-		event.FSM.SetState(stateFailed)
-		_ = req.p.fsm.Event(eventFailed, req)
+		procedure.CancelEventWithLog(event, procedure.FSMError{Err: err}, "create table metadata")
 		return
 	}
 
 	req.createTableResult = createTableResult
+
+	err = req.p.fsm.Event(ctx, eventSucceeded, req)
+	if err != nil {
+		procedure.CancelEventWithLog(event, err, "create table metadata")
+	}
 }
 
-func succeededCallback(event *fsm.Event) {
+func succeededCallback(_ context.Context, event *fsm.Event) {
 	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
 	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
+		procedure.CancelEventWithLog(event, procedure.FSMError{Err: err}, "get request from event")
 		return
 	}
 
 	req.p.params.OnSucceeded(req.createTableResult)
-}
-
-func failedCallback(event *fsm.Event) {
-	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-
-	req.p.params.OnFailed(event.Err)
 }
 
 // callbackRequest is fsm callbacks param.
@@ -201,13 +180,22 @@ func (p *Procedure) Start(ctx context.Context) error {
 		p:   p,
 	}
 
-	if err := p.fsm.Event(eventCreateTable, req); err != nil {
-		p.updateState(procedure.StateFailed)
-		return errors.WithMessage(err, "create table")
+	retrySize := 3
+	var err error
+	for i := 0; i < retrySize; i++ {
+		err = p.fsm.Event(ctx, p.fsm.AvailableTransitions()[0], req)
+		if err == nil {
+			p.updateState(procedure.StateFinished)
+			return nil
+		}
+		if _, ok := err.(procedure.FSMError); !ok {
+			break
+		}
 	}
 
-	p.updateState(procedure.StateFinished)
-	return nil
+	p.params.OnFailed(err)
+	p.updateState(procedure.StateFailed)
+	return errors.WithMessage(err, "create table")
 }
 
 func (p *Procedure) Cancel(_ context.Context) error {

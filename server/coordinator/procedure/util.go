@@ -9,6 +9,14 @@ import (
 	"go.uber.org/zap"
 )
 
+type FSMError struct {
+	Err error
+}
+
+func (e FSMError) Error() string {
+	return e.Err.Error()
+}
+
 // CancelEventWithLog Cancel event when error is not nil. If error is nil, do nothing.
 func CancelEventWithLog(event *fsm.Event, err error, msg string, fields ...zap.Field) {
 	if err == nil {
@@ -16,6 +24,10 @@ func CancelEventWithLog(event *fsm.Event, err error, msg string, fields ...zap.F
 	}
 	fields = append(fields, zap.Error(err))
 	log.Error(msg, fields...)
+	if err, ok := err.(FSMError); ok {
+		event.Cancel(FSMError{errors.WithMessage(err.Err, msg)})
+		return
+	}
 	event.Cancel(errors.WithMessage(err, msg))
 }
 
