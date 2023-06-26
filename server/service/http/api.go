@@ -571,7 +571,7 @@ func (a *API) getFlowLimiter(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	limiter := a.flowLimiter.GetLimiter()
+	limiter := a.flowLimiter.GetConfig()
 	a.respond(writer, limiter)
 }
 

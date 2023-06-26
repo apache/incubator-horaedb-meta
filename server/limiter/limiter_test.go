@@ -44,7 +44,7 @@ func TestFlowLimiter(t *testing.T) {
 	})
 	re.NoError(err)
 
-	limiter := flowLimiter.GetLimiter()
+	limiter := flowLimiter.GetConfig()
 	re.Equal(defaultUpdateLimiterRate, limiter.Limit)
 	re.Equal(defaultUpdateLimiterCapacity, limiter.Burst)
 	re.Equal(defaultEnableLimiter, limiter.Enable)

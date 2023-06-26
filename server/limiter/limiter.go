@@ -51,7 +51,7 @@ func (f *FlowLimiter) UpdateLimiter(config config.LimiterConfig) error {
 	return nil
 }
 
-func (f *FlowLimiter) GetLimiter() *config.LimiterConfig {
+func (f *FlowLimiter) GetConfig() *config.LimiterConfig {
 	return &config.LimiterConfig{
 		Limit:  f.limit,
 		Burst:  f.burst,
