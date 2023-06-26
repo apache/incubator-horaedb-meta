@@ -61,7 +61,7 @@ func prepareCallback(event *fsm.Event) {
 		return
 	}
 
-	log.Info("create table metadata finish", zap.String("tableName", createTableMetadataRequest.TableName))
+	log.Debug("create table metadata finish", zap.String("tableName", createTableMetadataRequest.TableName))
 
 	shardVersionUpdate := metadata.ShardVersionUpdate{
 		ShardID:     params.ShardID,
@@ -75,7 +75,7 @@ func prepareCallback(event *fsm.Event) {
 		return
 	}
 
-	log.Info("create table on shard finish", zap.String("tableName", createTableMetadataRequest.TableName))
+	log.Debug("create table on shard finish", zap.String("tableName", createTableMetadataRequest.TableName))
 
 	createTableResult, err := params.ClusterMetadata.AddTableTopology(req.ctx, params.ShardID, result.Table)
 	if err != nil {
@@ -83,7 +83,7 @@ func prepareCallback(event *fsm.Event) {
 		return
 	}
 
-	log.Info("addTable topology finish", zap.String("tableName", createTableMetadataRequest.TableName))
+	log.Debug("addTable topology finish", zap.String("tableName", createTableMetadataRequest.TableName))
 
 	req.createTableResult = createTableResult
 }
