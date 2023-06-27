@@ -53,34 +53,23 @@ func (m mockProcedure) Priority() procedure.Priority {
 
 func TestBatchProcedure(t *testing.T) {
 	re := require.New(t)
-
 	var procedures []procedure.Procedure
 
 	// Procedures with same type and version.
 	for i := 0; i < 3; i++ {
 		shardWithVersion := map[storage.ShardID]uint64{}
 		shardWithVersion[storage.ShardID(i)] = 0
-		p := mockProcedure{
-			ClusterID:        0,
-			clusterVersion:   0,
-			typ:              0,
-			ShardWithVersion: shardWithVersion,
-		}
+		p := CreateMockProcedure(storage.ClusterID(0), 0, 0, shardWithVersion)
 		procedures = append(procedures, p)
 	}
 	_, err := transferleader.NewBatchTransferLeaderProcedure(0, procedures)
 	re.NoError(err)
 
-	// Procedure with different clusterID
+	// Procedure with different clusterID.
 	for i := 0; i < 3; i++ {
 		shardWithVersion := map[storage.ShardID]uint64{}
 		shardWithVersion[storage.ShardID(i)] = 0
-		p := mockProcedure{
-			ClusterID:        storage.ClusterID(i),
-			clusterVersion:   0,
-			typ:              procedure.TransferLeader,
-			ShardWithVersion: shardWithVersion,
-		}
+		p := CreateMockProcedure(storage.ClusterID(i), 0, procedure.TransferLeader, shardWithVersion)
 		procedures = append(procedures, p)
 	}
 	_, err = transferleader.NewBatchTransferLeaderProcedure(0, procedures)
@@ -90,12 +79,7 @@ func TestBatchProcedure(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		shardWithVersion := map[storage.ShardID]uint64{}
 		shardWithVersion[storage.ShardID(i)] = 0
-		p := mockProcedure{
-			ClusterID:        0,
-			clusterVersion:   0,
-			typ:              procedure.Typ(i),
-			ShardWithVersion: shardWithVersion,
-		}
+		p := CreateMockProcedure(0, 0, procedure.Typ(i), shardWithVersion)
 		procedures = append(procedures, p)
 	}
 	_, err = transferleader.NewBatchTransferLeaderProcedure(0, procedures)
@@ -105,14 +89,18 @@ func TestBatchProcedure(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		shardWithVersion := map[storage.ShardID]uint64{}
 		shardWithVersion[storage.ShardID(0)] = uint64(i)
-		p := mockProcedure{
-			ClusterID:        0,
-			clusterVersion:   0,
-			typ:              procedure.Typ(i),
-			ShardWithVersion: shardWithVersion,
-		}
+		p := CreateMockProcedure(0, 0, procedure.Typ(i), shardWithVersion)
 		procedures = append(procedures, p)
 	}
 	_, err = transferleader.NewBatchTransferLeaderProcedure(0, procedures)
 	re.Error(err)
+}
+
+func CreateMockProcedure(clusterID storage.ClusterID, clusterVersion uint64, typ procedure.Typ, shardWithVersion map[storage.ShardID]uint64) procedure.Procedure {
+	return mockProcedure{
+		ClusterID:        clusterID,
+		clusterVersion:   clusterVersion,
+		typ:              typ,
+		ShardWithVersion: shardWithVersion,
+	}
 }

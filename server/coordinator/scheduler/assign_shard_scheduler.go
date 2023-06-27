@@ -15,14 +15,16 @@ import (
 
 // AssignShardScheduler used to assigning shards without nodes.
 type AssignShardScheduler struct {
-	factory    *coordinator.Factory
-	nodePicker coordinator.NodePicker
+	factory                     *coordinator.Factory
+	nodePicker                  coordinator.NodePicker
+	procedureExecutingBatchSize uint32
 }
 
-func NewAssignShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker) Scheduler {
+func NewAssignShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker, procedureExecutingBatchSize uint32) Scheduler {
 	return &AssignShardScheduler{
-		factory:    factory,
-		nodePicker: nodePicker,
+		factory:                     factory,
+		nodePicker:                  nodePicker,
+		procedureExecutingBatchSize: procedureExecutingBatchSize,
 	}
 }
 
@@ -55,7 +57,10 @@ func (a AssignShardScheduler) Schedule(ctx context.Context, clusterSnapshot meta
 		}
 
 		procedures = append(procedures, p)
-		reasons.WriteString(fmt.Sprintf("the shard:%d is not assigned to any node, try to assign it to node:%s", shardView.ShardID, newLeaderNode.Node.Name))
+		reasons.WriteString(fmt.Sprintf("the shard is not assigned to any node, try to assign it to node, shardID:%d, node:%s.", shardView.ShardID, newLeaderNode.Node.Name))
+		if len(procedures) >= int(a.procedureExecutingBatchSize) {
+			break
+		}
 	}
 
 	if len(procedures) == 0 {

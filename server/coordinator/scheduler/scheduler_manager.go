@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	schedulerInterval   = time.Second * 5
+	schedulerInterval   = time.Second * 15
 	defaultHashReplicas = 50
 )
 
@@ -52,15 +52,16 @@ type ManagerImpl struct {
 	rootPath         string
 
 	// This lock is used to protect the following field.
-	lock               sync.RWMutex
-	registerSchedulers []Scheduler
-	shardWatch         watch.ShardWatch
-	isRunning          atomic.Bool
-	enableSchedule     bool
-	topologyType       storage.TopologyType
+	lock                        sync.RWMutex
+	registerSchedulers          []Scheduler
+	shardWatch                  watch.ShardWatch
+	isRunning                   atomic.Bool
+	enableSchedule              bool
+	topologyType                storage.TopologyType
+	procedureExecutingBatchSize uint32
 }
 
-func NewManager(logger *zap.Logger, procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType storage.TopologyType) Manager {
+func NewManager(logger *zap.Logger, procedureManager procedure.Manager, factory *coordinator.Factory, clusterMetadata *metadata.ClusterMetadata, client *clientv3.Client, rootPath string, enableSchedule bool, topologyType storage.TopologyType, procedureExecutingBatchSize uint32) Manager {
 	var shardWatch watch.ShardWatch
 	switch topologyType {
 	case storage.TopologyTypeDynamic:
@@ -71,17 +72,18 @@ func NewManager(logger *zap.Logger, procedureManager procedure.Manager, factory 
 	}
 
 	return &ManagerImpl{
-		procedureManager:   procedureManager,
-		registerSchedulers: []Scheduler{},
-		factory:            factory,
-		nodePicker:         coordinator.NewConsistentHashNodePicker(logger, defaultHashReplicas),
-		clusterMetadata:    clusterMetadata,
-		client:             client,
-		shardWatch:         shardWatch,
-		rootPath:           rootPath,
-		enableSchedule:     enableSchedule,
-		topologyType:       topologyType,
-		logger:             logger,
+		procedureManager:            procedureManager,
+		registerSchedulers:          []Scheduler{},
+		factory:                     factory,
+		nodePicker:                  coordinator.NewConsistentHashNodePicker(logger, defaultHashReplicas),
+		clusterMetadata:             clusterMetadata,
+		client:                      client,
+		shardWatch:                  shardWatch,
+		rootPath:                    rootPath,
+		enableSchedule:              enableSchedule,
+		topologyType:                topologyType,
+		procedureExecutingBatchSize: procedureExecutingBatchSize,
+		logger:                      logger,
 	}
 }
 
@@ -189,13 +191,13 @@ func (m *ManagerImpl) initRegister() {
 }
 
 func (m *ManagerImpl) createStaticTopologySchedulers() []Scheduler {
-	staticTopologyShardScheduler := NewStaticTopologyShardScheduler(m.factory, m.nodePicker)
+	staticTopologyShardScheduler := NewStaticTopologyShardScheduler(m.factory, m.nodePicker, m.procedureExecutingBatchSize)
 	return []Scheduler{staticTopologyShardScheduler}
 }
 
 func (m *ManagerImpl) createDynamicTopologySchedulers() []Scheduler {
-	assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker)
-	rebalancedShardScheduler := NewRebalancedShardScheduler(m.logger, m.factory, m.nodePicker)
+	assignShardScheduler := NewAssignShardScheduler(m.factory, m.nodePicker, m.procedureExecutingBatchSize)
+	rebalancedShardScheduler := NewRebalancedShardScheduler(m.logger, m.factory, m.nodePicker, m.procedureExecutingBatchSize)
 	return []Scheduler{assignShardScheduler, rebalancedShardScheduler}
 }
 
@@ -213,16 +215,16 @@ func (m *ManagerImpl) ListScheduler() []Scheduler {
 
 func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot metadata.Snapshot) []ScheduleResult {
 	// TODO: Every scheduler should run in an independent goroutine.
-	allResults := make([]ScheduleResult, 0, len(m.registerSchedulers))
+	results := make([]ScheduleResult, 0, len(m.registerSchedulers))
 	for _, scheduler := range m.registerSchedulers {
 		result, err := scheduler.Schedule(ctx, clusterSnapshot)
 		if err != nil {
 			m.logger.Error("scheduler failed", zap.Error(err))
 			continue
 		}
-		allResults = append(allResults, result)
+		results = append(results, result)
 	}
-	return allResults
+	return results
 }
 
 func (m *ManagerImpl) UpdateEnableSchedule(_ context.Context, enableSchedule bool) {

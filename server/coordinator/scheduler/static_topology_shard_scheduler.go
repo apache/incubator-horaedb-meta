@@ -16,12 +16,13 @@ import (
 )
 
 type StaticTopologyShardScheduler struct {
-	factory    *coordinator.Factory
-	nodePicker coordinator.NodePicker
+	factory                     *coordinator.Factory
+	nodePicker                  coordinator.NodePicker
+	procedureExecutingBatchSize uint32
 }
 
-func NewStaticTopologyShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker) Scheduler {
-	return &StaticTopologyShardScheduler{factory: factory, nodePicker: nodePicker}
+func NewStaticTopologyShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker, procedureExecutingBatchSize uint32) Scheduler {
+	return &StaticTopologyShardScheduler{factory: factory, nodePicker: nodePicker, procedureExecutingBatchSize: procedureExecutingBatchSize}
 }
 
 func (s *StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnapshot metadata.Snapshot) (ScheduleResult, error) {
@@ -53,7 +54,10 @@ func (s *StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnap
 				return ScheduleResult{}, err
 			}
 			procedures = append(procedures, p)
-			reasons.WriteString(fmt.Sprintf("Cluster initialization, shard:%d is assigned to node:%s \n", shardView.ShardID, newLeaderNode.Node.Name))
+			reasons.WriteString(fmt.Sprintf("Cluster initialization, assign shard to node, shardID:%d, nodeName:%s. ", shardView.ShardID, newLeaderNode.Node.Name))
+			if len(procedures) >= int(s.procedureExecutingBatchSize) {
+				break
+			}
 		}
 	case storage.ClusterStateStable:
 		for i := 0; i < len(clusterSnapshot.Topology.ClusterView.ShardNodes); i++ {
@@ -74,7 +78,10 @@ func (s *StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnap
 					return ScheduleResult{}, err
 				}
 				procedures = append(procedures, p)
-				reasons.WriteString(fmt.Sprintf("Cluster initialization, shard:%d is assigned to node:%s \n", shardNode.ID, node.Node.Name))
+				reasons.WriteString(fmt.Sprintf("Cluster initialization, assign shard to node, shardID:%d, nodeName:%s. ", shardNode.ID, node.Node.Name))
+				if len(procedures) >= int(s.procedureExecutingBatchSize) {
+					break
+				}
 			}
 		}
 	}

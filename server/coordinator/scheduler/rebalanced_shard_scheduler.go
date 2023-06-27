@@ -14,16 +14,18 @@ import (
 )
 
 type RebalancedShardScheduler struct {
-	logger     *zap.Logger
-	factory    *coordinator.Factory
-	nodePicker coordinator.NodePicker
+	logger                      *zap.Logger
+	factory                     *coordinator.Factory
+	nodePicker                  coordinator.NodePicker
+	procedureExecutingBatchSize uint32
 }
 
-func NewRebalancedShardScheduler(logger *zap.Logger, factory *coordinator.Factory, nodePicker coordinator.NodePicker) Scheduler {
+func NewRebalancedShardScheduler(logger *zap.Logger, factory *coordinator.Factory, nodePicker coordinator.NodePicker, procedureExecutingBatchSize uint32) Scheduler {
 	return &RebalancedShardScheduler{
-		logger:     logger,
-		factory:    factory,
-		nodePicker: nodePicker,
+		logger:                      logger,
+		factory:                     factory,
+		nodePicker:                  nodePicker,
+		procedureExecutingBatchSize: procedureExecutingBatchSize,
 	}
 }
 
@@ -53,7 +55,10 @@ func (r RebalancedShardScheduler) Schedule(ctx context.Context, clusterSnapshot 
 				return ScheduleResult{}, err
 			}
 			procedures = append(procedures, p)
-			reasons.WriteString(fmt.Sprintf("the shard:%d on the node:%s does not meet the balance requirements,it should be assigned to node:%s \n", shardNode.ID, shardNode.NodeName, node.Node.Name))
+			reasons.WriteString(fmt.Sprintf("the shard does not meet the balance requirements,it should be assigned to node, shardID:%d, oldNode:%s, newNode:%s.", shardNode.ID, shardNode.NodeName, node.Node.Name))
+			if len(procedures) >= int(r.procedureExecutingBatchSize) {
+				break
+			}
 		}
 	}
 
