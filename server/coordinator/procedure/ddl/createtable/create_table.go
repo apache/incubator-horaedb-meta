@@ -75,15 +75,15 @@ func prepareCallback(event *fsm.Event) {
 		return
 	}
 
-	log.Debug("create table on shard finish", zap.String("tableName", createTableMetadataRequest.TableName))
+	log.Debug("dispatch createTableOnShard finish", zap.String("tableName", createTableMetadataRequest.TableName))
 
 	createTableResult, err := params.ClusterMetadata.AddTableTopology(req.ctx, params.ShardID, result.Table)
 	if err != nil {
-		procedure.CancelEventWithLog(event, err, "create table metadata")
+		procedure.CancelEventWithLog(event, err, "add table topology")
 		return
 	}
 
-	log.Debug("addTable topology finish", zap.String("tableName", createTableMetadataRequest.TableName))
+	log.Debug("add table topology finish", zap.String("tableName", createTableMetadataRequest.TableName))
 
 	req.createTableResult = createTableResult
 }
