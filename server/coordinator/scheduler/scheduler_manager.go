@@ -213,16 +213,16 @@ func (m *ManagerImpl) ListScheduler() []Scheduler {
 
 func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot metadata.Snapshot) []ScheduleResult {
 	// TODO: Every scheduler should run in an independent goroutine.
-	allResults := make([]ScheduleResult, 0, len(m.registerSchedulers))
+	results := make([]ScheduleResult, 0, len(m.registerSchedulers))
 	for _, scheduler := range m.registerSchedulers {
 		result, err := scheduler.Schedule(ctx, clusterSnapshot)
 		if err != nil {
 			m.logger.Error("scheduler failed", zap.Error(err))
 			continue
 		}
-		allResults = append(allResults, result)
+		results = append(results, result)
 	}
-	return allResults
+	return results
 }
 
 func (m *ManagerImpl) UpdateEnableSchedule(_ context.Context, enableSchedule bool) {
