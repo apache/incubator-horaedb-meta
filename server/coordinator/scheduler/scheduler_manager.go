@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	schedulerInterval   = time.Second * 15
+	schedulerInterval   = time.Second * 5
 	defaultHashReplicas = 50
 )
 
