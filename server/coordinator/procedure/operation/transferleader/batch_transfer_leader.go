@@ -63,7 +63,7 @@ func buildBatchRelatedVersionInfo(batch []procedure.Procedure) (procedure.Relate
 		for shardID, version := range p.RelatedVersionInfo().ShardWithVersion {
 			if resultVersion, exists := result.ShardWithVersion[shardID]; exists {
 				if version != resultVersion {
-					return procedure.RelatedVersionInfo{}, errors.WithMessage(procedure.ErrMergeBatchProcedure, fmt.Sprintf("procedure shardVersion in the same batch is inconsistent, shardID: %d, expetcdShardVersion: %d, shardVersion: %d", shardID, version, resultVersion))
+					return procedure.RelatedVersionInfo{}, errors.WithMessage(procedure.ErrMergeBatchProcedure, fmt.Sprintf("procedure shardVersion in the same batch is inconsistent, shardID:%d, expetcdShardVersion:%d, shardVersion:%d", shardID, version, resultVersion))
 				}
 			} else {
 				result.ShardWithVersion[shardID] = version
@@ -90,7 +90,7 @@ func (p *BatchTransferLeaderProcedure) Start(ctx context.Context) error {
 		g.Go(func() error {
 			err := p.Start(ctx)
 			if err != nil {
-				log.Error("procedure start failed", zap.Error(err), zap.String("procedure", fmt.Sprintf("%v", p)))
+				log.Error("procedure start failed", zap.Error(err), zap.String("procedure", fmt.Sprintf("%v", p)), zap.Error(err))
 			}
 			return err
 		})
