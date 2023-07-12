@@ -4,6 +4,7 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -17,17 +18,18 @@ import (
 const (
 	nodeLength            = 3
 	selectOnlineNodeIndex = 1
+	defaultTotalShardNum  = 10
 	defaultHashReplicas   = 50
 )
 
-func TestConsistentHashNodePicker(t *testing.T) {
+func TestNodePicker(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
 
-	nodePicker := NewConsistentHashNodePicker(zap.NewNop(), 50)
+	nodePicker := NewUniformityConsistentHashNodePicker(zap.NewNop())
 
 	var nodes []metadata.RegisteredNode
-	_, err := nodePicker.PickNode(ctx, 0, nodes)
+	_, err := nodePicker.PickNode(ctx, 0, defaultTotalShardNum, nodes)
 	re.Error(err)
 
 	for i := 0; i < nodeLength; i++ {
@@ -36,7 +38,7 @@ func TestConsistentHashNodePicker(t *testing.T) {
 			ShardInfos: nil,
 		})
 	}
-	_, err = nodePicker.PickNode(ctx, 0, nodes)
+	_, err = nodePicker.PickNode(ctx, 0, defaultTotalShardNum, nodes)
 	re.Error(err)
 
 	nodes = nodes[:0]
@@ -46,7 +48,7 @@ func TestConsistentHashNodePicker(t *testing.T) {
 			ShardInfos: nil,
 		})
 	}
-	_, err = nodePicker.PickNode(ctx, 0, nodes)
+	_, err = nodePicker.PickNode(ctx, 0, defaultTotalShardNum, nodes)
 	re.NoError(err)
 
 	nodes = nodes[:0]
@@ -57,11 +59,95 @@ func TestConsistentHashNodePicker(t *testing.T) {
 		})
 	}
 	nodes[selectOnlineNodeIndex].Node.LastTouchTime = uint64(time.Now().UnixMilli())
-	node, err := nodePicker.PickNode(ctx, 0, nodes)
+	node, err := nodePicker.PickNode(ctx, 0, defaultTotalShardNum, nodes)
 	re.NoError(err)
 	re.Equal(strconv.Itoa(selectOnlineNodeIndex), node.Node.Name)
 }
 
+func TestUniformity(t *testing.T) {
+	re := require.New(t)
+	ctx := context.Background()
+
+	nodePicker := NewUniformityConsistentHashNodePicker(zap.NewNop())
+	mapping := allocShards(ctx, nodePicker, 30, 256, re)
+	for nodeName, shards := range mapping {
+		println(fmt.Sprintf("nodeName:%s contains shards num:%d", nodeName, len(shards)))
+	}
+
+	// Verify that the result of hash remains unchanged through the same nodes and shards.
+	println("\nVerify that the result of hash remains unchanged through the same nodes and shards")
+	newMapping := allocShards(ctx, nodePicker, 30, 256, re)
+	for nodeName, shards := range newMapping {
+		println(fmt.Sprintf("nodeName:%s contains shards num:%d", nodeName, len(shards)))
+	}
+	for nodeName, shardIds := range mapping {
+		newShardIDs := newMapping[nodeName]
+		diffShardID := diffShardIds(shardIds, newShardIDs)
+		println(fmt.Sprintf("diff shardID, nodeName:%s, diffShardIDs:%d", nodeName, len(diffShardID)))
+	}
+
+	// Add new node and testing shard rebalanced.
+	println("\nAdd new node and testing shard rebalanced.")
+	newMapping = allocShards(ctx, nodePicker, 31, 256, re)
+	for nodeName, shards := range newMapping {
+		println(fmt.Sprintf("nodeName:%s contains shards num:%d", nodeName, len(shards)))
+	}
+	for nodeName, shardIds := range mapping {
+		newShardIDs := newMapping[nodeName]
+		diffShardID := diffShardIds(shardIds, newShardIDs)
+		println(fmt.Sprintf("diff shardID, nodeName:%s, diff shardIDs num:%d", nodeName, len(diffShardID)))
+	}
+
+	// Add new shard and testing shard rebalanced.
+	println("\nAdd new shard and testing shard rebalanced.")
+	newShardMapping := allocShards(ctx, nodePicker, 30, 257, re)
+	for nodeName, shards := range newShardMapping {
+		println(fmt.Sprintf("nodeName:%s contains shards num:%d", nodeName, len(shards)))
+	}
+	for nodeName, shardIds := range newShardMapping {
+		newShardIDs := newMapping[nodeName]
+		diffShardID := diffShardIds(shardIds, newShardIDs)
+		println(fmt.Sprintf("diff shardID, nodeName:%s, diffShardIDs:%d", nodeName, len(diffShardID)))
+	}
+}
+
+func allocShards(ctx context.Context, nodePicker NodePicker, nodeNum int, shardNum int, re *require.Assertions) map[string][]int {
+	var nodes []metadata.RegisteredNode
+	for i := 0; i < nodeNum; i++ {
+		nodes = append(nodes, metadata.RegisteredNode{
+			Node:       storage.Node{Name: strconv.Itoa(i), LastTouchTime: generateLastTouchTime(0)},
+			ShardInfos: nil,
+		})
+	}
+	mapping := make(map[string][]int, 0)
+	for i := 0; i < shardNum; i++ {
+		node, err := nodePicker.PickNode(ctx, storage.ShardID(i), uint32(shardNum), nodes)
+		re.NoError(err)
+		mapping[node.Node.Name] = append(mapping[node.Node.Name], i)
+	}
+	return mapping
+}
+
 func generateLastTouchTime(duration time.Duration) uint64 {
 	return uint64(time.Now().UnixMilli() - int64(duration))
+}
+
+func diffShardIds(oldShardIDs []int, newShardIDs []int) []int {
+	diff := make(map[int]bool, 0)
+	for i := 0; i < len(oldShardIDs); i++ {
+		diff[oldShardIDs[i]] = false
+	}
+	for i := 0; i < len(newShardIDs); i++ {
+		if diff[newShardIDs[i]] == false {
+			diff[newShardIDs[i]] = true
+		}
+	}
+
+	var result []int
+	for k, v := range diff {
+		if !v {
+			result = append(result, k)
+		}
+	}
+	return result
 }

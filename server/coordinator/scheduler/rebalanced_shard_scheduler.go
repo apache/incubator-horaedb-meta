@@ -39,7 +39,7 @@ func (r RebalancedShardScheduler) Schedule(ctx context.Context, clusterSnapshot 
 	var reasons strings.Builder
 	// TODO: Improve scheduling efficiency and verify whether the topology changes.
 	for _, shardNode := range clusterSnapshot.Topology.ClusterView.ShardNodes {
-		node, err := r.nodePicker.PickNode(ctx, shardNode.ID, clusterSnapshot.RegisteredNodes)
+		node, err := r.nodePicker.PickNode(ctx, shardNode.ID, uint32(len(clusterSnapshot.Topology.ShardViewsMapping)), clusterSnapshot.RegisteredNodes)
 		if err != nil {
 			return ScheduleResult{}, err
 		}

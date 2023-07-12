@@ -39,7 +39,7 @@ func (s *StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnap
 				continue
 			}
 			// Assign shards
-			newLeaderNode, err := s.nodePicker.PickNode(ctx, shardView.ShardID, clusterSnapshot.RegisteredNodes)
+			newLeaderNode, err := s.nodePicker.PickNode(ctx, shardView.ShardID, uint32(len(clusterSnapshot.Topology.ShardViewsMapping)), clusterSnapshot.RegisteredNodes)
 			if err != nil {
 				return ScheduleResult{}, err
 			}

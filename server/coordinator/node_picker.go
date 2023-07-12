@@ -4,53 +4,77 @@ package coordinator
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/hash"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
+	"github.com/spaolacci/murmur3"
 	"go.uber.org/zap"
 )
 
 type NodePicker interface {
-	PickNode(ctx context.Context, shardID storage.ShardID, registerNodes []metadata.RegisteredNode) (metadata.RegisteredNode, error)
+	PickNode(ctx context.Context, shardIDs []storage.ShardID, shardTotalNum uint32, registerNodes []metadata.RegisteredNode) ([]storage.Node, error)
+}
+type UniformityConsistentHashNodePicker struct {
+	logger *zap.Logger
 }
 
-type ConsistentHashNodePicker struct {
-	logger       *zap.Logger
-	hashReplicas int
+func NewUniformityConsistentHashNodePicker(logger *zap.Logger) NodePicker {
+	return &UniformityConsistentHashNodePicker{logger: logger}
 }
 
-func NewConsistentHashNodePicker(logger *zap.Logger, hashReplicas int) NodePicker {
-	return &ConsistentHashNodePicker{hashReplicas: hashReplicas, logger: logger}
+type nodeMember string
+
+func (m nodeMember) String() string {
+	return string(m)
 }
 
-func (p *ConsistentHashNodePicker) PickNode(_ context.Context, shardID storage.ShardID, registerNodes []metadata.RegisteredNode) (metadata.RegisteredNode, error) {
+type hasher struct{}
+
+func (h hasher) Sum64(data []byte) uint64 {
+	return murmur3.Sum64(data)
+}
+
+func (p *UniformityConsistentHashNodePicker) PickNode(_ context.Context, shardID []storage.ShardID, shardTotalNum uint32, registerNodes []metadata.RegisteredNode) ([]metadata.RegisteredNode, error) {
 	now := time.Now()
 
-	hashRing := hash.New(p.hashReplicas, nil)
-	aliveNodeNumber := 0
+	aliveNodes := make([]metadata.RegisteredNode, 0, len(registerNodes))
 	for _, registerNode := range registerNodes {
 		if !registerNode.IsExpired(now) {
-			hashRing.Add(registerNode.Node.Name)
-			aliveNodeNumber++
+			aliveNodes = append(aliveNodes, registerNode)
+		}
+	}
+	if len(aliveNodes) == 0 {
+		return []metadata.RegisteredNode{}, errors.WithMessage(ErrPickNode, "no alive node in cluster")
+	}
+
+	mems := make([]hash.Member, 0, len(aliveNodes))
+	for _, node := range aliveNodes {
+		mems = append(mems, nodeMember(node.Node.Name))
+	}
+
+	consistentConfig := hash.Config{
+		PartitionCount:    int(shardTotalNum),
+		ReplicationFactor: int(shardTotalNum),
+		Load:              1,
+		Hasher:            hasher{},
+	}
+	c := hash.NewUniformityHash(mems, consistentConfig)
+	for partID := 0; partID < consistentConfig.PartitionCount; partID++ {
+		mem := c.GetPartitionOwner(partID)
+		nodeName := mem.String()
+
+		if storage.ShardID(partID) == shardID {
+			p.logger.Debug("shard is founded in members", zap.Uint32("shardID", uint32(shardID)), zap.String("memberName", mem.String()))
+			for _, node := range aliveNodes {
+				if node.Node.Name == nodeName {
+					return node, nil
+				}
+			}
 		}
 	}
 
-	if hashRing.IsEmpty() {
-		return metadata.RegisteredNode{}, errors.WithMessage(ErrNodeNumberNotEnough, "at least one online nodes is required")
-	}
-
-	pickedNodeName := hashRing.Get(strconv.Itoa(int(shardID)))
-	p.logger.Debug("ConsistentHashNodePicker pick result", zap.Uint64("shardID", uint64(shardID)), zap.String("node", pickedNodeName), zap.Int("nodeNumber", aliveNodeNumber))
-
-	for i := 0; i < len(registerNodes); i++ {
-		if registerNodes[i].Node.Name == pickedNodeName {
-			return registerNodes[i], nil
-		}
-	}
-
-	return metadata.RegisteredNode{}, errors.WithMessagef(ErrPickNode, "pickedNode not found in register nodes, nodeName:%s", pickedNodeName)
+	return []metadata.RegisteredNode{}, errors.WithMessagef(ErrPickNode, "no node is picked, shardID:%d, shardTotalNum:%d, aliveNodeNum:%d", shardID, shardTotalNum, len(aliveNodes))
 }
