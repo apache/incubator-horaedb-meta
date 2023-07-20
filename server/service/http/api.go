@@ -677,20 +677,21 @@ func (a *API) listProcedures(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	clusterName := Param(req.Context(), "name")
+	ctx := req.Context()
+	clusterName := Param(ctx, "name")
 	if len(clusterName) == 0 {
 		a.respondError(writer, ErrParseRequest, "clusterName cloud not be empty")
 		return
 	}
 
-	c, err := a.clusterManager.GetCluster(req.Context(), clusterName)
+	c, err := a.clusterManager.GetCluster(ctx, clusterName)
 	if err != nil {
 		log.Error("get cluster failed", zap.Error(err))
 		a.respondError(writer, ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
 		return
 	}
 
-	infos, err := c.GetProcedureManager().ListRunningProcedure(req.Context())
+	infos, err := c.GetProcedureManager().ListRunningProcedure(ctx)
 	if err != nil {
 		log.Error("list running procedure failed", zap.Error(err))
 		a.respondError(writer, procedure.ErrListRunningProcedure, fmt.Sprintf("clusterName: %s", clusterName))
