@@ -28,34 +28,51 @@ type AddMemberRequest struct {
 	MemberAddrs []string `json:"memberAddrs"`
 }
 
-func (a *EtcdAPI) addMember(writer http.ResponseWriter, req *http.Request) {
+func (a *EtcdAPI) addMember(req *http.Request) apiFuncResult {
 	var addMemberRequest AddMemberRequest
 	err := json.NewDecoder(req.Body).Decode(&addMemberRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
-		respondError(writer, ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrParseRequest,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	resp, err := a.etcdClient.MemberAdd(req.Context(), addMemberRequest.MemberAddrs)
 	if err != nil {
 		log.Error("member add as learner failed", zap.Error(err))
-		respondError(writer, ErrAddLearner, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrAddLearner,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
-	respond(writer, resp)
+	return apiFuncResult{
+		data:   resp,
+		err:    nil,
+		errMsg: "",
+	}
 }
 
-func (a *EtcdAPI) getMember(writer http.ResponseWriter, req *http.Request) {
+func (a *EtcdAPI) getMember(req *http.Request) apiFuncResult {
 	resp, err := a.etcdClient.MemberList(req.Context())
 	if err != nil {
 		log.Error("list member failed", zap.Error(err))
-		respondError(writer, ErrListMembers, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrListMembers,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
-	respond(writer, resp)
+	return apiFuncResult{
+		data:   resp,
+		err:    nil,
+		errMsg: "",
+	}
 }
 
 type UpdateMemberRequest struct {
@@ -63,20 +80,26 @@ type UpdateMemberRequest struct {
 	NewMemberAddr []string `json:"newMemberAddr"`
 }
 
-func (a *EtcdAPI) updateMember(writer http.ResponseWriter, req *http.Request) {
+func (a *EtcdAPI) updateMember(req *http.Request) apiFuncResult {
 	var updateMemberRequest UpdateMemberRequest
 	err := json.NewDecoder(req.Body).Decode(&updateMemberRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
-		respondError(writer, ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrParseTopology,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	memberListResp, err := a.etcdClient.MemberList(req.Context())
 	if err != nil {
 		log.Error("list members failed", zap.Error(err))
-		respondError(writer, ErrListMembers, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrListMembers,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	for _, member := range memberListResp.Members {
@@ -84,35 +107,51 @@ func (a *EtcdAPI) updateMember(writer http.ResponseWriter, req *http.Request) {
 			_, err := a.etcdClient.MemberUpdate(req.Context(), member.ID, updateMemberRequest.NewMemberAddr)
 			if err != nil {
 				log.Error("remove learner failed", zap.Error(err))
-				respondError(writer, ErrRemoveMembers, fmt.Sprintf("err: %s", err.Error()))
-				return
+				return apiFuncResult{
+					data:   nil,
+					err:    ErrRemoveMembers,
+					errMsg: fmt.Sprintf("err: %s", err.Error()),
+				}
 			}
-			respond(writer, "ok")
-			return
+			return apiFuncResult{
+				data:   "ok",
+				err:    nil,
+				errMsg: "",
+			}
 		}
 	}
 
-	respondError(writer, ErrGetMember, fmt.Sprintf("member not found, member name: %s", updateMemberRequest.OldMemberName))
+	return apiFuncResult{
+		data:   nil,
+		err:    ErrGetMember,
+		errMsg: fmt.Sprintf("member not found, member name: %s", updateMemberRequest.OldMemberName),
+	}
 }
 
 type RemoveMemberRequest struct {
 	MemberName string `json:"memberName"`
 }
 
-func (a *EtcdAPI) removeMember(writer http.ResponseWriter, req *http.Request) {
+func (a *EtcdAPI) removeMember(req *http.Request) apiFuncResult {
 	var removeMemberRequest RemoveMemberRequest
 	err := json.NewDecoder(req.Body).Decode(&removeMemberRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
-		respondError(writer, ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrParseRequest,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	memberListResp, err := a.etcdClient.MemberList(req.Context())
 	if err != nil {
 		log.Error("list members failed", zap.Error(err))
-		respondError(writer, ErrListMembers, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrListMembers,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	for _, member := range memberListResp.Members {
@@ -120,35 +159,51 @@ func (a *EtcdAPI) removeMember(writer http.ResponseWriter, req *http.Request) {
 			_, err := a.etcdClient.MemberRemove(req.Context(), member.ID)
 			if err != nil {
 				log.Error("remove learner failed", zap.Error(err))
-				respondError(writer, ErrRemoveMembers, fmt.Sprintf("err: %s", err.Error()))
-				return
+				return apiFuncResult{
+					data:   nil,
+					err:    ErrRemoveMembers,
+					errMsg: fmt.Sprintf("err: %s", err.Error()),
+				}
 			}
-			respond(writer, "ok")
-			return
+			return apiFuncResult{
+				data:   "ok",
+				err:    nil,
+				errMsg: "",
+			}
 		}
 	}
 
-	respondError(writer, ErrGetMember, fmt.Sprintf("member not found, member name: %s", removeMemberRequest.MemberName))
+	return apiFuncResult{
+		data:   nil,
+		err:    ErrGetMember,
+		errMsg: fmt.Sprintf("member not found, member name: %s", removeMemberRequest.MemberName),
+	}
 }
 
 type PromoteLearnerRequest struct {
 	LearnerName string `json:"learnerName"`
 }
 
-func (a *EtcdAPI) promoteLearner(writer http.ResponseWriter, req *http.Request) {
+func (a *EtcdAPI) promoteLearner(req *http.Request) apiFuncResult {
 	var promoteLearnerRequest PromoteLearnerRequest
 	err := json.NewDecoder(req.Body).Decode(&promoteLearnerRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
-		respondError(writer, ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrParseRequest,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	memberListResp, err := a.etcdClient.MemberList(req.Context())
 	if err != nil {
 		log.Error("list members failed", zap.Error(err))
-		respondError(writer, ErrListMembers, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrListMembers,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	for _, member := range memberListResp.Members {
@@ -156,47 +211,51 @@ func (a *EtcdAPI) promoteLearner(writer http.ResponseWriter, req *http.Request) 
 			_, err := a.etcdClient.MemberPromote(req.Context(), member.ID)
 			if err != nil {
 				log.Error("remove learner failed", zap.Error(err))
-				respondError(writer, ErrRemoveMembers, fmt.Sprintf("err: %s", err.Error()))
-				return
+				return apiFuncResult{
+					data:   nil,
+					err:    ErrRemoveMembers,
+					errMsg: fmt.Sprintf("err: %s", err.Error()),
+				}
 			}
-			respond(writer, "ok")
-			return
+			return apiFuncResult{
+				data:   "ok",
+				err:    nil,
+				errMsg: "",
+			}
 		}
 	}
 
-	respondError(writer, ErrGetMember, fmt.Sprintf("learner not found, learner name: %s", promoteLearnerRequest.LearnerName))
+	return apiFuncResult{
+		data:   nil,
+		err:    ErrGetMember,
+		errMsg: fmt.Sprintf("learner not found, learner name: %s", promoteLearnerRequest.LearnerName),
+	}
 }
 
 type MoveLeaderRequest struct {
 	MemberName string `json:"memberName"`
 }
 
-func (a *EtcdAPI) moveLeader(writer http.ResponseWriter, req *http.Request) {
-	resp, isLeader, err := a.forwardClient.forwardToLeader(req)
-	if err != nil {
-		log.Error("forward to leader failed", zap.Error(err))
-		respondError(writer, ErrForwardToLeader, fmt.Sprintf("err: %s", err.Error()))
-		return
-	}
-
-	if !isLeader {
-		respondForward(writer, resp)
-		return
-	}
-
+func (a *EtcdAPI) moveLeader(req *http.Request) apiFuncResult {
 	var moveLeaderRequest MoveLeaderRequest
-	err = json.NewDecoder(req.Body).Decode(&moveLeaderRequest)
+	err := json.NewDecoder(req.Body).Decode(&moveLeaderRequest)
 	if err != nil {
 		log.Error("decode request body failed", zap.Error(err))
-		respondError(writer, ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrParseRequest,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	memberListResp, err := a.etcdClient.MemberList(req.Context())
 	if err != nil {
 		log.Error("list members failed", zap.Error(err))
-		respondError(writer, ErrListMembers, fmt.Sprintf("err: %s", err.Error()))
-		return
+		return apiFuncResult{
+			data:   nil,
+			err:    ErrListMembers,
+			errMsg: fmt.Sprintf("err: %s", err.Error()),
+		}
 	}
 
 	for _, member := range memberListResp.Members {
@@ -204,14 +263,24 @@ func (a *EtcdAPI) moveLeader(writer http.ResponseWriter, req *http.Request) {
 			moveLeaderResp, err := a.etcdClient.MoveLeader(req.Context(), member.ID)
 			if err != nil {
 				log.Error("remove learner failed", zap.Error(err))
-				respondError(writer, ErrRemoveMembers, fmt.Sprintf("err: %s", err.Error()))
-				return
+				return apiFuncResult{
+					data:   nil,
+					err:    ErrRemoveMembers,
+					errMsg: fmt.Sprintf("err: %s", err.Error()),
+				}
 			}
 			log.Info("move leader", zap.String("moveLeaderResp", fmt.Sprintf("%v", moveLeaderResp)))
-			respond(writer, "ok")
-			return
+			return apiFuncResult{
+				data:   "ok",
+				err:    nil,
+				errMsg: "",
+			}
 		}
 	}
 
-	respondError(writer, ErrGetMember, fmt.Sprintf("member not found, member name: %s", moveLeaderRequest.MemberName))
+	return apiFuncResult{
+		data:   nil,
+		err:    ErrGetMember,
+		errMsg: fmt.Sprintf("member not found, member name: %s", moveLeaderRequest.MemberName),
+	}
 }
