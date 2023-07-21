@@ -25,7 +25,7 @@ func NewEtcdAPI(etcdClient *clientv3.Client, forwardClient *ForwardClient) EtcdA
 }
 
 type AddMemberRequest struct {
-	MembersAddr []string `json:"membersAddr"`
+	MemberAddrs []string `json:"memberAddrs"`
 }
 
 func (a *EtcdAPI) addMember(writer http.ResponseWriter, req *http.Request) {
@@ -37,7 +37,7 @@ func (a *EtcdAPI) addMember(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	resp, err := a.etcdClient.MemberAdd(req.Context(), addMemberRequest.MembersAddr)
+	resp, err := a.etcdClient.MemberAdd(req.Context(), addMemberRequest.MemberAddrs)
 	if err != nil {
 		log.Error("member add as learner failed", zap.Error(err))
 		respondError(writer, ErrAddLearner, fmt.Sprintf("err: %s", err.Error()))
@@ -91,6 +91,8 @@ func (a *EtcdAPI) updateMember(writer http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
+
+	respondError(writer, ErrGetMember, fmt.Sprintf("member not found, member name: %s", updateMemberRequest.OldMemberName))
 }
 
 type RemoveMemberRequest struct {
