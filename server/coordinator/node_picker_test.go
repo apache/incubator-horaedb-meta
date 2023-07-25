@@ -19,7 +19,6 @@ const (
 	nodeLength            = 3
 	selectOnlineNodeIndex = 1
 	defaultTotalShardNum  = 10
-	defaultHashReplicas   = 50
 )
 
 func TestNodePicker(t *testing.T) {
@@ -29,7 +28,7 @@ func TestNodePicker(t *testing.T) {
 	nodePicker := NewUniformityConsistentHashNodePicker(zap.NewNop())
 
 	var nodes []metadata.RegisteredNode
-	_, err := nodePicker.PickNode(ctx, 0, defaultTotalShardNum, nodes)
+	_, err := nodePicker.PickNode(ctx, []storage.ShardID{0}, defaultTotalShardNum, nodes)
 	re.Error(err)
 
 	for i := 0; i < nodeLength; i++ {
@@ -38,7 +37,7 @@ func TestNodePicker(t *testing.T) {
 			ShardInfos: nil,
 		})
 	}
-	_, err = nodePicker.PickNode(ctx, 0, defaultTotalShardNum, nodes)
+	_, err = nodePicker.PickNode(ctx, []storage.ShardID{0}, defaultTotalShardNum, nodes)
 	re.Error(err)
 
 	nodes = nodes[:0]
@@ -48,7 +47,7 @@ func TestNodePicker(t *testing.T) {
 			ShardInfos: nil,
 		})
 	}
-	_, err = nodePicker.PickNode(ctx, 0, defaultTotalShardNum, nodes)
+	_, err = nodePicker.PickNode(ctx, []storage.ShardID{0}, defaultTotalShardNum, nodes)
 	re.NoError(err)
 
 	nodes = nodes[:0]
@@ -59,9 +58,9 @@ func TestNodePicker(t *testing.T) {
 		})
 	}
 	nodes[selectOnlineNodeIndex].Node.LastTouchTime = uint64(time.Now().UnixMilli())
-	node, err := nodePicker.PickNode(ctx, 0, defaultTotalShardNum, nodes)
+	shardNodeMapping, err := nodePicker.PickNode(ctx, []storage.ShardID{0}, defaultTotalShardNum, nodes)
 	re.NoError(err)
-	re.Equal(strconv.Itoa(selectOnlineNodeIndex), node.Node.Name)
+	re.Equal(strconv.Itoa(selectOnlineNodeIndex), shardNodeMapping[0])
 }
 
 func TestUniformity(t *testing.T) {
@@ -120,11 +119,16 @@ func allocShards(ctx context.Context, nodePicker NodePicker, nodeNum int, shardN
 		})
 	}
 	mapping := make(map[string][]int, 0)
+	shardIDs := make([]storage.ShardID, 0, shardNum)
 	for i := 0; i < shardNum; i++ {
-		node, err := nodePicker.PickNode(ctx, storage.ShardID(i), uint32(shardNum), nodes)
-		re.NoError(err)
-		mapping[node.Node.Name] = append(mapping[node.Node.Name], i)
+		shardIDs = append(shardIDs, storage.ShardID(i))
 	}
+	shardNodeMapping, err := nodePicker.PickNode(ctx, shardIDs, uint32(shardNum), nodes)
+	re.NoError(err)
+	for shardID, node := range shardNodeMapping {
+		mapping[node.Node.Name] = append(mapping[node.Node.Name], int(shardID))
+	}
+
 	return mapping
 }
 

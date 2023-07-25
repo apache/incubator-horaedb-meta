@@ -15,7 +15,7 @@ import (
 )
 
 type NodePicker interface {
-	PickNode(ctx context.Context, shardIDs []storage.ShardID, shardTotalNum uint32, registerNodes []metadata.RegisteredNode) ([]storage.Node, error)
+	PickNode(ctx context.Context, shardIDs []storage.ShardID, shardTotalNum uint32, registerNodes []metadata.RegisteredNode) (map[storage.ShardID]metadata.RegisteredNode, error)
 }
 type UniformityConsistentHashNodePicker struct {
 	logger *zap.Logger
@@ -37,9 +37,10 @@ func (h hasher) Sum64(data []byte) uint64 {
 	return murmur3.Sum64(data)
 }
 
-func (p *UniformityConsistentHashNodePicker) PickNode(_ context.Context, shardID []storage.ShardID, shardTotalNum uint32, registerNodes []metadata.RegisteredNode) ([]metadata.RegisteredNode, error) {
+func (p *UniformityConsistentHashNodePicker) PickNode(_ context.Context, shardIDs []storage.ShardID, shardTotalNum uint32, registerNodes []metadata.RegisteredNode) (map[storage.ShardID]metadata.RegisteredNode, error) {
 	now := time.Now()
 
+	result := make(map[storage.ShardID]metadata.RegisteredNode, len(registerNodes))
 	aliveNodes := make([]metadata.RegisteredNode, 0, len(registerNodes))
 	for _, registerNode := range registerNodes {
 		if !registerNode.IsExpired(now) {
@@ -47,7 +48,7 @@ func (p *UniformityConsistentHashNodePicker) PickNode(_ context.Context, shardID
 		}
 	}
 	if len(aliveNodes) == 0 {
-		return []metadata.RegisteredNode{}, errors.WithMessage(ErrPickNode, "no alive node in cluster")
+		return map[storage.ShardID]metadata.RegisteredNode{}, errors.WithMessage(ErrPickNode, "no alive node in cluster")
 	}
 
 	mems := make([]hash.Member, 0, len(aliveNodes))
@@ -66,15 +67,24 @@ func (p *UniformityConsistentHashNodePicker) PickNode(_ context.Context, shardID
 		mem := c.GetPartitionOwner(partID)
 		nodeName := mem.String()
 
-		if storage.ShardID(partID) == shardID {
-			p.logger.Debug("shard is founded in members", zap.Uint32("shardID", uint32(shardID)), zap.String("memberName", mem.String()))
+		if contains(storage.ShardID(partID), shardIDs) {
+			p.logger.Debug("shard is founded in members", zap.Uint32("shardID", uint32(partID)), zap.String("memberName", mem.String()))
 			for _, node := range aliveNodes {
 				if node.Node.Name == nodeName {
-					return node, nil
+					result[storage.ShardID(partID)] = node
 				}
 			}
 		}
 	}
 
-	return []metadata.RegisteredNode{}, errors.WithMessagef(ErrPickNode, "no node is picked, shardID:%d, shardTotalNum:%d, aliveNodeNum:%d", shardID, shardTotalNum, len(aliveNodes))
+	return result, errors.WithMessagef(ErrPickNode, "no node is picked, shardID:%d, shardTotalNum:%d, aliveNodeNum:%d", shardIDs, shardTotalNum, len(aliveNodes))
+}
+
+func contains(target storage.ShardID, shardIDs []storage.ShardID) bool {
+	for i := 0; i < len(shardIDs); i++ {
+		if shardIDs[i] == target {
+			return true
+		}
+	}
+	return false
 }
