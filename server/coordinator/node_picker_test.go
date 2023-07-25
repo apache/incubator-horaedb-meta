@@ -60,7 +60,7 @@ func TestNodePicker(t *testing.T) {
 	nodes[selectOnlineNodeIndex].Node.LastTouchTime = uint64(time.Now().UnixMilli())
 	shardNodeMapping, err := nodePicker.PickNode(ctx, []storage.ShardID{0}, defaultTotalShardNum, nodes)
 	re.NoError(err)
-	re.Equal(strconv.Itoa(selectOnlineNodeIndex), shardNodeMapping[0])
+	re.Equal(strconv.Itoa(selectOnlineNodeIndex), shardNodeMapping[0].Node.Name)
 }
 
 func TestUniformity(t *testing.T) {

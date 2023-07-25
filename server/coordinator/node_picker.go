@@ -77,7 +77,11 @@ func (p *UniformityConsistentHashNodePicker) PickNode(_ context.Context, shardID
 		}
 	}
 
-	return result, errors.WithMessagef(ErrPickNode, "no node is picked, shardID:%d, shardTotalNum:%d, aliveNodeNum:%d", shardIDs, shardTotalNum, len(aliveNodes))
+	if len(result) != len(shardIDs) {
+		return map[storage.ShardID]metadata.RegisteredNode{}, errors.WithMessagef(ErrPickNode, "length of the result is inconsistent with the length of the shard, shardID:%d, shardTotalNum:%d, aliveNodeNum:%d", shardIDs, shardTotalNum, len(aliveNodes))
+	}
+
+	return result, nil
 }
 
 func contains(target storage.ShardID, shardIDs []storage.ShardID) bool {
