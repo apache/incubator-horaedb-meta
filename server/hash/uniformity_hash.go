@@ -51,6 +51,9 @@
 //	     // The owner of the partition is already calculated by New/Add/Remove.
 //	     // LocateKey just returns the member which's responsible for the key.
 //		member := c.LocateKey(key)
+//
+// We optimized this hash algorithm and improved the problem of panic in borderline cases mentioned in this issue:
+// https://github.com/buraksezer/consistent/issues/13
 package hash
 
 import (

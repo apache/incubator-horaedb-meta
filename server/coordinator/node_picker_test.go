@@ -69,44 +69,57 @@ func TestUniformity(t *testing.T) {
 
 	nodePicker := NewUniformityConsistentHashNodePicker(zap.NewNop())
 	mapping := allocShards(ctx, nodePicker, 30, 256, re)
+	maxShardNum := 256/30 + 1
 	for nodeName, shards := range mapping {
 		println(fmt.Sprintf("nodeName:%s contains shards num:%d", nodeName, len(shards)))
+		re.LessOrEqual(len(shards), maxShardNum)
 	}
 
 	// Verify that the result of hash remains unchanged through the same nodes and shards.
 	println("\nVerify that the result of hash remains unchanged through the same nodes and shards")
 	newMapping := allocShards(ctx, nodePicker, 30, 256, re)
+	maxShardNum = 256/30 + 1
 	for nodeName, shards := range newMapping {
 		println(fmt.Sprintf("nodeName:%s contains shards num:%d", nodeName, len(shards)))
+		re.LessOrEqual(len(shards), maxShardNum)
 	}
 	for nodeName, shardIds := range mapping {
 		newShardIDs := newMapping[nodeName]
 		diffShardID := diffShardIds(shardIds, newShardIDs)
 		println(fmt.Sprintf("diff shardID, nodeName:%s, diffShardIDs:%d", nodeName, len(diffShardID)))
+		re.Equal(0, len(diffShardID))
 	}
 
 	// Add new node and testing shard rebalanced.
 	println("\nAdd new node and testing shard rebalanced.")
 	newMapping = allocShards(ctx, nodePicker, 31, 256, re)
+	maxShardNum = 256/31 + 1
 	for nodeName, shards := range newMapping {
 		println(fmt.Sprintf("nodeName:%s contains shards num:%d", nodeName, len(shards)))
+		re.LessOrEqual(len(shards), maxShardNum)
 	}
+	maxDiffNum := 3
 	for nodeName, shardIds := range mapping {
 		newShardIDs := newMapping[nodeName]
 		diffShardID := diffShardIds(shardIds, newShardIDs)
 		println(fmt.Sprintf("diff shardID, nodeName:%s, diff shardIDs num:%d", nodeName, len(diffShardID)))
+		re.LessOrEqual(len(diffShardID), maxDiffNum)
 	}
 
 	// Add new shard and testing shard rebalanced.
 	println("\nAdd new shard and testing shard rebalanced.")
 	newShardMapping := allocShards(ctx, nodePicker, 30, 257, re)
+	maxShardNum = 257/31 + 1
 	for nodeName, shards := range newShardMapping {
 		println(fmt.Sprintf("nodeName:%s contains shards num:%d", nodeName, len(shards)))
+		re.LessOrEqual(len(shards), maxShardNum)
 	}
+	maxDiffNum = 3
 	for nodeName, shardIds := range newShardMapping {
 		newShardIDs := newMapping[nodeName]
 		diffShardID := diffShardIds(shardIds, newShardIDs)
 		println(fmt.Sprintf("diff shardID, nodeName:%s, diffShardIDs:%d", nodeName, len(diffShardID)))
+		re.LessOrEqual(len(diffShardID), maxDiffNum)
 	}
 }
 
