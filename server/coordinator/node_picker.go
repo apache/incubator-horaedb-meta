@@ -27,6 +27,8 @@ func NewUniformityConsistentHashNodePicker(logger *zap.Logger) NodePicker {
 
 type nodeMember string
 
+var _ hash.Member = nodeMember("")
+
 func (m nodeMember) String() string {
 	return string(m)
 }

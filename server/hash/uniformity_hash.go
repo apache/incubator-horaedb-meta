@@ -1,4 +1,5 @@
 // Copyright 2023 CeresDB Project Authors. Licensed under Apache-2.0.
+// This file fork from: https://github.com/buraksezer/consistent/blob/4516339c49db00f725fa89d0e3e7e970e4039af0/consistent.go
 // Copyright (c) 2018 Burak Sezer
 // All rights reserved.
 //
