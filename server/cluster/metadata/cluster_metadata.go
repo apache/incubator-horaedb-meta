@@ -362,6 +362,7 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 	}
 
 	if err := c.UpdateClusterViewByNode(ctx, shardNodes); err != nil {
+		c.logger.Error("update cluster view by node", zap.Error(err), zap.String("nodeName", registeredNode.Node.Name))
 		return errors.WithMessage(err, "update cluster view failed")
 	}
 

@@ -9,6 +9,7 @@ var (
 	ErrDropTable         = coderr.NewCodeError(coderr.Internal, "drop table")
 	ErrRouteTable        = coderr.NewCodeError(coderr.Internal, "route table")
 	ErrGetNodeShards     = coderr.NewCodeError(coderr.Internal, "get node shards")
+	ErrDropShardNodes    = coderr.NewCodeError(coderr.Internal, "drop shard nodes")
 	ErrCreateProcedure   = coderr.NewCodeError(coderr.Internal, "create procedure")
 	ErrSubmitProcedure   = coderr.NewCodeError(coderr.Internal, "submit procedure")
 	ErrGetCluster        = coderr.NewCodeError(coderr.Internal, "get cluster")

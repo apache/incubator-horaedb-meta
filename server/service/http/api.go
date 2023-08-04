@@ -88,7 +88,9 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/split", wrap(a.split, true, a.forwardClient))
 	router.Post("/route", wrap(a.route, true, a.forwardClient))
 	router.Post("/dropTable", wrap(a.dropTable, true, a.forwardClient))
-	router.Post("/getNodeShards", wrap(a.getNodeShards, true, a.forwardClient))
+	router.Post("/nodeShards", wrap(a.getNodeShards, true, a.forwardClient))
+	router.Del("/nodeShards/:name", wrap(a.dropNodeShards, true, a.forwardClient))
+	router.Get("/nodes/:name", wrap(a.getNodeShards, true, a.forwardClient))
 	router.Get("/flowLimiter", wrap(a.getFlowLimiter, true, a.forwardClient))
 	router.Put("/flowLimiter", wrap(a.updateFlowLimiter, true, a.forwardClient))
 	router.Get("/procedures/:name", wrap(a.listProcedures, true, a.forwardClient))
@@ -349,6 +351,72 @@ func (a *API) getNodeShards(req *http.Request) apiFuncResult {
 	result, err := a.clusterManager.GetNodeShards(context.Background(), nodeShardsRequest.ClusterName)
 	if err != nil {
 		log.Error("get node shards failed", zap.Error(err))
+		return errResult(ErrGetNodeShards, fmt.Sprintf("err: %s", err.Error()))
+	}
+
+	return okResult(result)
+}
+
+type DropNodeShardRequest struct {
+	ShardIDs []uint64 `json:"shardIDs"`
+}
+
+func (a *API) dropNodeShards(req *http.Request) apiFuncResult {
+	clusterName := Param(req.Context(), "name")
+	if len(clusterName) == 0 {
+		return errResult(ErrParseRequest, "clusterName cloud not be empty")
+	}
+
+	var dropRequest DropNodeShardRequest
+	err := json.NewDecoder(req.Body).Decode(&dropRequest)
+	if err != nil {
+		log.Error("decode request body failed", zap.Error(err))
+		return errResult(ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
+	}
+
+	c, err := a.clusterManager.GetCluster(req.Context(), clusterName)
+	if err != nil {
+		log.Error("get cluster failed", zap.String("clusterName", clusterName), zap.Error(err))
+		return errResult(ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
+	}
+
+	nodeShards, err := a.clusterManager.GetNodeShards(context.Background(), clusterName)
+	if err != nil {
+		log.Error("get node shards failed", zap.Error(err))
+		return errResult(ErrGetNodeShards, fmt.Sprintf("err: %s", err.Error()))
+	}
+
+	shardNodes := make([]storage.ShardNode, 0, len(dropRequest.ShardIDs))
+	for _, shardID := range dropRequest.ShardIDs {
+		for _, nodeShard := range nodeShards.NodeShards {
+			if nodeShard.ShardNode.ID == storage.ShardID(shardID) {
+				shardNodes = append(shardNodes, storage.ShardNode{
+					ID:        nodeShard.ShardNode.ID,
+					ShardRole: nodeShard.ShardNode.ShardRole,
+					NodeName:  nodeShard.ShardNode.NodeName,
+				})
+			}
+		}
+	}
+
+	err = c.GetMetadata().DropShardNode(req.Context(), shardNodes)
+	if err != nil {
+		log.Error("drop shard node failed", zap.Error(err))
+		return errResult(ErrDropShardNodes, fmt.Sprintf("err: %s", err.Error()))
+	}
+
+	return okResult("ok")
+}
+
+func (a *API) getNodes(req *http.Request) apiFuncResult {
+	clusterName := Param(req.Context(), "name")
+	if len(clusterName) == 0 {
+		return errResult(ErrParseRequest, "clusterName cloud not be empty")
+	}
+
+	result, err := a.clusterManager.ListRegisterNodes(context.Background(), clusterName)
+	if err != nil {
+		log.Error("get register node failed", zap.Error(err))
 		return errResult(ErrGetNodeShards, fmt.Sprintf("err: %s", err.Error()))
 	}
 
