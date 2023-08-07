@@ -88,9 +88,9 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/split", wrap(a.split, true, a.forwardClient))
 	router.Post("/route", wrap(a.route, true, a.forwardClient))
 	router.Post("/dropTable", wrap(a.dropTable, true, a.forwardClient))
-	router.Post("/nodeShards", wrap(a.getNodeShards, true, a.forwardClient))
+	router.Get("/nodeShards/:name", wrap(a.getNodeShards, true, a.forwardClient))
 	router.Del("/nodeShards/:name", wrap(a.dropNodeShards, true, a.forwardClient))
-	router.Get("/nodes/:name", wrap(a.getNodeShards, true, a.forwardClient))
+	router.Get("/nodes/:name", wrap(a.getNodes, true, a.forwardClient))
 	router.Get("/flowLimiter", wrap(a.getFlowLimiter, true, a.forwardClient))
 	router.Put("/flowLimiter", wrap(a.updateFlowLimiter, true, a.forwardClient))
 	router.Get("/procedures/:name", wrap(a.listProcedures, true, a.forwardClient))
@@ -336,19 +336,13 @@ func (a *API) route(req *http.Request) apiFuncResult {
 	return okResult(result)
 }
 
-type NodeShardsRequest struct {
-	ClusterName string `json:"clusterName"`
-}
-
 func (a *API) getNodeShards(req *http.Request) apiFuncResult {
-	var nodeShardsRequest NodeShardsRequest
-	err := json.NewDecoder(req.Body).Decode(&nodeShardsRequest)
-	if err != nil {
-		log.Error("decode request body failed", zap.Error(err))
-		return errResult(ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
+	clusterName := Param(req.Context(), "name")
+	if len(clusterName) == 0 {
+		return errResult(ErrParseRequest, "clusterName cloud not be empty")
 	}
 
-	result, err := a.clusterManager.GetNodeShards(context.Background(), nodeShardsRequest.ClusterName)
+	result, err := a.clusterManager.GetNodeShards(context.Background(), clusterName)
 	if err != nil {
 		log.Error("get node shards failed", zap.Error(err))
 		return errResult(ErrGetNodeShards, fmt.Sprintf("err: %s", err.Error()))
