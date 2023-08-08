@@ -94,6 +94,9 @@ func (a *API) NewAPIRouter() *Router {
 	router.Get("/procedures/:name", wrap(a.listProcedures, true, a.forwardClient))
 	router.Get("/healthCheck", wrap(a.healthCheck, false, a.forwardClient))
 
+	// Register Partition Table API.
+	router.Get("/partitionTable/:name", wrap(a.getPartitionTable, true, a.forwardClient))
+
 	// Register cluster API.
 	router.Get("/clusters", wrap(a.listClusters, true, a.forwardClient))
 	router.Post("/clusters", wrap(a.createCluster, true, a.forwardClient))
@@ -592,6 +595,57 @@ func (a *API) healthCheck(_ *http.Request) apiFuncResult {
 		return okResult(nil)
 	}
 	return errResult(ErrHealthCheck, fmt.Sprintf("server heath check failed, status is %v", a.serverStatus.Get()))
+}
+
+type GetPartitionTableRequest struct {
+	SchemaName string `json:"schemaName"`
+	TableName  string `json:"tableName"`
+}
+
+func (a *API) getPartitionTable(req *http.Request) apiFuncResult {
+	ctx := req.Context()
+	clusterName := Param(ctx, "name")
+	if len(clusterName) == 0 {
+		return errResult(ErrParseRequest, "clusterName cloud not be empty")
+	}
+
+	var getPartitionTableRequest GetPartitionTableRequest
+	err := json.NewDecoder(req.Body).Decode(&getPartitionTableRequest)
+	if err != nil {
+		log.Error("decode request body failed", zap.Error(err))
+		return errResult(ErrParseRequest, fmt.Sprintf("err: %s", err.Error()))
+	}
+
+	c, err := a.clusterManager.GetCluster(ctx, clusterName)
+	if err != nil {
+		log.Error("get cluster failed", zap.Error(err))
+		return errResult(ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
+	}
+
+	table, exist, err := c.GetMetadata().GetTable(getPartitionTableRequest.SchemaName, getPartitionTableRequest.TableName)
+	if err != nil {
+		log.Error("get table failed", zap.Error(err))
+		return errResult(ErrGetTable, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
+	}
+	if !exist {
+		return errResult(ErrGetTable, "table not exists")
+	}
+
+	if !table.IsPartitioned() {
+		return errResult(ErrGetTable, "table it not partitioned")
+	}
+
+	subTableName := make([]string, 0, len(table.PartitionInfo.Info.GetKey().GetDefinitions()))
+	for _, definition := range table.PartitionInfo.Info.GetKey().GetDefinitions() {
+		partitionName := definition.GetName()
+		subTableName = append(subTableName, fmt.Sprintf("__%s_%s", getPartitionTableRequest.TableName, partitionName))
+	}
+	result, err := c.GetMetadata().RouteTables(req.Context(), getPartitionTableRequest.SchemaName, subTableName)
+	if err != nil {
+		return errResult(ErrRouteTable, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
+	}
+
+	return okResult(result)
 }
 
 func (a *API) pprofHeap(writer http.ResponseWriter, req *http.Request) {

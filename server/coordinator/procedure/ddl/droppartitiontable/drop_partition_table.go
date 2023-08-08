@@ -101,11 +101,11 @@ func buildRelatedVersionInfo(params ProcedureParams) (procedure.RelatedVersionIn
 			return procedure.RelatedVersionInfo{}, errors.WithMessagef(err, "get sub table, tableName:%s", subTableName)
 		}
 		if !exists {
-			return procedure.RelatedVersionInfo{}, errors.WithMessagef(procedure.ErrTableNotExists, "get sub table, tableName:%s", subTableName)
+			continue
 		}
 		shardID, exists := tableShardMapping[table.ID]
 		if !exists {
-			return procedure.RelatedVersionInfo{}, errors.WithMessagef(metadata.ErrShardNotFound, "get shard of sub table, tableID:%d", table.ID)
+			continue
 		}
 		shardView, exists := params.ClusterSnapshot.Topology.ShardViewsMapping[shardID]
 		if !exists {
@@ -280,8 +280,8 @@ func dropDataTablesCallback(event *fsm.Event) {
 	for _, tableName := range params.SourceReq.PartitionTableInfo.SubTableNames {
 		table, shardVersionUpdate, err := ddl.GetShardVersionByTableName(params.ClusterMetadata, req.schemaName(), tableName, shardVersions)
 		if err != nil {
-			procedure.CancelEventWithLog(event, err, fmt.Sprintf("get shard version by table, table:%s", tableName))
-			return
+			log.Warn(fmt.Sprintf("get shard version by table, table:%s", tableName))
+			continue
 		}
 
 		if err := ddl.DispatchDropTable(req.ctx, params.ClusterMetadata, params.Dispatch, params.SourceReq.GetSchemaName(), table, shardVersionUpdate); err != nil {
