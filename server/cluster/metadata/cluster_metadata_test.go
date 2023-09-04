@@ -116,7 +116,7 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 	re.True(exists)
 	re.Equal(testTableName, t.Name)
 
-	// Route table should return error when table metadata is not exists in any shard.
+	// Route table return empty when table not assign to any node.
 	routeTable, err := m.RouteTables(ctx, testSchema, []string{testTableName})
 	re.NoError(err)
 	re.Equal(0, len(routeTable.RouteEntries[testTableName].NodeShards))
