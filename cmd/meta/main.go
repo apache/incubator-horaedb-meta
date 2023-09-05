@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 	"os/signal"
@@ -17,12 +18,41 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate sh -c "printf %s $(git rev-parse HEAD) > commit.version"
+//go:embed commit.version
+var commitID string
+
+//go:generate sh -c "printf %s $(git rev-parse --abbrev-ref HEAD) > branch.version"
+//go:embed branch.version
+var branchName string
+
+//go:generate sh -c "printf %s $(git tag -l --sort=-creatordate | head -n 1) > tag.version"
+//go:embed tag.version
+var latestTag string
+
+//go:generate sh -c "printf %s $(date '+%A %W %Y %X') > time.version"
+//go:embed time.version
+var buildDate string
+
+func buildVersion() string {
+	return fmt.Sprintf("CeresMeta Server\nVersion:%s\nGit commit:%s\nGit branch:%s\nBuild date:%s", latestTag, commitID, branchName, buildDate)
+}
+
 func panicf(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	panic(msg)
 }
 
 func main() {
+	// Match version input
+	for _, v := range os.Args {
+		if v == "--version" || v == "-V" {
+			version := buildVersion()
+			println(version)
+			return
+		}
+	}
+
 	cfgParser, err := config.MakeConfigParser()
 	if err != nil {
 		panicf("fail to generate config builder, err:%v", err)

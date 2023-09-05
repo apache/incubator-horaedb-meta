@@ -32,7 +32,10 @@ test: install-tools
 check-license:
 	@ sh ./scripts/check-license.sh
 
-build: check
+generate: check
+	@ go generate ./cmd/meta/...
+
+build: generate
 	@ go build -o ceresmeta ./cmd/meta/...
 
 integration_test: build
