@@ -18,10 +18,12 @@ import (
 	"go.uber.org/zap"
 )
 
-var commitID string
-var branchName string
-var gitTag string
-var buildDate string
+var (
+	buildDate  string
+	branchName string
+	commitID   string
+	gitTag     string
+)
 
 func buildVersion() string {
 	return fmt.Sprintf("CeresMeta Server\nVersion:%s\nGit commit:%s\nGit branch:%s\nBuild date:%s", gitTag, commitID, branchName, buildDate)
