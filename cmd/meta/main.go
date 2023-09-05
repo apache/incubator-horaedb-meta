@@ -18,24 +18,13 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate sh -c "printf %s $(git rev-parse HEAD) > commit.version"
-//go:embed commit.version
 var commitID string
-
-//go:generate sh -c "printf %s $(git rev-parse --abbrev-ref HEAD) > branch.version"
-//go:embed branch.version
 var branchName string
-
-//go:generate sh -c "printf %s $(git tag -l --sort=-creatordate | head -n 1) > tag.version"
-//go:embed tag.version
-var latestTag string
-
-//go:generate sh -c "printf %s $(date '+%A %W %Y %X') > time.version"
-//go:embed time.version
+var gitTag string
 var buildDate string
 
 func buildVersion() string {
-	return fmt.Sprintf("CeresMeta Server\nVersion:%s\nGit commit:%s\nGit branch:%s\nBuild date:%s", latestTag, commitID, branchName, buildDate)
+	return fmt.Sprintf("CeresMeta Server\nVersion:%s\nGit commit:%s\nGit branch:%s\nBuild date:%s", gitTag, commitID, branchName, buildDate)
 }
 
 func panicf(format string, args ...any) {
@@ -44,15 +33,6 @@ func panicf(format string, args ...any) {
 }
 
 func main() {
-	// Match version input
-	for _, v := range os.Args {
-		if v == "--version" || v == "-V" {
-			version := buildVersion()
-			println(version)
-			return
-		}
-	}
-
 	cfgParser, err := config.MakeConfigParser()
 	if err != nil {
 		panicf("fail to generate config builder, err:%v", err)
@@ -65,6 +45,11 @@ func main() {
 
 	if err != nil {
 		panicf("fail to parse config from command line params, err:%v", err)
+	}
+
+	if cfgParser.NeedPrintVersion() {
+		println(buildVersion())
+		return
 	}
 
 	if err := cfg.ValidateAndAdjust(); err != nil {
@@ -93,6 +78,7 @@ func main() {
 		panicf("fail to init global logger, err:%v", err)
 	}
 	defer logger.Sync() //nolint:errcheck
+	log.Info(fmt.Sprintf("server start with version: %s", buildVersion()))
 	// TODO: Do adjustment to config for preparing joining existing cluster.
 	log.Info("server start with config", zap.String("config", string(cfgByte)))
 
