@@ -136,7 +136,7 @@ func (c *ClusterMetadata) GetShardTables(shardIDs []storage.ShardID) map[storage
 func (c *ClusterMetadata) DropTable(ctx context.Context, schemaName, tableName string) (DropTableResult, error) {
 	c.logger.Info("drop table start", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
 
-	if c.GetClusterState() != storage.ClusterStateStable {
+	if !c.ensureClusterStable() {
 		return DropTableResult{}, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
 	}
 
@@ -174,7 +174,7 @@ func (c *ClusterMetadata) DropTable(ctx context.Context, schemaName, tableName s
 func (c *ClusterMetadata) MigrateTable(ctx context.Context, request MigrateTableRequest) error {
 	c.logger.Info("migrate table", zap.String("request", fmt.Sprintf("%v", request)))
 
-	if c.GetClusterState() != storage.ClusterStateStable {
+	if !c.ensureClusterStable() {
 		return errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
 	}
 
@@ -224,7 +224,7 @@ func (c *ClusterMetadata) GetTable(schemaName, tableName string) (storage.Table,
 func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request CreateTableMetadataRequest) (CreateTableMetadataResult, error) {
 	c.logger.Info("create table start", zap.String("cluster", c.Name()), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
 
-	if c.GetClusterState() != storage.ClusterStateStable {
+	if !c.ensureClusterStable() {
 		return CreateTableMetadataResult{}, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
 	}
 
@@ -254,7 +254,7 @@ func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request Creat
 func (c *ClusterMetadata) AddTableTopology(ctx context.Context, shardID storage.ShardID, table storage.Table) (CreateTableResult, error) {
 	c.logger.Info("add table topology start", zap.String("cluster", c.Name()), zap.String("tableName", table.Name))
 
-	if c.GetClusterState() != storage.ClusterStateStable {
+	if !c.ensureClusterStable() {
 		return CreateTableResult{}, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
 	}
 
@@ -275,7 +275,7 @@ func (c *ClusterMetadata) AddTableTopology(ctx context.Context, shardID storage.
 func (c *ClusterMetadata) DropTableMetadata(ctx context.Context, schemaName, tableName string) (DropTableMetadataResult, error) {
 	c.logger.Info("drop table start", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
 
-	if c.GetClusterState() != storage.ClusterStateStable {
+	if !c.ensureClusterStable() {
 		return DropTableMetadataResult{}, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
 	}
 
@@ -301,7 +301,7 @@ func (c *ClusterMetadata) DropTableMetadata(ctx context.Context, schemaName, tab
 func (c *ClusterMetadata) CreateTable(ctx context.Context, request CreateTableRequest) (CreateTableResult, error) {
 	c.logger.Info("create table start", zap.String("cluster", c.Name()), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
 
-	if c.GetClusterState() != storage.ClusterStateStable {
+	if !c.ensureClusterStable() {
 		return CreateTableResult{}, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
 	}
 
@@ -619,6 +619,10 @@ func (c *ClusterMetadata) GetClusterState() storage.ClusterState {
 	defer c.lock.RUnlock()
 
 	return c.topologyManager.GetClusterState()
+}
+
+func (c *ClusterMetadata) ensureClusterStable() bool {
+	return c.GetClusterState() == storage.ClusterStateStable
 }
 
 func (c *ClusterMetadata) GetClusterView() storage.ClusterView {
