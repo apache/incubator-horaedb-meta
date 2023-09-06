@@ -36,7 +36,7 @@ test: install-tools
 check-license:
 	@ sh ./scripts/check-license.sh
 
-build:
+build: check
 	@ go build -ldflags="-X main.commitID=$(COMMIT_ID) -X main.branchName=$(BRANCH_NAME) -X main.buildDate=$(BUILD_DATE)" -o ceresmeta ./cmd/meta/...
 
 integration_test: build
