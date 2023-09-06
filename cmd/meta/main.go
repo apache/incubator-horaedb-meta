@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
 	"os"
 	"os/signal"
@@ -22,11 +21,10 @@ var (
 	buildDate  string
 	branchName string
 	commitID   string
-	gitTag     string
 )
 
 func buildVersion() string {
-	return fmt.Sprintf("CeresMeta Server\nVersion:%s\nGit commit:%s\nGit branch:%s\nBuild date:%s", gitTag, commitID, branchName, buildDate)
+	return fmt.Sprintf("CeresMeta Server\nGit commit:%s\nGit branch:%s\nBuild date:%s", commitID, branchName, buildDate)
 }
 
 func panicf(format string, args ...any) {

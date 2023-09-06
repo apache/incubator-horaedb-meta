@@ -8,7 +8,6 @@ SHELL := env PATH='$(PATH)' GOBIN='$(GO_TOOLS_BIN_PATH)' $(shell which bash)
 
 COMMIT_ID := $(shell git rev-parse HEAD)
 BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD)
-GIT_TAG := $(shell git tag -l --sort=-creatordate | head -n 1)
 BUILD_DATE := $(shell date +'%Y/%m/%dT%H:%M:%S')
 
 install-tools:
@@ -38,7 +37,7 @@ check-license:
 	@ sh ./scripts/check-license.sh
 
 build:
-	@ go build -ldflags="-X main.commitID=$(COMMIT_ID) -X main.branchName=$(BRANCH_NAME) -X main.gitTag=$(GIT_TAG) -X main.buildDate=$(BUILD_DATE)" -o ceresmeta ./cmd/meta/...
+	@ go build -ldflags="-X main.commitID=$(COMMIT_ID) -X main.branchName=$(BRANCH_NAME) -X main.buildDate=$(BUILD_DATE)" -o ceresmeta ./cmd/meta/...
 
 integration_test: build
 	@ sh ./scripts/run_integration_test.sh

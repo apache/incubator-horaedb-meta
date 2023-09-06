@@ -312,8 +312,6 @@ func MakeConfigParser() (*Parser, error) {
 
 	version := fs.Bool("version", false, "print version information")
 
-	println(*version)
-
 	builder := &Parser{
 		flagSet: fs,
 		cfg:     cfg,
