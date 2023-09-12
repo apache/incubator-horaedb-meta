@@ -170,7 +170,7 @@ func validateTable(params ProcedureParams) (storage.ShardID, error) {
 	}
 	if !exists {
 		log.Error("drop non-existing table", zap.String("schema", params.SourceReq.GetSchemaName()), zap.String("table", params.SourceReq.GetName()))
-		return 0, err
+		return 0, errors.WithMessagef(metadata.ErrTableNotFound, "The table to drop doesn't exists, schema:%s, table:%s", params.SourceReq.GetSchemaName(), params.SourceReq.GetName())
 	}
 
 	for _, shardView := range params.ClusterSnapshot.Topology.ShardViewsMapping {
