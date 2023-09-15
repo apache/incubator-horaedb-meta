@@ -17,6 +17,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/config"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
+	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/limiter"
 	"github.com/CeresDB/ceresmeta/server/member"
@@ -274,6 +275,7 @@ type TransferLeaderRequest struct {
 	ShardID           uint32 `json:"shardID"`
 	OldLeaderNodeName string `json:"OldLeaderNodeName"`
 	NewLeaderNodeName string `json:"newLeaderNodeName"`
+	NeedUpdateMapping bool   `json:"needUpdateMapping"`
 }
 
 func (a *API) transferLeader(req *http.Request) apiFuncResult {
@@ -305,6 +307,44 @@ func (a *API) transferLeader(req *http.Request) apiFuncResult {
 	if err != nil {
 		log.Error("submit transfer leader procedure failed", zap.Error(err))
 		return errResult(ErrSubmitProcedure, fmt.Sprintf("err: %s", err.Error()))
+	}
+
+	if transferLeaderRequest.NeedUpdateMapping {
+		// Close old shard
+
+		// Drop old leader shard node mapping.
+		if err := c.GetMetadata().DropShardNode(req.Context(), []storage.ShardNode{{
+			ID:        storage.ShardID(transferLeaderRequest.ShardID),
+			ShardRole: storage.ShardRoleLeader,
+			NodeName:  transferLeaderRequest.OldLeaderNodeName,
+		}}); err != nil {
+			log.Error("drop old leader mapping failed", zap.Error(err))
+			return errResult(ErrDropShardNodes, fmt.Sprintf("err: %s", err.Error()))
+		}
+
+		// Add new leader shard node mapping.
+		mapping := map[string][]storage.ShardNode{}
+		for _, shardNode := range c.GetMetadata().GetClusterSnapshot().Topology.ClusterView.ShardNodes {
+			if shardNode.NodeName == transferLeaderRequest.NewLeaderNodeName {
+				mapping[transferLeaderRequest.NewLeaderNodeName] = append(mapping[transferLeaderRequest.NewLeaderNodeName], shardNode)
+				if shardNode.ID == storage.ShardID(transferLeaderRequest.ShardID) {
+					continue
+				}
+			}
+		}
+		mapping[transferLeaderRequest.NewLeaderNodeName] = append(mapping[transferLeaderRequest.NewLeaderNodeName], storage.ShardNode{
+			ID:        storage.ShardID(transferLeaderRequest.ShardID),
+			ShardRole: storage.ShardRoleLeader,
+			NodeName:  transferLeaderRequest.NewLeaderNodeName},
+		)
+		if err := c.GetMetadata().UpdateClusterViewByNode(req.Context(), mapping); err != nil {
+			log.Error("add new leader mapping failed", zap.Error(err))
+			return errResult(ErrDropShardNodes, fmt.Sprintf("err: %s", err.Error()))
+		}
+
+		// Try to close old shard.
+		dispatch := eventdispatch.NewDispatchImpl()
+		dispatch.CloseShard(req.Context(), transferLeaderRequest.OldLeaderNodeName, eventdispatch.CloseShardRequest{ShardID: transferLeaderRequest.ShardID})
 	}
 
 	return okResult("ok")

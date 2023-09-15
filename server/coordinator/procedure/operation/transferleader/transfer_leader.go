@@ -86,7 +86,7 @@ type ProcedureParams struct {
 }
 
 func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
-	if err := validateClusterTopology(params.ClusterSnapshot.Topology, params.ShardID, params.OldLeaderNodeName); err != nil {
+	if err := validateClusterTopology(params.ClusterSnapshot.Topology, params.ShardID); err != nil {
 		return nil, err
 	}
 
@@ -125,28 +125,11 @@ func buildRelatedVersionInfo(params ProcedureParams) (procedure.RelatedVersionIn
 	return relatedVersionInfo, nil
 }
 
-func validateClusterTopology(topology metadata.Topology, shardID storage.ShardID, oldLeaderNodeName string) error {
+func validateClusterTopology(topology metadata.Topology, shardID storage.ShardID) error {
 	_, found := topology.ShardViewsMapping[shardID]
 	if !found {
 		log.Error("shard not found", zap.Uint64("shardID", uint64(shardID)))
 		return metadata.ErrShardNotFound
-	}
-	if len(oldLeaderNodeName) == 0 {
-		return nil
-	}
-	shardNodes := topology.ClusterView.ShardNodes
-	if len(shardNodes) == 0 {
-		log.Error("shard not exist in any node", zap.Uint32("shardID", uint32(shardID)))
-		return metadata.ErrShardNotFound
-	}
-	for _, shardNode := range shardNodes {
-		if shardNode.ID == shardID {
-			leaderNodeName := shardNode.NodeName
-			if leaderNodeName != oldLeaderNodeName {
-				log.Error("shard leader node not match", zap.String("requestOldLeaderNodeName", oldLeaderNodeName), zap.String("actualOldLeaderNodeName", leaderNodeName))
-				return metadata.ErrNodeNotFound
-			}
-		}
 	}
 	return nil
 }
