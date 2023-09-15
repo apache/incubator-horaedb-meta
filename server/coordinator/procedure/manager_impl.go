@@ -156,12 +156,13 @@ func (m *ManagerImpl) startProcedurePromoteInternal(ctx context.Context, procedu
 
 func (m *ManagerImpl) startProcedureWorker(ctx context.Context, newProcedure Procedure, procedureWorkerChan chan struct{}) {
 	go func() {
+		start := time.Now()
 		m.logger.Info("procedure start", zap.Uint64("procedureID", newProcedure.ID()))
 		err := newProcedure.Start(ctx)
 		if err != nil {
-			m.logger.Error("procedure start failed", zap.Error(err))
+			m.logger.Error("procedure start failed", zap.Error(err), zap.Int64("costTime", time.Since(start).Milliseconds()))
 		}
-		m.logger.Info("procedure finish", zap.Uint64("procedureID", newProcedure.ID()))
+		m.logger.Info("procedure finish", zap.Uint64("procedureID", newProcedure.ID()), zap.Int64("costTime", time.Since(start).Milliseconds()))
 		for shardID := range newProcedure.RelatedVersionInfo().ShardWithVersion {
 			m.lock.Lock()
 			delete(m.runningProcedures, shardID)

@@ -51,9 +51,21 @@ func prepareCallback(event *fsm.Event) {
 	}
 	params := req.p.params
 
-	table, shardVersionUpdate, err := ddl.GetShardVersionByTableName(params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetName(), req.p.relatedVersionInfo.ShardWithVersion)
+	table, err := ddl.GetTableMetadata(params.ClusterMetadata, params.SourceReq.GetSchemaName(), params.SourceReq.GetName())
 	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get shard version by table name", zap.String("tableName", params.SourceReq.GetName()))
+		procedure.CancelEventWithLog(event, err, "get table metadata", zap.String("tableName", params.SourceReq.GetName()), zap.Error(err))
+		return
+	}
+
+	shardVersionUpdate, err := ddl.GetTableShardVersion(table, params.ClusterMetadata, req.p.relatedVersionInfo.ShardWithVersion)
+	if err != nil {
+		_, err = params.ClusterMetadata.DropTable(req.ctx, params.SourceReq.GetSchemaName(), params.SourceReq.GetName())
+		if err != nil {
+			procedure.CancelEventWithLog(event, err, "drop table metadata", zap.String("tableName", params.SourceReq.GetName()))
+			return
+		}
+		log.Error("get shard version by table", zap.String("tableName", params.SourceReq.GetName()), zap.Error(err))
+		procedure.CancelEventWithLog(event, err, "get shard version by table name", zap.String("tableName", params.SourceReq.GetName()), zap.Error(err))
 		return
 	}
 

@@ -67,18 +67,21 @@ func BuildCreateTableRequest(table storage.Table, shardVersionUpdate metadata.Sh
 	}
 }
 
-func GetShardVersionByTableName(clusterMetadata *metadata.ClusterMetadata, schemaName, tableName string, shardVersions map[storage.ShardID]uint64) (storage.Table, metadata.ShardVersionUpdate, error) {
+func GetTableMetadata(clusterMetadata *metadata.ClusterMetadata, schemaName, tableName string) (storage.Table, error) {
 	table, exists, err := clusterMetadata.GetTable(schemaName, tableName)
 	if err != nil {
-		return storage.Table{}, metadata.ShardVersionUpdate{}, err
+		return storage.Table{}, err
 	}
 	if !exists {
-		return storage.Table{}, metadata.ShardVersionUpdate{}, errors.WithMessage(procedure.ErrTableNotExists, "table not exists")
+		return storage.Table{}, errors.WithMessage(procedure.ErrTableNotExists, "table not exists")
 	}
+	return table, nil
+}
 
+func GetTableShardVersion(table storage.Table, clusterMetadata *metadata.ClusterMetadata, shardVersions map[storage.ShardID]uint64) (metadata.ShardVersionUpdate, error) {
 	shardNodesResult, err := clusterMetadata.GetShardNodeByTableIDs([]storage.TableID{table.ID})
 	if err != nil {
-		return storage.Table{}, metadata.ShardVersionUpdate{}, err
+		return metadata.ShardVersionUpdate{}, err
 	}
 
 	leader := storage.ShardNode{}
@@ -92,17 +95,17 @@ func GetShardVersionByTableName(clusterMetadata *metadata.ClusterMetadata, schem
 	}
 
 	if !found {
-		return storage.Table{}, metadata.ShardVersionUpdate{}, errors.WithMessage(procedure.ErrShardLeaderNotFound, "can't find leader")
+		return metadata.ShardVersionUpdate{}, errors.WithMessagef(procedure.ErrShardLeaderNotFound, "can't find leader")
 	}
 
 	prevVersion, exists := shardVersions[leader.ID]
 	if !exists {
-		return storage.Table{}, metadata.ShardVersionUpdate{}, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
+		return metadata.ShardVersionUpdate{}, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
 	}
 
 	currVersion := prevVersion + 1
 
-	return table, metadata.ShardVersionUpdate{
+	return metadata.ShardVersionUpdate{
 		ShardID:     leader.ID,
 		CurrVersion: currVersion,
 		PrevVersion: prevVersion,
