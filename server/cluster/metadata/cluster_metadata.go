@@ -221,6 +221,10 @@ func (c *ClusterMetadata) GetTable(schemaName, tableName string) (storage.Table,
 	return c.tableManager.GetTable(schemaName, tableName)
 }
 
+func (c *ClusterMetadata) ListTables(schemaName string) ([]storage.Table, error) {
+	return c.tableManager.ListTables(schemaName)
+}
+
 func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request CreateTableMetadataRequest) (CreateTableMetadataResult, error) {
 	c.logger.Info("create table start", zap.String("cluster", c.Name()), zap.String("schemaName", request.SchemaName), zap.String("tableName", request.TableName))
 

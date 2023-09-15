@@ -22,6 +22,8 @@ type TableManager interface {
 	GetTable(schemaName string, tableName string) (storage.Table, bool, error)
 	// GetTablesByIDs get tables with tableIDs.
 	GetTablesByIDs(tableIDs []storage.TableID) []storage.Table
+	// ListTables get all tables with schemaName.
+	ListTables(schemaName string) ([]storage.Table, error)
 	// CreateTable create table with schemaName and tableName.
 	CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo storage.PartitionInfo) (storage.Table, error)
 	// DropTable drop table with schemaName and tableName.
@@ -101,6 +103,26 @@ func (m *TableManagerImpl) GetTablesByIDs(tableIDs []storage.TableID) []storage.
 	}
 
 	return result
+}
+
+func (m *TableManagerImpl) ListTables(schemaName string) ([]storage.Table, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	schema, ok := m.schemas[schemaName]
+	if !ok {
+		return []storage.Table{}, ErrSchemaNotFound.WithCausef("schema name", schemaName)
+	}
+	tables, ok := m.schemaTables[schema.ID]
+	if !ok {
+		return []storage.Table{}, nil
+	}
+
+	result := make([]storage.Table, 0, len(tables.tables))
+	for _, table := range tables.tables {
+		result = append(result, table)
+	}
+	return result, nil
 }
 
 func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo storage.PartitionInfo) (storage.Table, error) {

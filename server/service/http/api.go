@@ -87,6 +87,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post("/transferLeader", wrap(a.transferLeader, true, a.forwardClient))
 	router.Post("/split", wrap(a.split, true, a.forwardClient))
 	router.Post("/route", wrap(a.route, true, a.forwardClient))
+	router.Get("/listTables/:name/:schema", wrap(a.listTables, true, a.forwardClient))
 	router.Post("/dropTable", wrap(a.dropTable, true, a.forwardClient))
 	router.Post("/getNodeShards", wrap(a.getNodeShards, true, a.forwardClient))
 	router.Get("/flowLimiter", wrap(a.getFlowLimiter, true, a.forwardClient))
@@ -332,6 +333,31 @@ func (a *API) route(req *http.Request) apiFuncResult {
 	}
 
 	return okResult(result)
+}
+
+func (a *API) listTables(req *http.Request) apiFuncResult {
+	clusterName := Param(req.Context(), "name")
+	if len(clusterName) == 0 {
+		return errResult(ErrParseRequest, "clusterName cloud not be empty")
+	}
+	c, err := a.clusterManager.GetCluster(req.Context(), clusterName)
+	if err != nil {
+		log.Error("get cluster failed", zap.String("clusterName", clusterName), zap.Error(err))
+		return errResult(ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
+	}
+
+	schemaName := Param(req.Context(), "schema")
+	if len(clusterName) == 0 {
+		return errResult(ErrParseRequest, "schemaName cloud not be empty")
+	}
+
+	tables, err := c.GetMetadata().ListTables(schemaName)
+	if err != nil {
+		log.Error("list tables failed", zap.String("clusterName", clusterName), zap.String("schemaName", schemaName), zap.Error(err))
+		return errResult(ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
+	}
+
+	return okResult(tables)
 }
 
 type NodeShardsRequest struct {
