@@ -187,6 +187,10 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 	})
 }
 
+// CreateDropTableProcedure creates a procedure to do drop table.
+//
+// And if no error is thrown, the returned boolean value is used to tell whether the procedure is created.
+// In some cases, e.g. the table doesn't exist, it should not be an error and false will be returned.
 func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTableRequest) (procedure.Procedure, bool, error) {
 	id, err := f.allocProcedureID(ctx)
 	if err != nil {
