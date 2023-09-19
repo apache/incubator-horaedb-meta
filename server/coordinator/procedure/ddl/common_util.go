@@ -73,15 +73,19 @@ func GetTableMetadata(clusterMetadata *metadata.ClusterMetadata, schemaName, tab
 		return storage.Table{}, err
 	}
 	if !exists {
-		return storage.Table{}, errors.WithMessage(procedure.ErrTableNotExists, "table not exists")
+		return storage.Table{}, errors.WithMessagef(procedure.ErrTableNotExists, "table not exists, tableName:%s", tableName)
 	}
 	return table, nil
 }
 
-func GetTableShardVersion(table storage.Table, clusterMetadata *metadata.ClusterMetadata, shardVersions map[storage.ShardID]uint64) (metadata.ShardVersionUpdate, error) {
+// BuildShardVersionUpdate build shard version update to assist in DDL on the shard.
+//
+// And if error is throw, the returned boolean value is used to tell whether this table is allocated to shard.
+// In some cases, we need to use this value to determine whether DDL can be executed normally。
+func BuildShardVersionUpdate(table storage.Table, clusterMetadata *metadata.ClusterMetadata, shardVersions map[storage.ShardID]uint64) (metadata.ShardVersionUpdate, bool, error) {
 	shardNodesResult, err := clusterMetadata.GetShardNodeByTableIDs([]storage.TableID{table.ID})
 	if err != nil {
-		return metadata.ShardVersionUpdate{}, err
+		return metadata.ShardVersionUpdate{}, true, err
 	}
 
 	leader := storage.ShardNode{}
@@ -95,12 +99,12 @@ func GetTableShardVersion(table storage.Table, clusterMetadata *metadata.Cluster
 	}
 
 	if !found {
-		return metadata.ShardVersionUpdate{}, errors.WithMessagef(procedure.ErrShardLeaderNotFound, "can't find leader")
+		return metadata.ShardVersionUpdate{}, false, errors.WithMessagef(procedure.ErrShardLeaderNotFound, "table can't find leader shard, tableName:%s", table.Name)
 	}
 
 	prevVersion, exists := shardVersions[leader.ID]
 	if !exists {
-		return metadata.ShardVersionUpdate{}, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
+		return metadata.ShardVersionUpdate{}, true, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
 	}
 
 	currVersion := prevVersion + 1
@@ -109,7 +113,7 @@ func GetTableShardVersion(table storage.Table, clusterMetadata *metadata.Cluster
 		ShardID:     leader.ID,
 		CurrVersion: currVersion,
 		PrevVersion: prevVersion,
-	}, nil
+	}, true, nil
 }
 
 func DispatchDropTable(ctx context.Context, clusterMetadata *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, schemaName string, table storage.Table, version metadata.ShardVersionUpdate) error {

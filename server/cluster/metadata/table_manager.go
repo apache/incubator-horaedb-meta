@@ -112,7 +112,7 @@ func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, t
 	}
 
 	if exists {
-		return storage.Table{}, errors.WithMessagef(ErrTableAlreadyExists, "table name:%s ", tableName)
+		return storage.Table{}, errors.WithMessagef(ErrTableAlreadyExists, "tableName:%s ", tableName)
 	}
 
 	// Create table in storage.

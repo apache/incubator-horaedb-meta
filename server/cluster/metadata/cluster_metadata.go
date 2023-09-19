@@ -234,7 +234,7 @@ func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request Creat
 	}
 
 	if exists {
-		return CreateTableMetadataResult{}, errors.WithMessagef(ErrTableAlreadyExists, "table name %s", request.TableName)
+		return CreateTableMetadataResult{}, errors.WithMessagef(ErrTableAlreadyExists, "tableName %s", request.TableName)
 	}
 
 	// Create table in table manager.
@@ -311,7 +311,7 @@ func (c *ClusterMetadata) CreateTable(ctx context.Context, request CreateTableRe
 	}
 
 	if exists {
-		return CreateTableResult{}, errors.WithMessagef(ErrTableAlreadyExists, "table name:%s", request.TableName)
+		return CreateTableResult{}, errors.WithMessagef(ErrTableAlreadyExists, "tableName:%s", request.TableName)
 	}
 
 	// Create table in table manager.
