@@ -187,10 +187,10 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 	})
 }
 
-func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTableRequest) (procedure.Procedure, error) {
+func (f *Factory) CreateDropTableProcedure(ctx context.Context, request DropTableRequest) (procedure.Procedure, bool, error) {
 	id, err := f.allocProcedureID(ctx)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	snapshot := request.ClusterMetadata.GetClusterSnapshot()

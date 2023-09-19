@@ -79,7 +79,7 @@ func TestDropTable(t *testing.T) {
 	ctx := context.Background()
 	f, m := setupFactory(t)
 	// Drop normal table procedure.
-	_, err := f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
+	_, _, err := f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
 		ClusterMetadata: m,
 		ClusterSnapshot: m.GetClusterSnapshot(),
 		SourceReq: &metaservicepb.DropTableRequest{
@@ -94,7 +94,7 @@ func TestDropTable(t *testing.T) {
 	re.Error(err)
 
 	// Create partition table procedure.
-	_, err = f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
+	_, _, err = f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
 		ClusterMetadata: m,
 		ClusterSnapshot: m.GetClusterSnapshot(),
 		SourceReq: &metaservicepb.DropTableRequest{
