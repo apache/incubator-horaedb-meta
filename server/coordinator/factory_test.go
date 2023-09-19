@@ -79,7 +79,7 @@ func TestDropTable(t *testing.T) {
 	ctx := context.Background()
 	f, m := setupFactory(t)
 	// Drop normal table procedure.
-	_, _, err := f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
+	p, ok, err := f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
 		ClusterMetadata: m,
 		ClusterSnapshot: m.GetClusterSnapshot(),
 		SourceReq: &metaservicepb.DropTableRequest{
@@ -91,10 +91,12 @@ func TestDropTable(t *testing.T) {
 		OnSucceeded: nil,
 		OnFailed:    nil,
 	})
-	re.Error(err)
+	re.NoError(err)
+	re.False(ok)
+	re.Nil(p)
 
 	// Create partition table procedure.
-	_, _, err = f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
+	p, ok, err = f.CreateDropTableProcedure(ctx, coordinator.DropTableRequest{
 		ClusterMetadata: m,
 		ClusterSnapshot: m.GetClusterSnapshot(),
 		SourceReq: &metaservicepb.DropTableRequest{
@@ -111,6 +113,8 @@ func TestDropTable(t *testing.T) {
 	})
 	// Drop non-existing partition table.
 	re.Error(err)
+	re.False(ok)
+	re.Nil(p)
 }
 
 func TestTransferLeader(t *testing.T) {
