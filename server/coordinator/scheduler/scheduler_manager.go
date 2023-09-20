@@ -75,7 +75,7 @@ func NewManager(logger *zap.Logger, procedureManager procedure.Manager, factory 
 		procedureManager:            procedureManager,
 		registerSchedulers:          []Scheduler{},
 		factory:                     factory,
-		nodePicker:                  coordinator.NewUniformityConsistentHashNodePicker(logger),
+		nodePicker:                  coordinator.NewConsistentUniformHashNodePicker(logger),
 		clusterMetadata:             clusterMetadata,
 		client:                      client,
 		shardWatch:                  shardWatch,

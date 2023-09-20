@@ -25,7 +25,7 @@ func TestNodePicker(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
 
-	nodePicker := NewUniformityConsistentHashNodePicker(zap.NewNop())
+	nodePicker := NewConsistentUniformHashNodePicker(zap.NewNop())
 
 	var nodes []metadata.RegisteredNode
 	_, err := nodePicker.PickNode(ctx, []storage.ShardID{0}, defaultTotalShardNum, nodes)
@@ -67,7 +67,7 @@ func TestUniformity(t *testing.T) {
 	re := require.New(t)
 	ctx := context.Background()
 
-	nodePicker := NewUniformityConsistentHashNodePicker(zap.NewNop())
+	nodePicker := NewConsistentUniformHashNodePicker(zap.NewNop())
 	mapping := allocShards(ctx, nodePicker, 30, 256, re)
 	maxShardNum := 256/30 + 1
 	for nodeName, shards := range mapping {

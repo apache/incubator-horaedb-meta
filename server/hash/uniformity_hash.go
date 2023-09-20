@@ -27,34 +27,7 @@
 // For more information about the underlying algorithm, please take a look at
 // https://research.googleblog.com/2017/04/consistent-hashing-with-bounded-loads.html
 //
-// Example Use:
-//
-//		cfg := consistent.Config{
-//			PartitionCount:    71,
-//			ReplicationFactor: 20,
-//			Load:              1.25,
-//			Hasher:            hasher{},
-//		}
-//
-//	     // Create a new consistent object
-//	     // You may call this with a list of members
-//	     // instead of adding them one by one.
-//		c := consistent.New(members, cfg)
-//
-//	     // myMember struct just needs to implement a String method.
-//	     // New/Add/Remove distributes partitions among members using the algorithm
-//	     // defined on Google Research Blog.
-//		c.Add(myMember)
-//
-//		key := []byte("my-key")
-//	     // LocateKey hashes the key and calculates partition ID with
-//	     // this modulo operation: MOD(hash result, partition count)
-//	     // The owner of the partition is already calculated by New/Add/Remove.
-//	     // LocateKey just returns the member which's responsible for the key.
-//		member := c.LocateKey(key)
-//
-// We optimized this hash algorithm and improved the problem of panic in borderline cases mentioned in this issue:
-// https://github.com/buraksezer/consistent/issues/13
+// We optimized and simplify this hash algorithm [implementation](https://github.com/buraksezer/consistent/issues/13)
 package hash
 
 import (
@@ -63,7 +36,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"sync"
 )
 
 var (
@@ -72,12 +44,14 @@ var (
 
 	// ErrMemberNotFound represents an error which means requested member could not be found in consistent hash ring.
 	ErrMemberNotFound = errors.New("member could not be found in ring")
+
+	// ErrHasherNotProvided will be thrown if the hasher is not provided.
+	ErrHasherNotProvided = errors.New("hasher is required")
+
+	// ErrMemberNotFound will be thrown if the replication factor is zero or negative.
+	ErrPositiveReplicationFactor = errors.New("positive replication factor is required")
 )
 
-// Hasher is responsible for generating unsigned, 64 bit hash of provided byte slice.
-// Hasher should minimize collisions (generating same hash for different byte slice)
-// and while performance is also important fast functions are preferable (i.e.
-// you can use FarmHash family).
 type Hasher interface {
 	Sum64([]byte) uint64
 }
@@ -95,87 +69,97 @@ type Config struct {
 	// Keys are distributed among partitions. Prime numbers are good to
 	// distribute keys uniformly. Select a big PartitionCount if you have
 	// too many keys.
-	PartitionCount int
-
-	// Members are replicated on consistent hash ring. This number means that a member
-	// how many times replicated on the ring.
 	ReplicationFactor int
-
-	// Load is used to calculate average load. See the code, the paper and Google's blog post to learn about it.
-	Load float64
 }
 
-// Consistent holds the information about the members of the consistent hash circle.
-type Consistent struct {
-	mu sync.RWMutex
-
+// ConsistentUniformHash generates a uniform distribution of partitions over the members, and this distribution will keep as
+// consistent as possible while the members has some tiny changes.
+type ConsistentUniformHash struct {
 	config         Config
-	hasher         Hasher
-	sortedSet      []uint64
 	partitionCount uint64
-	loads          map[string]float64
+	sortedSet      []uint64
 	members        map[string]*Member
+	loads          map[string]float64
 	partitions     map[int]*Member
 	ring           map[uint64]*Member
 }
 
-// NewUniformityHash creates and returns a new Consistent object.
-func NewUniformityHash(members []Member, config Config) *Consistent {
-	c := &Consistent{
+func (c *Config) Sanitize() error {
+	if c.Hasher == nil {
+		return ErrHasherNotProvided
+	}
+
+	if c.ReplicationFactor <= 0 {
+		return ErrPositiveReplicationFactor
+	}
+
+	return nil
+}
+
+// NewUniformConsistentHash creates and returns a new Consistent object.
+func NewUniformConsistentHash(partitionNum int, members []Member, config Config) (*ConsistentUniformHash, error) {
+	if err := config.Sanitize(); err != nil {
+		return nil, err
+	}
+
+	numReplicatedNodes := len(members) * config.ReplicationFactor
+	c := &ConsistentUniformHash{
 		config:         config,
-		members:        make(map[string]*Member),
-		partitionCount: uint64(config.PartitionCount),
-		ring:           make(map[uint64]*Member),
+		partitionCount: uint64(partitionNum),
+		sortedSet:      make([]uint64, 0, numReplicatedNodes),
+		members:        make(map[string]*Member, len(members)),
+		loads:          make(map[string]float64, len(members)),
+		partitions:     make(map[int]*Member, partitionNum),
+		ring:           make(map[uint64]*Member, numReplicatedNodes),
 	}
-	if config.Hasher == nil {
-		panic("Hasher cannot be nil")
-	}
-	// TODO: Check configuration here
-	c.hasher = config.Hasher
+
 	for _, member := range members {
 		c.add(member)
 	}
-	if members != nil {
-		c.distributePartitions()
+	c.distributePartitions()
+	return c, nil
+}
+
+func (c *ConsistentUniformHash) MinLoad() float64 {
+	return math.Floor(c.AvgLoad())
+}
+
+func (c *ConsistentUniformHash) AvgLoad() float64 {
+	return float64(c.partitionCount) / float64(len(c.members))
+}
+
+func (c *ConsistentUniformHash) MaxLoad() float64 {
+	return math.Ceil(c.AvgLoad())
+}
+
+func (c *ConsistentUniformHash) distributePartition(partID, idx int) {
+	avgLoad := c.AvgLoad()
+	ok := c.distributeWithLoad(partID, idx, avgLoad)
+	if ok {
+		return
 	}
-	return c
-}
 
-// GetMembers returns a thread-safe copy of members.
-func (c *Consistent) GetMembers() []Member {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	// Create a thread-safe copy of member list.
-	members := make([]Member, 0, len(c.members))
-	for _, member := range c.members {
-		members = append(members, *member)
+	maxLoad := c.MaxLoad()
+	ok = c.distributeWithLoad(partID, idx, maxLoad)
+	if !ok {
+		panic("not enough room to distribute partitions")
 	}
-	return members
 }
 
-// AverageLoad exposes the current average load.
-func (c *Consistent) AverageLoad() float64 {
-	avgLoad := float64(c.partitionCount) / float64(len(c.members)) * c.config.Load
-	return math.Ceil(avgLoad)
-}
-
-func (c *Consistent) distributeWithLoad(partID, idx int, partitions map[int]*Member, loads map[string]float64) {
-	avgLoad := c.AverageLoad()
+func (c *ConsistentUniformHash) distributeWithLoad(partID, idx int, allowedLoad float64) bool {
 	var count int
 	for {
 		count++
 		if count > len(c.sortedSet) {
-			// User needs to decrease partition count, increase member count or increase load factor.
-			panic("not enough room to distribute partitions")
+			return false
 		}
 		i := c.sortedSet[idx]
 		member := *c.ring[i]
-		load := loads[member.String()]
-		if load+1 <= avgLoad {
-			partitions[partID] = &member
-			loads[member.String()]++
-			return
+		load := c.loads[member.String()]
+		if load+1 <= allowedLoad {
+			c.partitions[partID] = &member
+			c.loads[member.String()]++
+			return true
 		}
 		idx++
 		if idx >= len(c.sortedSet) {
@@ -184,93 +168,39 @@ func (c *Consistent) distributeWithLoad(partID, idx int, partitions map[int]*Mem
 	}
 }
 
-func (c *Consistent) distributePartitions() {
-	loads := make(map[string]float64)
-	partitions := make(map[int]*Member)
-
+func (c *ConsistentUniformHash) distributePartitions() {
 	bs := make([]byte, 8)
 	for partID := uint64(0); partID < c.partitionCount; partID++ {
 		binary.LittleEndian.PutUint64(bs, partID)
-		key := c.hasher.Sum64(bs)
+		key := c.config.Hasher.Sum64(bs)
 		idx := sort.Search(len(c.sortedSet), func(i int) bool {
 			return c.sortedSet[i] >= key
 		})
 		if idx >= len(c.sortedSet) {
 			idx = 0
 		}
-		c.distributeWithLoad(int(partID), idx, partitions, loads)
+		c.distributePartition(int(partID), idx)
 	}
-	c.partitions = partitions
-	c.loads = loads
 }
 
-func (c *Consistent) add(member Member) {
+func (c *ConsistentUniformHash) add(member Member) {
 	for i := 0; i < c.config.ReplicationFactor; i++ {
 		key := []byte(fmt.Sprintf("%s%d", member.String(), i))
-		h := c.hasher.Sum64(key)
+		h := c.config.Hasher.Sum64(key)
 		c.ring[h] = &member
 		c.sortedSet = append(c.sortedSet, h)
 	}
-	// sort hashes ascendingly
+
 	sort.Slice(c.sortedSet, func(i int, j int) bool {
 		return c.sortedSet[i] < c.sortedSet[j]
 	})
+
 	// Storing member at this map is useful to find backup members of a partition.
 	c.members[member.String()] = &member
 }
 
-// Add adds a new member to the consistent hash circle.
-func (c *Consistent) Add(member Member) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, ok := c.members[member.String()]; ok {
-		// We already have this member. Quit immediately.
-		return
-	}
-	c.add(member)
-	c.distributePartitions()
-}
-
-func (c *Consistent) delSlice(val uint64) {
-	for i := 0; i < len(c.sortedSet); i++ {
-		if c.sortedSet[i] == val {
-			c.sortedSet = append(c.sortedSet[:i], c.sortedSet[i+1:]...)
-			break
-		}
-	}
-}
-
-// Remove removes a member from the consistent hash circle.
-func (c *Consistent) Remove(name string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, ok := c.members[name]; !ok {
-		// There is no member with that name. Quit immediately.
-		return
-	}
-
-	for i := 0; i < c.config.ReplicationFactor; i++ {
-		key := []byte(fmt.Sprintf("%s%d", name, i))
-		h := c.hasher.Sum64(key)
-		delete(c.ring, h)
-		c.delSlice(h)
-	}
-	delete(c.members, name)
-	if len(c.members) == 0 {
-		// consistent hash ring is empty now. Reset the partition table.
-		c.partitions = make(map[int]*Member)
-		return
-	}
-	c.distributePartitions()
-}
-
 // LoadDistribution exposes load distribution of members.
-func (c *Consistent) LoadDistribution() map[string]float64 {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+func (c *ConsistentUniformHash) LoadDistribution() map[string]float64 {
 	// Create a thread-safe copy
 	res := make(map[string]float64)
 	for member, load := range c.loads {
@@ -279,89 +209,12 @@ func (c *Consistent) LoadDistribution() map[string]float64 {
 	return res
 }
 
-// FindPartitionID returns partition id for given key.
-func (c *Consistent) FindPartitionID(key []byte) int {
-	hkey := c.hasher.Sum64(key)
-	return int(hkey % c.partitionCount)
-}
-
 // GetPartitionOwner returns the owner of the given partition.
-func (c *Consistent) GetPartitionOwner(partID int) Member {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+func (c *ConsistentUniformHash) GetPartitionOwner(partID int) Member {
 	member, ok := c.partitions[partID]
 	if !ok {
 		return nil
 	}
 	// Create a thread-safe copy of member and return it.
 	return *member
-}
-
-// LocateKey finds a home for given key
-func (c *Consistent) LocateKey(key []byte) Member {
-	partID := c.FindPartitionID(key)
-	return c.GetPartitionOwner(partID)
-}
-
-func (c *Consistent) getClosestN(partID, count int) ([]Member, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	res := []Member{}
-	if count > len(c.members) {
-		return res, ErrInsufficientMemberCount
-	}
-
-	var ownerKey uint64
-	owner := c.GetPartitionOwner(partID)
-	// Hash and sort all the names.
-	keys := []uint64{}
-	kmems := make(map[uint64]*Member)
-	for name, member := range c.members {
-		key := c.hasher.Sum64([]byte(name))
-		if name == owner.String() {
-			ownerKey = key
-		}
-		keys = append(keys, key)
-		kmems[key] = member
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
-
-	// Find the key owner
-	idx := 0
-	for idx < len(keys) {
-		if keys[idx] == ownerKey {
-			key := keys[idx]
-			res = append(res, *kmems[key])
-			break
-		}
-		idx++
-	}
-
-	// Find the closest(replica owners) members.
-	for len(res) < count {
-		idx++
-		if idx >= len(keys) {
-			idx = 0
-		}
-		key := keys[idx]
-		res = append(res, *kmems[key])
-	}
-	return res, nil
-}
-
-// GetClosestN returns the closest N member to a key in the hash ring.
-// This may be useful to find members for replication.
-func (c *Consistent) GetClosestN(key []byte, count int) ([]Member, error) {
-	partID := c.FindPartitionID(key)
-	return c.getClosestN(partID, count)
-}
-
-// GetClosestNForPartition returns the closest N member for given partition.
-// This may be useful to find members for replication.
-func (c *Consistent) GetClosestNForPartition(partID, count int) ([]Member, error) {
-	return c.getClosestN(partID, count)
 }

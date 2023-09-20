@@ -27,15 +27,14 @@ package hash
 import (
 	"fmt"
 	"hash/fnv"
-	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func newConfig() Config {
 	return Config{
-		PartitionCount:    23,
-		ReplicationFactor: 20,
-		Load:              1.25,
+		ReplicationFactor: 127,
 		Hasher:            hasher{},
 	}
 }
@@ -54,158 +53,62 @@ func (hs hasher) Sum64(data []byte) uint64 {
 	return h.Sum64()
 }
 
-func TestConsistentAdd(t *testing.T) {
-	cfg := newConfig()
-	c := NewUniformityHash(nil, cfg)
-	members := make(map[string]struct{})
-	for i := 0; i < 8; i++ {
-		member := testMember(fmt.Sprintf("node%d.olric", i))
-		members[member.String()] = struct{}{}
-		c.Add(member)
-	}
-	for member := range members {
-		found := false
-		for _, mem := range c.GetMembers() {
-			if member == mem.String() {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatalf("%s could not be found", member)
-		}
-	}
-}
-
-func TestConsistentRemove(t *testing.T) {
+func TestUniformLoad(t *testing.T) {
 	members := []Member{}
 	for i := 0; i < 8; i++ {
-		member := testMember(fmt.Sprintf("node%d.olric", i))
+		member := testMember(fmt.Sprintf("node-%d", i))
 		members = append(members, member)
 	}
 	cfg := newConfig()
-	c := NewUniformityHash(members, cfg)
-	if len(c.GetMembers()) != len(members) {
-		t.Fatalf("inserted member count is different")
-	}
-	for _, member := range members {
-		c.Remove(member.String())
-	}
-	if len(c.GetMembers()) != 0 {
-		t.Fatalf("member count should be zero")
+	c, err := NewUniformConsistentHash(23, members, cfg)
+	assert.NoError(t, err)
+
+	minLoad := c.MinLoad()
+	assert.True(t, minLoad >= 1.0)
+	maxLoad := c.MaxLoad()
+	loadDistribution := c.LoadDistribution()
+	for _, mem := range members {
+		load, ok := loadDistribution[mem.String()]
+		assert.True(t, ok)
+
+		assert.GreaterOrEqual(t, load, minLoad)
+		assert.LessOrEqual(t, load, maxLoad)
 	}
 }
 
-func TestConsistentLoad(t *testing.T) {
-	members := []Member{}
-	for i := 0; i < 8; i++ {
-		member := testMember(fmt.Sprintf("node%d.olric", i))
+func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
+	members := make([]Member, 0, numMembers)
+	for i := 0; i < numMembers; i++ {
+		member := testMember(fmt.Sprintf("node-%d", i))
 		members = append(members, member)
 	}
 	cfg := newConfig()
-	c := NewUniformityHash(members, cfg)
-	if len(c.GetMembers()) != len(members) {
-		t.Fatalf("inserted member count is different")
+	c, err := NewUniformConsistentHash(numPartitions, members, cfg)
+	assert.NoError(t, err)
+
+	distribution := make(map[int]string, 23)
+	for partID := 0; partID < numPartitions; partID++ {
+		distribution[partID] = c.GetPartitionOwner(partID).String()
 	}
-	maxLoad := c.AverageLoad()
-	for member, load := range c.LoadDistribution() {
-		if load > maxLoad {
-			t.Fatalf("%s exceeds max load. Its load: %f, max load: %f", member, load, maxLoad)
+
+	members[0] = testMember("new-node-0")
+	c, err = NewUniformConsistentHash(numPartitions, members, cfg)
+	assert.NoError(t, err)
+
+	numDiffs := 0
+	for partID := 0; partID < numPartitions; partID++ {
+		newMem := c.GetPartitionOwner(partID).String()
+		oldMem := distribution[partID]
+		if newMem != oldMem {
+			numDiffs += 1
 		}
 	}
+
+	assert.LessOrEqual(t, numDiffs, maxDiff)
 }
 
-func TestConsistentLocateKey(t *testing.T) {
-	cfg := newConfig()
-	c := NewUniformityHash(nil, cfg)
-	key := []byte("Olric")
-	res := c.LocateKey(key)
-	if res != nil {
-		t.Fatalf("This should be nil: %v", res)
-	}
-	members := make(map[string]struct{})
-	for i := 0; i < 8; i++ {
-		member := testMember(fmt.Sprintf("node%d.olric", i))
-		members[member.String()] = struct{}{}
-		c.Add(member)
-	}
-	res = c.LocateKey(key)
-	if res == nil {
-		t.Fatalf("This shouldn't be nil: %v", res)
-	}
-}
-
-func TestConsistentInsufficientMemberCount(t *testing.T) {
-	members := []Member{}
-	for i := 0; i < 8; i++ {
-		member := testMember(fmt.Sprintf("node%d.olric", i))
-		members = append(members, member)
-	}
-	cfg := newConfig()
-	c := NewUniformityHash(members, cfg)
-	key := []byte("Olric")
-	_, err := c.GetClosestN(key, 30)
-	if err != ErrInsufficientMemberCount {
-		t.Fatalf("Expected ErrInsufficientMemberCount(%v), Got: %v", ErrInsufficientMemberCount, err)
-	}
-}
-
-func TestConsistentClosestMembers(t *testing.T) {
-	members := []Member{}
-	for i := 0; i < 8; i++ {
-		member := testMember(fmt.Sprintf("node%d.olric", i))
-		members = append(members, member)
-	}
-	cfg := newConfig()
-	c := NewUniformityHash(members, cfg)
-	key := []byte("Olric")
-	closestn, err := c.GetClosestN(key, 2)
-	if err != nil {
-		t.Fatalf("Expected nil, Got: %v", err)
-	}
-	if len(closestn) != 2 {
-		t.Fatalf("Expected closest member count is 2. Got: %d", len(closestn))
-	}
-	partID := c.FindPartitionID(key)
-	owner := c.GetPartitionOwner(partID)
-	for i, cl := range closestn {
-		if i != 0 && cl.String() == owner.String() {
-			t.Fatalf("Backup is equal the partition owner: %s", owner.String())
-		}
-	}
-}
-
-func BenchmarkAddRemove(b *testing.B) {
-	cfg := newConfig()
-	c := NewUniformityHash(nil, cfg)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		member := testMember("node" + strconv.Itoa(i))
-		c.Add(member)
-		c.Remove(member.String())
-	}
-}
-
-func BenchmarkLocateKey(b *testing.B) {
-	cfg := newConfig()
-	c := NewUniformityHash(nil, cfg)
-	c.Add(testMember("node1"))
-	c.Add(testMember("node2"))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		key := []byte("key" + strconv.Itoa(i))
-		c.LocateKey(key)
-	}
-}
-
-func BenchmarkGetClosestN(b *testing.B) {
-	cfg := newConfig()
-	c := NewUniformityHash(nil, cfg)
-	for i := 0; i < 10; i++ {
-		c.Add(testMember(fmt.Sprintf("node%d", i)))
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		key := []byte("key" + strconv.Itoa(i))
-		_, _ = c.GetClosestN(key, 3)
-	}
+func TestConsistency(t *testing.T) {
+	checkConsistent(t, 120, 20, 10)
+	checkConsistent(t, 100, 20, 8)
+	checkConsistent(t, 128, 70, 3)
 }
