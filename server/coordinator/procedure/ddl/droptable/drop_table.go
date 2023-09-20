@@ -56,20 +56,28 @@ func prepareCallback(event *fsm.Event) {
 		procedure.CancelEventWithLog(event, err, "get table metadata", zap.String("tableName", params.SourceReq.GetName()), zap.Error(err))
 		return
 	}
+	req.ret = metadata.TableInfo{
+		ID:            table.ID,
+		Name:          table.Name,
+		SchemaID:      table.SchemaID,
+		SchemaName:    params.SourceReq.GetSchemaName(),
+		PartitionInfo: table.PartitionInfo,
+	}
 
 	shardVersionUpdate, shardExists, err := ddl.BuildShardVersionUpdate(table, params.ClusterMetadata, req.p.relatedVersionInfo.ShardWithVersion)
 	if err != nil {
 		log.Error("get shard version by table", zap.String("tableName", params.SourceReq.GetName()), zap.Bool("shardExists", shardExists), zap.Error(err))
-		// If the shard corresponding to this table does not exist, it means that the actual table creation failed.
-		// In order to ensure that the table can be deleted normally, we need to directly delete the metadata of the table.
-		if !shardExists {
-			_, err = params.ClusterMetadata.DropTable(req.ctx, params.SourceReq.GetSchemaName(), params.SourceReq.GetName())
-			if err != nil {
-				procedure.CancelEventWithLog(event, err, "drop table metadata", zap.String("tableName", params.SourceReq.GetName()))
-				return
-			}
-		}
 		procedure.CancelEventWithLog(event, err, "get shard version by table name", zap.String("tableName", params.SourceReq.GetName()), zap.Bool("shardExists", shardExists), zap.Error(err))
+		return
+	}
+	// If the shard corresponding to this table does not exist, it means that the actual table creation failed.
+	// In order to ensure that the table can be deleted normally, we need to directly delete the metadata of the table.
+	if !shardExists {
+		_, err = params.ClusterMetadata.DropTable(req.ctx, params.SourceReq.GetSchemaName(), params.SourceReq.GetName())
+		if err != nil {
+			procedure.CancelEventWithLog(event, err, "drop table metadata", zap.String("tableName", params.SourceReq.GetName()))
+			return
+		}
 		return
 	}
 
@@ -92,14 +100,6 @@ func prepareCallback(event *fsm.Event) {
 	if len(result.ShardVersionUpdate) != 1 {
 		procedure.CancelEventWithLog(event, procedure.ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult is %d", len(result.ShardVersionUpdate)))
 		return
-	}
-
-	req.ret = metadata.TableInfo{
-		ID:            table.ID,
-		Name:          table.Name,
-		SchemaID:      table.SchemaID,
-		SchemaName:    params.SourceReq.GetSchemaName(),
-		PartitionInfo: table.PartitionInfo,
 	}
 }
 

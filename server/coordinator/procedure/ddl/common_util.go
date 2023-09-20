@@ -99,7 +99,8 @@ func BuildShardVersionUpdate(table storage.Table, clusterMetadata *metadata.Clus
 	}
 
 	if !found {
-		return metadata.ShardVersionUpdate{}, false, errors.WithMessagef(procedure.ErrShardLeaderNotFound, "table can't find leader shard, tableName:%s", table.Name)
+		log.Warn("table can't find leader shard", zap.String("tableName", table.Name))
+		return metadata.ShardVersionUpdate{}, false, nil
 	}
 
 	prevVersion, exists := shardVersions[leader.ID]

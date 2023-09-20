@@ -290,15 +290,17 @@ func dropDataTablesCallback(event *fsm.Event) {
 
 		shardVersionUpdate, shardExists, err := ddl.BuildShardVersionUpdate(table, params.ClusterMetadata, shardVersions)
 		if err != nil {
-			log.Warn("get shard version by table", zap.String("tableName", tableName), zap.Error(err))
-			// If the shard corresponding to this table does not exist, it means that the actual table creation failed.
-			// In order to ensure that the table can be deleted normally, we need to directly delete the metadata of the table.
-			if !shardExists {
-				_, err := params.ClusterMetadata.DropTableMetadata(req.ctx, req.schemaName(), tableName)
-				if err != nil {
-					procedure.CancelEventWithLog(event, err, "drop table metadata", zap.String("tableName", tableName))
-					return
-				}
+			log.Error("get shard version by table", zap.String("tableName", tableName), zap.Error(err))
+			procedure.CancelEventWithLog(event, err, "build shard version update", zap.String("tableName", tableName))
+			return
+		}
+		// If the shard corresponding to this table does not exist, it means that the actual table creation failed.
+		// In order to ensure that the table can be deleted normally, we need to directly delete the metadata of the table.
+		if !shardExists {
+			_, err := params.ClusterMetadata.DropTableMetadata(req.ctx, req.schemaName(), tableName)
+			if err != nil {
+				procedure.CancelEventWithLog(event, err, "drop table metadata", zap.String("tableName", tableName))
+				return
 			}
 			continue
 		}
