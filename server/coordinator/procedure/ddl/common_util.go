@@ -80,7 +80,7 @@ func GetTableMetadata(clusterMetadata *metadata.ClusterMetadata, schemaName, tab
 
 // BuildShardVersionUpdate builds metadata.ShardVersionUpdate to assist DDL on the shard.
 //
-// And if no error is throw, the returned boolean value is used to tell whether this table is allocated to shard.
+// And if no error is thrown, the returned boolean value is used to tell whether this table is allocated to shard.
 // In some cases, we need to use this value to determine whether DDL can be executed normally。
 func BuildShardVersionUpdate(table storage.Table, clusterMetadata *metadata.ClusterMetadata, shardVersions map[storage.ShardID]uint64) (metadata.ShardVersionUpdate, bool, error) {
 	shardNodesResult, err := clusterMetadata.GetShardNodeByTableIDs([]storage.TableID{table.ID})
