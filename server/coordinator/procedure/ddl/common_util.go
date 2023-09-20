@@ -85,7 +85,7 @@ func GetTableMetadata(clusterMetadata *metadata.ClusterMetadata, schemaName, tab
 func BuildShardVersionUpdate(table storage.Table, clusterMetadata *metadata.ClusterMetadata, shardVersions map[storage.ShardID]uint64) (metadata.ShardVersionUpdate, bool, error) {
 	shardNodesResult, err := clusterMetadata.GetShardNodeByTableIDs([]storage.TableID{table.ID})
 	if err != nil {
-		return metadata.ShardVersionUpdate{}, true, err
+		return metadata.ShardVersionUpdate{}, false, err
 	}
 
 	leader := storage.ShardNode{}
@@ -105,7 +105,7 @@ func BuildShardVersionUpdate(table storage.Table, clusterMetadata *metadata.Clus
 
 	prevVersion, exists := shardVersions[leader.ID]
 	if !exists {
-		return metadata.ShardVersionUpdate{}, true, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
+		return metadata.ShardVersionUpdate{}, false, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
 	}
 
 	currVersion := prevVersion + 1
