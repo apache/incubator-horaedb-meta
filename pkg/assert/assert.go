@@ -1,3 +1,5 @@
+// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+
 package assert
 
 import "fmt"
@@ -8,4 +10,9 @@ func Assertf(cond bool, format string, a ...any) {
 		msg := fmt.Sprintf(format, a...)
 		panic(msg)
 	}
+}
+
+// Assertf panics and prints the appended message if the cond is false.
+func Assert(cond bool) {
+	Assertf(cond, "unexpected case")
 }

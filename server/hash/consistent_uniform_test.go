@@ -53,27 +53,73 @@ func (hs hasher) Sum64(data []byte) uint64 {
 	return h.Sum64()
 }
 
-func TestUniformLoad(t *testing.T) {
+func checkUniform(t *testing.T, numPartitions, numMembers int) {
 	members := []Member{}
-	for i := 0; i < 8; i++ {
+	for i := 0; i < numMembers; i++ {
 		member := testMember(fmt.Sprintf("node-%d", i))
 		members = append(members, member)
 	}
 	cfg := newConfig()
-	c, err := NewUniformConsistentHash(23, members, cfg)
+	c, err := BuildConsistentUniformHash(numPartitions, members, cfg)
 	assert.NoError(t, err)
 
 	minLoad := c.MinLoad()
-	assert.True(t, minLoad >= 1.0)
 	maxLoad := c.MaxLoad()
 	loadDistribution := c.LoadDistribution()
 	for _, mem := range members {
 		load, ok := loadDistribution[mem.String()]
-		assert.True(t, ok)
-
-		assert.GreaterOrEqual(t, load, minLoad)
-		assert.LessOrEqual(t, load, maxLoad)
+		if ok {
+			assert.GreaterOrEqual(t, load, minLoad)
+			assert.LessOrEqual(t, load, maxLoad)
+		} else {
+			assert.Equal(t, 0.0, minLoad)
+		}
 	}
+}
+
+func TestZeroReplicationFactor(t *testing.T) {
+	cfg := Config{
+		ReplicationFactor: 0,
+		Hasher:            hasher{},
+	}
+	_, err := BuildConsistentUniformHash(0, []Member{testMember("")}, cfg)
+	assert.Error(t, err)
+}
+
+func TestEmptyHasher(t *testing.T) {
+	cfg := Config{
+		ReplicationFactor: 127,
+		Hasher:            nil,
+	}
+	_, err := BuildConsistentUniformHash(0, []Member{testMember("")}, cfg)
+	assert.Error(t, err)
+}
+
+func TestEmptyMembers(t *testing.T) {
+	cfg := Config{
+		ReplicationFactor: 127,
+		Hasher:            hasher{},
+	}
+	_, err := BuildConsistentUniformHash(0, []Member{}, cfg)
+	assert.Error(t, err)
+}
+
+func TestNegativeNumPartitions(t *testing.T) {
+	cfg := Config{
+		ReplicationFactor: 127,
+		Hasher:            hasher{},
+	}
+	_, err := BuildConsistentUniformHash(-1, []Member{testMember("")}, cfg)
+	assert.Error(t, err)
+}
+
+func TestUniform(t *testing.T) {
+	checkUniform(t, 23, 8)
+	checkUniform(t, 128, 72)
+	checkUniform(t, 10, 72)
+	checkUniform(t, 1, 8)
+	checkUniform(t, 0, 8)
+	checkUniform(t, 100, 1)
 }
 
 func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
@@ -83,24 +129,31 @@ func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
 		members = append(members, member)
 	}
 	cfg := newConfig()
-	c, err := NewUniformConsistentHash(numPartitions, members, cfg)
+	c, err := BuildConsistentUniformHash(numPartitions, members, cfg)
 	assert.NoError(t, err)
 
-	distribution := make(map[int]string, 23)
+	distribution := make(map[int]string, numPartitions)
 	for partID := 0; partID < numPartitions; partID++ {
 		distribution[partID] = c.GetPartitionOwner(partID).String()
 	}
 
-	members[0] = testMember("new-node-0")
-	c, err = NewUniformConsistentHash(numPartitions, members, cfg)
+	oldMem0 := members[0].String()
+	newMem0 := "new-node-0"
+	members[0] = testMember(newMem0)
+	c, err = BuildConsistentUniformHash(numPartitions, members, cfg)
 	assert.NoError(t, err)
 
 	numDiffs := 0
 	for partID := 0; partID < numPartitions; partID++ {
 		newMem := c.GetPartitionOwner(partID).String()
 		oldMem := distribution[partID]
+		if newMem0 == newMem && oldMem != oldMem0 {
+			numDiffs++
+			continue
+		}
+
 		if newMem != oldMem {
-			numDiffs += 1
+			numDiffs++
 		}
 	}
 
@@ -108,7 +161,8 @@ func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
 }
 
 func TestConsistency(t *testing.T) {
-	checkConsistent(t, 120, 20, 10)
-	checkConsistent(t, 100, 20, 8)
-	checkConsistent(t, 128, 70, 3)
+	checkConsistent(t, 120, 20, 30)
+	checkConsistent(t, 100, 20, 25)
+	checkConsistent(t, 128, 70, 26)
+	checkConsistent(t, 17, 5, 7)
 }

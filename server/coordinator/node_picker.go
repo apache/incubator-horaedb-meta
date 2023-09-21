@@ -72,7 +72,7 @@ func (p *ConsistentUniformHashNodePicker) PickNode(_ context.Context, shardIDs [
 		ReplicationFactor: uniformHashReplicationFactor,
 		Hasher:            hasher{},
 	}
-	h, err := hash.NewUniformConsistentHash(len(shardIDs), mems, conf)
+	h, err := hash.BuildConsistentUniformHash(len(shardIDs), mems, conf)
 	if err != nil {
 		return nil, err
 	}

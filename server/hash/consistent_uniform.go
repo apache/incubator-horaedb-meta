@@ -36,6 +36,8 @@ import (
 	"fmt"
 	"math"
 	"sort"
+
+	"github.com/CeresDB/ceresmeta/pkg/assert"
 )
 
 var (
@@ -48,8 +50,14 @@ var (
 	// ErrHasherNotProvided will be thrown if the hasher is not provided.
 	ErrHasherNotProvided = errors.New("hasher is required")
 
-	// ErrMemberNotFound will be thrown if the replication factor is zero or negative.
-	ErrPositiveReplicationFactor = errors.New("positive replication factor is required")
+	// ErrInvalidReplication will be thrown if the replication factor is zero or negative.
+	ErrInvalidReplicationFactor = errors.New("positive replication factor is required")
+
+	// ErrInvalidNumPartitions will be thrown if the number of partitions is negative.
+	ErrInvalidNumPartitions = errors.New("invalid number of the partitions")
+
+	// ErrEmptyMembers will be thrown if no member is provided.
+	ErrEmptyMembers = errors.New("at least one member is required")
 )
 
 type Hasher interface {
@@ -72,16 +80,24 @@ type Config struct {
 	ReplicationFactor int
 }
 
+type virtualNode uint64
+
 // ConsistentUniformHash generates a uniform distribution of partitions over the members, and this distribution will keep as
 // consistent as possible while the members has some tiny changes.
 type ConsistentUniformHash struct {
-	config         Config
-	partitionCount uint64
-	sortedSet      []uint64
-	members        map[string]*Member
-	loads          map[string]float64
-	partitions     map[int]*Member
-	ring           map[uint64]*Member
+	config        Config
+	minLoad       float64
+	maxLoad       float64
+	numPartitions uint32
+	// Member name => Member
+	members map[string]Member
+	// Member name => Member's load
+	memLoads map[string]float64
+	// partition id => index of the virtualNode in the sortedRing
+	partitionDist map[int]int
+	// The nodeToMems contains all the virtual nodes
+	nodeToMems map[virtualNode]Member
+	sortedRing []virtualNode
 }
 
 func (c *Config) Sanitize() error {
@@ -90,120 +106,125 @@ func (c *Config) Sanitize() error {
 	}
 
 	if c.ReplicationFactor <= 0 {
-		return ErrPositiveReplicationFactor
+		return ErrInvalidReplicationFactor
 	}
 
 	return nil
 }
 
-// NewUniformConsistentHash creates and returns a new Consistent object.
-func NewUniformConsistentHash(partitionNum int, members []Member, config Config) (*ConsistentUniformHash, error) {
+// BuildConsistentUniformHash creates and returns a new hash which is ensured to be uniform and as consistent as possible.
+func BuildConsistentUniformHash(numPartitions int, members []Member, config Config) (*ConsistentUniformHash, error) {
 	if err := config.Sanitize(); err != nil {
 		return nil, err
 	}
+	if numPartitions < 0 {
+		return nil, ErrInvalidNumPartitions
+	}
+	if len(members) == 0 {
+		return nil, ErrEmptyMembers
+	}
 
 	numReplicatedNodes := len(members) * config.ReplicationFactor
+	avgLoad := float64(numPartitions) / float64(len(members))
 	c := &ConsistentUniformHash{
-		config:         config,
-		partitionCount: uint64(partitionNum),
-		sortedSet:      make([]uint64, 0, numReplicatedNodes),
-		members:        make(map[string]*Member, len(members)),
-		loads:          make(map[string]float64, len(members)),
-		partitions:     make(map[int]*Member, partitionNum),
-		ring:           make(map[uint64]*Member, numReplicatedNodes),
+		config:        config,
+		minLoad:       math.Floor(avgLoad),
+		maxLoad:       math.Ceil(avgLoad),
+		numPartitions: uint32(numPartitions),
+		sortedRing:    make([]virtualNode, 0, numReplicatedNodes),
+		members:       make(map[string]Member, len(members)),
+		memLoads:      make(map[string]float64, len(members)),
+		partitionDist: make(map[int]int, numPartitions),
+		nodeToMems:    make(map[virtualNode]Member, numReplicatedNodes),
 	}
 
-	for _, member := range members {
-		c.add(member)
-	}
+	c.initializeVirtualNodes(members)
 	c.distributePartitions()
 	return c, nil
 }
 
-func (c *ConsistentUniformHash) MinLoad() float64 {
-	return math.Floor(c.AvgLoad())
+func (c *ConsistentUniformHash) distributePartitionWithLoad(partID, virtualNodeIdx int, allowedLoad float64) bool {
+	// A fast path to avoid unnecessary loop.
+	if allowedLoad == 0 {
+		return false
+	}
+
+	var count int
+	for {
+		count++
+		if count > len(c.sortedRing) {
+			return false
+		}
+		i := c.sortedRing[virtualNodeIdx]
+		member := c.nodeToMems[i]
+		load := c.memLoads[member.String()]
+		if load+1 <= allowedLoad {
+			c.partitionDist[partID] = virtualNodeIdx
+			c.memLoads[member.String()]++
+			return true
+		}
+		virtualNodeIdx++
+		if virtualNodeIdx >= len(c.sortedRing) {
+			virtualNodeIdx = 0
+		}
+	}
 }
 
-func (c *ConsistentUniformHash) AvgLoad() float64 {
-	return float64(c.partitionCount) / float64(len(c.members))
-}
-
-func (c *ConsistentUniformHash) MaxLoad() float64 {
-	return math.Ceil(c.AvgLoad())
-}
-
-func (c *ConsistentUniformHash) distributePartition(partID, idx int) {
-	avgLoad := c.AvgLoad()
-	ok := c.distributeWithLoad(partID, idx, avgLoad)
+func (c *ConsistentUniformHash) distributePartition(partID, virtualNodeIdx int) {
+	ok := c.distributePartitionWithLoad(partID, virtualNodeIdx, c.MinLoad())
 	if ok {
 		return
 	}
 
-	maxLoad := c.MaxLoad()
-	ok = c.distributeWithLoad(partID, idx, maxLoad)
-	if !ok {
-		panic("not enough room to distribute partitions")
-	}
-}
-
-func (c *ConsistentUniformHash) distributeWithLoad(partID, idx int, allowedLoad float64) bool {
-	var count int
-	for {
-		count++
-		if count > len(c.sortedSet) {
-			return false
-		}
-		i := c.sortedSet[idx]
-		member := *c.ring[i]
-		load := c.loads[member.String()]
-		if load+1 <= allowedLoad {
-			c.partitions[partID] = &member
-			c.loads[member.String()]++
-			return true
-		}
-		idx++
-		if idx >= len(c.sortedSet) {
-			idx = 0
-		}
-	}
+	ok = c.distributePartitionWithLoad(partID, virtualNodeIdx, c.MaxLoad())
+	assert.Assertf(ok, "not enough room to distribute partitions")
 }
 
 func (c *ConsistentUniformHash) distributePartitions() {
 	bs := make([]byte, 8)
-	for partID := uint64(0); partID < c.partitionCount; partID++ {
-		binary.LittleEndian.PutUint64(bs, partID)
+	for partID := uint32(0); partID < c.numPartitions; partID++ {
+		binary.LittleEndian.PutUint32(bs, partID)
 		key := c.config.Hasher.Sum64(bs)
-		idx := sort.Search(len(c.sortedSet), func(i int) bool {
-			return c.sortedSet[i] >= key
+		idx := sort.Search(len(c.sortedRing), func(i int) bool {
+			return c.sortedRing[i] >= virtualNode(key)
 		})
-		if idx >= len(c.sortedSet) {
+		if idx >= len(c.sortedRing) {
 			idx = 0
 		}
 		c.distributePartition(int(partID), idx)
 	}
 }
 
-func (c *ConsistentUniformHash) add(member Member) {
-	for i := 0; i < c.config.ReplicationFactor; i++ {
-		key := []byte(fmt.Sprintf("%s%d", member.String(), i))
-		h := c.config.Hasher.Sum64(key)
-		c.ring[h] = &member
-		c.sortedSet = append(c.sortedSet, h)
+func (c *ConsistentUniformHash) MinLoad() float64 {
+	return c.minLoad
+}
+
+func (c *ConsistentUniformHash) MaxLoad() float64 {
+	return c.maxLoad
+}
+
+func (c *ConsistentUniformHash) initializeVirtualNodes(members []Member) {
+	for _, mem := range members {
+		for i := 0; i < c.config.ReplicationFactor; i++ {
+			// TODO: Shall use a more generic hasher which receives multiple slices or string?
+			key := []byte(fmt.Sprintf("%s%d", mem.String(), i))
+			h := virtualNode(c.config.Hasher.Sum64(key))
+			c.nodeToMems[h] = mem
+			c.sortedRing = append(c.sortedRing, h)
+		}
+		c.members[mem.String()] = mem
 	}
 
-	sort.Slice(c.sortedSet, func(i int, j int) bool {
-		return c.sortedSet[i] < c.sortedSet[j]
+	sort.Slice(c.sortedRing, func(i int, j int) bool {
+		return c.sortedRing[i] < c.sortedRing[j]
 	})
-
-	// Storing member at this map is useful to find backup members of a partition.
-	c.members[member.String()] = &member
 }
 
 // LoadDistribution exposes load distribution of members.
 func (c *ConsistentUniformHash) LoadDistribution() map[string]float64 {
 	// Create a thread-safe copy
 	res := make(map[string]float64)
-	for member, load := range c.loads {
+	for member, load := range c.memLoads {
 		res[member] = load
 	}
 	return res
@@ -211,10 +232,12 @@ func (c *ConsistentUniformHash) LoadDistribution() map[string]float64 {
 
 // GetPartitionOwner returns the owner of the given partition.
 func (c *ConsistentUniformHash) GetPartitionOwner(partID int) Member {
-	member, ok := c.partitions[partID]
+	virtualNodeIdx, ok := c.partitionDist[partID]
 	if !ok {
 		return nil
 	}
-	// Create a thread-safe copy of member and return it.
-	return *member
+	virtualNode := c.sortedRing[virtualNodeIdx]
+	mem, ok := c.nodeToMems[virtualNode]
+	assert.Assertf(ok, "member must exist for the virtual node")
+	return mem
 }
