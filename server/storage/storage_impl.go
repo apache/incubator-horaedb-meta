@@ -471,16 +471,19 @@ func (s *metaStorageImpl) UpdateShardView(ctx context.Context, req UpdateShardVi
 	}
 
 	key := makeShardViewKey(s.rootPath, uint32(req.ClusterID), shardViewPB.ShardId, fmtID(shardViewPB.GetVersion()))
+	oldTopologyKey := makeShardViewKey(s.rootPath, uint32(req.ClusterID), shardViewPB.ShardId, fmtID(req.LatestVersion))
 	latestVersionKey := makeShardViewLatestVersionKey(s.rootPath, uint32(req.ClusterID), shardViewPB.ShardId)
 
 	// Check whether the latest version is equal to that in etcd. If it is equal，update shard clusterView and latest version; Otherwise, return an error.
 	latestVersionEquals := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(req.LatestVersion))
 	opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardViewPB.Version))
 	opPutShardTopology := clientv3.OpPut(key, string(value))
+	// Delete expired shard topology.
+	opDelShardTopology := clientv3.OpDelete(oldTopologyKey)
 
 	resp, err := s.client.Txn(ctx).
 		If(latestVersionEquals).
-		Then(opPutLatestVersion, opPutShardTopology).
+		Then(opPutLatestVersion, opPutShardTopology, opDelShardTopology).
 		Commit()
 	if err != nil {
 		return errors.WithMessagef(err, "fail to put shard clusterView, clusterID:%d, shardID:%d, key:%s", req.ClusterID, shardViewPB.ShardId, key)
