@@ -27,8 +27,9 @@ import (
 )
 
 const (
-	statusSuccess string = "success"
-	statusError   string = "error"
+	statusSuccess    string = "success"
+	statusError      string = "error"
+	clusterNameParam string = "cluster"
 
 	apiPrefix string = "/api/v1"
 )
@@ -75,8 +76,8 @@ type DiagnoseShardStatus struct {
 
 type DiagnoseShardResult struct {
 	// shardID -> nodeName
-	ShardNotRegister map[storage.ShardID]string              `json:"shard_not_register"`
-	ShardNotReady    map[storage.ShardID]DiagnoseShardStatus `json:"shard_not_ready"`
+	UnregisteredShards map[storage.ShardID]string              `json:"unregistered_shards"`
+	UnreadyShards      map[storage.ShardID]DiagnoseShardStatus `json:"unready_shards"`
 }
 
 func NewAPI(clusterManager cluster.Manager, serverStatus *status.ServerStatus, forwardClient *ForwardClient, flowLimiter *limiter.FlowLimiter, etcdClient *clientv3.Client) *API {
@@ -119,7 +120,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Get("/debug/pprof/block", a.pprofBlock)
 	router.Get("/debug/pprof/goroutine", a.pprofGoroutine)
 	router.Get("/debug/pprof/threadCreate", a.pprofThreadcreate)
-	router.Get("/debug/diagnose/shards/:name", wrap(a.diagnoseShards, true, a.forwardClient))
+	router.Get("/debug/diagnose/shards/:"+clusterNameParam, wrap(a.diagnoseShards, true, a.forwardClient))
 
 	// Register ETCD API.
 	router.Post("/etcd/promoteLearner", wrap(a.etcdAPI.promoteLearner, false, a.forwardClient))
@@ -600,7 +601,7 @@ func (a *API) listProcedures(req *http.Request) apiFuncResult {
 
 func (a *API) diagnoseShards(req *http.Request) apiFuncResult {
 	ctx := req.Context()
-	clusterName := Param(ctx, "name")
+	clusterName := Param(ctx, clusterNameParam)
 	if len(clusterName) == 0 {
 		clusterName = config.DefaultClusterName
 	}
@@ -625,8 +626,8 @@ func (a *API) diagnoseShards(req *http.Request) apiFuncResult {
 	}
 
 	ret := DiagnoseShardResult{
-		ShardNotRegister: make(map[storage.ShardID]string),
-		ShardNotReady:    make(map[storage.ShardID]DiagnoseShardStatus),
+		UnregisteredShards: make(map[storage.ShardID]string),
+		UnreadyShards:      make(map[storage.ShardID]DiagnoseShardStatus),
 	}
 	// Check shard not register and not ready.
 	for _, shardNode := range expectedShardNodes.ShardNodes {
@@ -634,13 +635,13 @@ func (a *API) diagnoseShards(req *http.Request) apiFuncResult {
 		nodeName := shardNode.NodeName
 		shardInfo, ok := registerNodesMap[nodeName]
 		if !ok {
-			ret.ShardNotRegister[shardID] = nodeName
+			ret.UnregisteredShards[shardID] = nodeName
 			continue
 		}
 		for _, info := range shardInfo {
 			if info.ID == shardID {
 				if info.Status != storage.ShardStatusReady {
-					ret.ShardNotReady[shardID] = DiagnoseShardStatus{
+					ret.UnreadyShards[shardID] = DiagnoseShardStatus{
 						NodeName: nodeName,
 						Status:   storage.ConvertShardStatusToString(info.Status),
 					}
