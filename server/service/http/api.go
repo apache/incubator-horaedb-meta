@@ -120,7 +120,7 @@ func (a *API) NewAPIRouter() *Router {
 	router.Get("/debug/pprof/block", a.pprofBlock)
 	router.Get("/debug/pprof/goroutine", a.pprofGoroutine)
 	router.Get("/debug/pprof/threadCreate", a.pprofThreadcreate)
-	router.Get("/debug/diagnose/shards/:"+clusterNameParam, wrap(a.diagnoseShards, true, a.forwardClient))
+	router.Get("/debug/diagnose/:"+clusterNameParam+"/shards", wrap(a.diagnoseShards, true, a.forwardClient))
 
 	// Register ETCD API.
 	router.Post("/etcd/promoteLearner", wrap(a.etcdAPI.promoteLearner, false, a.forwardClient))
@@ -620,7 +620,7 @@ func (a *API) diagnoseShards(req *http.Request) apiFuncResult {
 
 	expectedShardNodes := c.GetShardNodes()
 	// shardName -> shardInfo
-	registerNodesMap := make(map[string][]metadata.ShardInfo)
+	registerNodesMap := make(map[string][]metadata.ShardInfo, len(registerNodes))
 	for _, node := range registerNodes {
 		registerNodesMap[node.Node.Name] = node.ShardInfos
 	}
