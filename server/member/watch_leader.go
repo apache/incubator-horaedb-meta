@@ -26,9 +26,10 @@ type WatchContext interface {
 }
 
 type LeaderWatcher struct {
-	watchCtx    WatchContext
-	self        *Member
-	leaseTTLSec int64
+	watchCtx        WatchContext
+	self            *Member
+	leaseTTLSec     int64
+	watchEtcdLeader bool
 }
 
 type LeadershipEventCallbacks interface {
@@ -36,15 +37,24 @@ type LeadershipEventCallbacks interface {
 	BeforeTransfer(ctx context.Context)
 }
 
-func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64) *LeaderWatcher {
+func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64, watchEtcdLeader bool) *LeaderWatcher {
 	return &LeaderWatcher{
 		ctx,
 		self,
 		leaseTTLSec,
+		watchEtcdLeader,
 	}
 }
 
-// Watch watches the leader changes:
+func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCallbacks) {
+	if l.watchEtcdLeader {
+		l.watchWithCheckEtcdLeader(ctx, callbacks)
+	} else {
+		l.watchLeader(ctx, callbacks)
+	}
+}
+
+// watchWithCheckEtcdLeader watches the leader changes:
 //  1. Check whether the leader is valid (same as the etcd leader) if leader exists.
 //     - Leader is valid: wait for the leader changes.
 //     - Leader is not valid: reset the leader by the current leader.
@@ -54,7 +64,7 @@ func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64) *Leader
 //     - The other members keeps waiting for the leader changes.
 //
 // The LeadershipCallbacks `callbacks` will be triggered when specific events occur.
-func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCallbacks) {
+func (l *LeaderWatcher) watchWithCheckEtcdLeader(ctx context.Context, callbacks LeadershipEventCallbacks) {
 	var wait string
 	logger := log.With(zap.String("self", l.self.Name))
 
@@ -91,7 +101,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 			// A new leader should be elected and the etcd leader should be elected as the new leader.
 			if l.self.ID == etcdLeaderID {
 				// Campaign the leader and block until leader changes.
-				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, callbacks); err != nil {
+				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, true, callbacks); err != nil {
 					logger.Error("fail to campaign and keep leader", zap.Error(err))
 					wait = waitReasonFailEtcd
 				} else {
@@ -127,6 +137,67 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 			}
 
 			// The leader is not etcd leader and this node is not the leader so just wait a moment and check leader again.
+			wait = waitReasonResetLeader
+		}
+	}
+}
+
+// Watch watches the leader changes:
+//  1. Check whether the leader is valid if leader exists.
+//     - Leader is valid: wait for the leader changes.
+//     - Leader is not valid: reset the leader by the current leader.
+//  2. Campaign the leadership if leader does not exist.
+//     - The leader keeps the leadership lease alive.
+//     - The other members keeps waiting for the leader changes.
+//
+// The LeadershipCallbacks `callbacks` will be triggered when specific events occur.
+func (l *LeaderWatcher) watchLeader(ctx context.Context, callbacks LeadershipEventCallbacks) {
+	var wait string
+	logger := log.With(zap.String("self", l.self.Name))
+
+	for {
+		if l.watchCtx.ShouldStop() {
+			logger.Warn("stop watching leader because of server is closed")
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			logger.Warn("stop watching leader because ctx is done")
+			return
+		default:
+		}
+
+		if wait != waitReasonNoWait {
+			logger.Warn("sleep a while during watch", zap.String("wait-reason", wait))
+			time.Sleep(watchLeaderFailInterval)
+			wait = waitReasonNoWait
+		}
+
+		// Check whether leader exists.
+		leaderResp, err := l.self.getLeader(ctx)
+		if err != nil {
+			logger.Error("fail to get leader", zap.Error(err))
+			wait = waitReasonFailEtcd
+			continue
+		}
+
+		if leaderResp.Leader == nil {
+			// Leader does not exist.
+			// A new leader should be elected and the etcd leader should be elected as the new leader.
+			// Campaign the leader and block until leader changes.
+			if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, false, callbacks); err != nil {
+				logger.Error("fail to campaign and keep leader", zap.Error(err))
+				wait = waitReasonFailEtcd
+			} else {
+				logger.Info("stop keeping leader")
+			}
+		} else {
+			// Cache leader in memory.
+			l.self.leader = leaderResp.Leader
+			log.Info("update leader cache", zap.String("endpoint", leaderResp.Leader.Endpoint))
+
+			// This node is not the leader so just wait a moment and check leader again.
 			wait = waitReasonResetLeader
 		}
 	}
