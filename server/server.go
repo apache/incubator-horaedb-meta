@@ -155,23 +155,27 @@ func (srv *Server) startEmbedEtcd(ctx context.Context) error {
 }
 
 func (srv *Server) initEtcdClient() error {
-	endpoints := []string{srv.etcdCfg.ACUrls[0].String()}
+	etcdEndpoints := make([]string, 0, len(srv.etcdCfg.ACUrls))
+	for _, url := range srv.etcdCfg.ACUrls {
+		etcdEndpoints = append(etcdEndpoints, url.String())
+	}
 	lgc := log.GetLoggerConfig()
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
+		Endpoints:   etcdEndpoints,
 		DialTimeout: srv.cfg.EtcdCallTimeout(),
 		LogConfig:   lgc,
 	})
 	if err != nil {
 		return ErrCreateEtcdClient.WithCause(err)
 	}
-
 	srv.etcdCli = client
+
+	endpoint := fmt.Sprintf("%s:%d", srv.cfg.Addr, srv.cfg.GrpcPort)
 	if srv.etcdSrv != nil {
 		etcdLeaderGetter := &etcdutil.LeaderGetterWrapper{Server: srv.etcdSrv.Server}
-		srv.member = member.NewMember("", 0, srv.cfg.NodeName, endpoints[0], client, etcdLeaderGetter, srv.cfg.EtcdCallTimeout())
+		srv.member = member.NewMember(srv.cfg.StorageRootPath, uint64(srv.etcdSrv.Server.ID()), srv.cfg.NodeName, srv.etcdCfg.ACUrls[0].String(), client, etcdLeaderGetter, srv.cfg.EtcdCallTimeout())
 	} else {
-		srv.member = member.NewMember("", 0, srv.cfg.NodeName, endpoints[0], client, nil, srv.cfg.EtcdCallTimeout())
+		srv.member = member.NewMember(srv.cfg.StorageRootPath, 0, srv.cfg.NodeName, endpoint, client, nil, srv.cfg.EtcdCallTimeout())
 	}
 	return nil
 }

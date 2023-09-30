@@ -77,7 +77,7 @@ func (m *Member) getLeader(ctx context.Context) (*getLeaderResp, error) {
 		return nil, ErrInvalidLeaderValue.WithCause(err)
 	}
 
-	return &getLeaderResp{Leader: leader, Revision: leaderKv.ModRevision, IsLocal: leader.GetId() == m.ID}, nil
+	return &getLeaderResp{Leader: leader, Revision: leaderKv.ModRevision, IsLocal: leader.GetEndpoint() == m.Endpoint}, nil
 }
 
 // GetLeaderAddr gets the leader address of the cluster with memory cache.
@@ -91,7 +91,7 @@ func (m *Member) GetLeaderAddr(_ context.Context) (GetLeaderAddrResp, error) {
 	}
 	return GetLeaderAddrResp{
 		LeaderEndpoint: m.leader.Endpoint,
-		IsLocal:        m.leader.GetId() == m.ID,
+		IsLocal:        m.leader.Endpoint == m.Endpoint,
 	}, nil
 }
 

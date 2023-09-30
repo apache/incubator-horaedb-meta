@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	defaultEnableEmbedEtcd        bool  = false
+	defaultEnableEmbedEtcd        bool  = true
 	defaultInitialLimiterCapacity int   = 100 * 1000
 	defaultInitialLimiterRate     int   = 10 * 1000
 	defaultEnableLimiter          bool  = false
@@ -37,6 +37,7 @@ const (
 	defaultGrpcServiceKeepAlivePingMinIntervalSec int = 20
 
 	defaultNodeNamePrefix          = "ceresmeta"
+	defaultEndpoint                = "127.0.0.1"
 	defaultRootPath                = "/ceresdb"
 	defaultClientUrls              = "http://0.0.0.0:2379"
 	defaultPeerUrls                = "http://0.0.0.0:2380"
@@ -65,7 +66,7 @@ const (
 	defaultProcedureExecutingBatchSize = math.MaxUint32
 
 	defaultHTTPPort = 8080
-	defaultGrpcPort = 3379
+	defaultGrpcPort = 2379
 
 	defaultDataDir = "/tmp/ceresmeta"
 
@@ -107,6 +108,7 @@ type Config struct {
 	LeaseTTLSec int64 `toml:"lease-sec" env:"LEASE_SEC"`
 
 	NodeName            string `toml:"node-name" env:"NODE_NAME"`
+	Addr                string `toml:"addr" env:"ADDR"`
 	DataDir             string `toml:"data-dir" env:"DATA_DIR"`
 	StorageRootPath     string `toml:"storage-root-path" env:"STORAGE_ROOT_PATH"`
 	InitialCluster      string `toml:"initial-cluster" env:"INITIAL_CLUSTER"`
@@ -288,6 +290,7 @@ func MakeConfigParser() (*Parser, error) {
 		LeaseTTLSec: defaultEtcdLeaseTTLSec,
 
 		NodeName:        defaultNodeName,
+		Addr:            defaultEndpoint,
 		DataDir:         defaultDataDir,
 		StorageRootPath: defaultRootPath,
 
