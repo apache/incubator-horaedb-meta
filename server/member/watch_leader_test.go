@@ -23,8 +23,8 @@ func (ctx *mockWatchCtx) ShouldStop() bool {
 	return ctx.stopped
 }
 
-func (ctx *mockWatchCtx) EtcdLeaderID() uint64 {
-	return ctx.srv.Lead()
+func (ctx *mockWatchCtx) EtcdLeaderID() (uint64, error) {
+	return ctx.srv.Lead(), nil
 }
 
 func TestWatchLeaderSingle(t *testing.T) {

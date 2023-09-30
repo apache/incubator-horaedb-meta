@@ -87,6 +87,14 @@ func (srv *Server) Run(ctx context.Context) error {
 			srv.status.Set(status.Terminated)
 			return err
 		}
+	} else {
+		// If enableEmbedEtcd is false, the grpc server is started in a separate process.
+		go func() {
+			if err := srv.startGrpcServer(ctx); err != nil {
+				srv.status.Set(status.Terminated)
+				log.Fatal("Grpc serve failed", zap.Error(err))
+			}
+		}()
 	}
 	if err := srv.initEtcdClient(); err != nil {
 		srv.status.Set(status.Terminated)
@@ -96,16 +104,6 @@ func (srv *Server) Run(ctx context.Context) error {
 	if err := srv.startServer(ctx); err != nil {
 		srv.status.Set(status.Terminated)
 		return err
-	}
-
-	// If enableEmbedEtcd is false, the grpc server is started in a separate process.
-	if !srv.cfg.EnableEmbedEtcd {
-		go func() {
-			if err := srv.startGrpcServer(ctx); err != nil {
-				srv.status.Set(status.Terminated)
-				log.Fatal("Grpc serve failed", zap.Error(err))
-			}
-		}()
 	}
 
 	srv.startBgJobs(ctx)
@@ -329,11 +327,11 @@ func (ctx *leaderWatchContext) ShouldStop() bool {
 	return ctx.srv.IsClosed()
 }
 
-func (ctx *leaderWatchContext) EtcdLeaderID() uint64 {
+func (ctx *leaderWatchContext) EtcdLeaderID() (uint64, error) {
 	if ctx.srv.etcdSrv != nil {
-		return ctx.srv.etcdSrv.Server.Lead()
+		return ctx.srv.etcdSrv.Server.Lead(), nil
 	}
-	return 0
+	return 0, errors.WithMessage(member.ErrGetLeader, "no leader found")
 }
 
 func (srv *Server) GetClusterManager() cluster.Manager {

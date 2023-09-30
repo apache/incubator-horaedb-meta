@@ -229,7 +229,10 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, e
 
 			if enableEmbedEtcd {
 				// Check the etcd leader periodically. If the etcd leader is changed, ceresmeta leader should be re-elected.
-				etcdLeader := m.etcdLeaderGetter.EtcdLeaderID()
+				etcdLeader, err := m.etcdLeaderGetter.EtcdLeaderID()
+				if err != nil {
+					return err
+				}
 				if etcdLeader != m.ID {
 					m.logger.Info("etcd leader changed and should re-assign the leadership", zap.String("old-leader", m.Name), zap.Uint64("new-leader", etcdLeader))
 					return nil

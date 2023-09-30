@@ -26,9 +26,12 @@ type WatchContext interface {
 }
 
 type LeaderWatcher struct {
-	watchCtx        WatchContext
-	self            *Member
-	leaseTTLSec     int64
+	watchCtx    WatchContext
+	self        *Member
+	leaseTTLSec int64
+
+	// When watchEtcdLeader is true, the leader watcher will check whether the leader is same as the etcd leader.
+	// Else, the leader watcher will only watch the leader changes.
 	watchEtcdLeader bool
 }
 
@@ -88,15 +91,19 @@ func (l *LeaderWatcher) watchWithCheckEtcdLeader(ctx context.Context, callbacks 
 		}
 
 		// Check whether leader exists.
-		leaderResp, err := l.self.getLeader(ctx)
+		resp, err := l.self.getLeader(ctx)
 		if err != nil {
 			logger.Error("fail to get leader", zap.Error(err))
 			wait = waitReasonFailEtcd
 			continue
 		}
 
-		etcdLeaderID := l.watchCtx.EtcdLeaderID()
-		if leaderResp.Leader == nil {
+		etcdLeaderID, err := l.watchCtx.EtcdLeaderID()
+		if err != nil {
+			logger.Fatal("fail to get etcd leader", zap.Error(err))
+			break
+		}
+		if resp.Leader == nil {
 			// Leader does not exist.
 			// A new leader should be elected and the etcd leader should be elected as the new leader.
 			if l.self.ID == etcdLeaderID {
@@ -114,21 +121,21 @@ func (l *LeaderWatcher) watchWithCheckEtcdLeader(ctx context.Context, callbacks 
 			wait = waitReasonElectLeader
 		} else {
 			// Cache leader in memory.
-			l.self.leader = leaderResp.Leader
-			log.Info("update leader cache", zap.String("endpoint", leaderResp.Leader.Endpoint))
+			l.self.leader = resp.Leader
+			log.Info("update leader cache", zap.String("endpoint", resp.Leader.Endpoint))
 
 			// Leader does exist.
 			// A new leader should be elected (the leader should be reset by the current leader itself) if the leader is
 			// not the etcd leader.
-			if etcdLeaderID == leaderResp.Leader.Id {
+			if etcdLeaderID == resp.Leader.Id {
 				// watch the leader and block until leader changes.
-				l.self.WaitForLeaderChange(ctx, leaderResp.Revision)
+				l.self.WaitForLeaderChange(ctx, resp.Revision)
 				logger.Warn("leader changes and stop watching")
 				continue
 			}
 
 			// The leader is not etcd leader and this node is leader so reset it.
-			if leaderResp.Leader.Endpoint == l.self.Endpoint {
+			if resp.Leader.Endpoint == l.self.Endpoint {
 				if err = l.self.ResetLeader(ctx); err != nil {
 					logger.Error("fail to reset leader", zap.Error(err))
 					wait = waitReasonFailEtcd
@@ -175,14 +182,14 @@ func (l *LeaderWatcher) watchLeader(ctx context.Context, callbacks LeadershipEve
 		}
 
 		// Check whether leader exists.
-		leaderResp, err := l.self.getLeader(ctx)
+		resp, err := l.self.getLeader(ctx)
 		if err != nil {
 			logger.Error("fail to get leader", zap.Error(err))
 			wait = waitReasonFailEtcd
 			continue
 		}
 
-		if leaderResp.Leader == nil {
+		if resp.Leader == nil {
 			// Leader does not exist.
 			// A new leader should be elected and the etcd leader should be elected as the new leader.
 			// Campaign the leader and block until leader changes.
@@ -194,11 +201,11 @@ func (l *LeaderWatcher) watchLeader(ctx context.Context, callbacks LeadershipEve
 			}
 		} else {
 			// Cache leader in memory.
-			l.self.leader = leaderResp.Leader
-			log.Info("update leader cache", zap.String("endpoint", leaderResp.Leader.Endpoint))
+			l.self.leader = resp.Leader
+			log.Info("update leader cache", zap.String("endpoint", resp.Leader.Endpoint))
 
 			// watch the leader and block until leader changes.
-			l.self.WaitForLeaderChange(ctx, leaderResp.Revision)
+			l.self.WaitForLeaderChange(ctx, resp.Revision)
 			logger.Warn("leader changes and stop watching")
 		}
 	}
