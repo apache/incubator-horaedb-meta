@@ -72,15 +72,16 @@ func (p *ConsistentUniformHashNodePicker) PickNode(_ context.Context, shardIDs [
 		ReplicationFactor: uniformHashReplicationFactor,
 		Hasher:            hasher{},
 	}
-	h, err := hash.BuildConsistentUniformHash(len(shardIDs), mems, conf)
+	h, err := hash.BuildConsistentUniformHash(int(shardTotalNum), mems, conf)
 	if err != nil {
 		return nil, err
 	}
 
 	shardNodes := make(map[storage.ShardID]metadata.RegisteredNode, len(registerNodes))
-	for partID := 0; partID < len(shardIDs); partID++ {
+	for _, shardID := range shardIDs {
+		assert.Assert(shardID < storage.ShardID(shardTotalNum))
+		partID := int(shardID)
 		nodeName := h.GetPartitionOwner(partID).String()
-		shardID := shardIDs[partID]
 		node, ok := aliveNodes[nodeName]
 		assert.Assertf(ok, "node:%s must be in the aliveNodes:%v", nodeName, aliveNodes)
 		shardNodes[storage.ShardID(partID)] = node
