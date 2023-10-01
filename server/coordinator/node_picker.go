@@ -10,7 +10,6 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/hash"
 	"github.com/CeresDB/ceresmeta/server/storage"
-	"github.com/pkg/errors"
 	"github.com/spaolacci/murmur3"
 	"go.uber.org/zap"
 )
@@ -60,7 +59,7 @@ func filterExpiredNodes(nodes []metadata.RegisteredNode) map[string]metadata.Reg
 func (p *ConsistentUniformHashNodePicker) PickNode(_ context.Context, shardIDs []storage.ShardID, shardTotalNum uint32, registerNodes []metadata.RegisteredNode) (map[storage.ShardID]metadata.RegisteredNode, error) {
 	aliveNodes := filterExpiredNodes(registerNodes)
 	if len(aliveNodes) == 0 {
-		return nil, errors.WithMessage(ErrPickNode, "no alive node in cluster")
+		return nil, ErrPickNode.WithCausef("no alive node in cluster")
 	}
 
 	mems := make([]hash.Member, 0, len(aliveNodes))
@@ -76,7 +75,7 @@ func (p *ConsistentUniformHashNodePicker) PickNode(_ context.Context, shardIDs [
 	}
 	h, err := hash.BuildConsistentUniformHash(int(shardTotalNum), mems, conf)
 	if err != nil {
-		return nil, err
+		return nil, ErrPickNode.WithCause(err)
 	}
 
 	shardNodes := make(map[storage.ShardID]metadata.RegisteredNode, len(registerNodes))

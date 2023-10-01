@@ -23,7 +23,7 @@ type RebalancedShardScheduler struct {
 }
 
 func NewRebalancedShardScheduler(logger *zap.Logger, factory *coordinator.Factory, nodePicker coordinator.NodePicker, procedureExecutingBatchSize uint32) Scheduler {
-	return &RebalancedShardScheduler{
+	return RebalancedShardScheduler{
 		logger:                      logger,
 		factory:                     factory,
 		nodePicker:                  nodePicker,
