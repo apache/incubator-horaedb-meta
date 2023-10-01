@@ -285,7 +285,7 @@ func dropDataTablesCallback(event *fsm.Event) {
 	g, _ := errgroup.WithContext(req.ctx)
 
 	// shardID -> tableNames
-	splitedTableNames := make(map[storage.ShardID][]string)
+	shardTables := make(map[storage.ShardID][]string)
 	for _, tableName := range params.SourceReq.PartitionTableInfo.GetSubTableNames() {
 		table, err := ddl.GetTableMetadata(params.ClusterMetadata, req.schemaName(), tableName)
 		if err != nil {
@@ -310,10 +310,10 @@ func dropDataTablesCallback(event *fsm.Event) {
 			continue
 		}
 
-		splitedTableNames[shardVersionUpdate.ShardID] = append(splitedTableNames[shardVersionUpdate.ShardID], tableName)
+		shardTables[shardVersionUpdate.ShardID] = append(shardTables[shardVersionUpdate.ShardID], tableName)
 	}
 
-	for shardID, tableNames := range splitedTableNames {
+	for shardID, tableNames := range shardTables {
 		shardID := shardID
 		tableNames := tableNames
 		shardVersion := shardVersions[shardID]
