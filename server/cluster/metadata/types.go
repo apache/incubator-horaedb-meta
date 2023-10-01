@@ -27,6 +27,7 @@ type TableInfo struct {
 	SchemaID      storage.SchemaID
 	SchemaName    string
 	PartitionInfo storage.PartitionInfo
+	CreatedAt     uint64
 }
 
 type ShardTables struct {

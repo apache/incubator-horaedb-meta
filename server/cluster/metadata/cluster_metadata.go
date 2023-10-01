@@ -143,6 +143,7 @@ func (c *ClusterMetadata) GetShardTables(shardIDs []storage.ShardID) map[storage
 				SchemaID:      table.SchemaID,
 				SchemaName:    schema.Name,
 				PartitionInfo: table.PartitionInfo,
+				CreatedAt:     table.CreatedAt,
 			})
 		}
 		result[shardID] = ShardTables{
@@ -484,6 +485,7 @@ func (c *ClusterMetadata) RouteTables(_ context.Context, schemaName string, tabl
 					SchemaID:      table.SchemaID,
 					SchemaName:    schemaName,
 					PartitionInfo: table.PartitionInfo,
+					CreatedAt:     table.CreatedAt,
 				},
 				NodeShards: nil,
 			}
@@ -523,6 +525,7 @@ func (c *ClusterMetadata) RouteTables(_ context.Context, schemaName string, tabl
 				SchemaID:      table.SchemaID,
 				SchemaName:    schemaName,
 				PartitionInfo: table.PartitionInfo,
+				CreatedAt:     table.CreatedAt,
 			},
 			NodeShards: nodeShardsResult,
 		}
