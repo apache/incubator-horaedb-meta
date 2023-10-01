@@ -332,18 +332,17 @@ func (m *TableManagerImpl) getTables(schemaName string, tableNames []string) ([]
 		return []storage.Table{}, ErrSchemaNotFound.WithCausef("schema name", schemaName)
 	}
 
-	tables, ok := m.schemaTables[schema.ID]
+	schemaTables, ok := m.schemaTables[schema.ID]
 	if !ok {
 		return []storage.Table{}, nil
 	}
 
-	ret := make([]storage.Table, 0, len(tableNames))
+	tables := make([]storage.Table, 0, len(tableNames))
 	for _, tableName := range tableNames {
-		table, ok := tables.tables[tableName]
-		if ok {
-			ret = append(ret, table)
+		if table, ok := schemaTables.tables[tableName]; ok {
+			tables = append(tables, table)
 		}
 	}
 
-	return ret, nil
+	return tables, nil
 }
