@@ -682,6 +682,14 @@ func (c *ClusterMetadata) GetShardNodes() GetShardNodesResult {
 	return c.topologyManager.GetShardNodes()
 }
 
+func (c *ClusterMetadata) GetTables(schemaName string, tableNames []string) ([]storage.Table, error) {
+	return c.tableManager.GetTables(schemaName, tableNames)
+}
+
+func (c *ClusterMetadata) GetTablesByIDs(tableIDs []storage.TableID) []storage.Table {
+	return c.tableManager.GetTablesByIDs(tableIDs)
+}
+
 func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {
 	if len(oldCache.ShardInfos) >= 50 {
 		return !sortCompare(oldCache.ShardInfos, registeredNode.ShardInfos)
