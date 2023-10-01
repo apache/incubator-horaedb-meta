@@ -64,8 +64,10 @@ func (p *ConsistentUniformHashNodePicker) PickNode(_ context.Context, shardIDs [
 	}
 
 	mems := make([]hash.Member, 0, len(aliveNodes))
-	for _, node := range aliveNodes {
-		mems = append(mems, nodeMember(node.Node.Name))
+	for _, node := range registerNodes {
+		if _, alive := aliveNodes[node.Node.Name]; alive {
+			mems = append(mems, nodeMember(node.Node.Name))
+		}
 	}
 
 	conf := hash.Config{

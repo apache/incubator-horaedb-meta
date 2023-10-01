@@ -122,6 +122,20 @@ func TestUniform(t *testing.T) {
 	checkUniform(t, 100, 1)
 }
 
+func computeDiffBetweenDist(t *testing.T, oldDist, newDist map[int]string) int {
+	numDiffs := 0
+	assert.Equal(t, len(oldDist), len(newDist))
+	for partID, oldMem := range oldDist {
+		newMem, ok := newDist[partID]
+		assert.True(t, ok)
+		if newMem != oldMem {
+			numDiffs++
+		}
+	}
+
+	return numDiffs
+}
+
 func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
 	members := make([]Member, 0, numMembers)
 	for i := 0; i < numMembers; i++ {
@@ -135,6 +149,17 @@ func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
 	distribution := make(map[int]string, numPartitions)
 	for partID := 0; partID < numPartitions; partID++ {
 		distribution[partID] = c.GetPartitionOwner(partID).String()
+	}
+
+	{
+		c, err := BuildConsistentUniformHash(numPartitions, members, cfg)
+		assert.NoError(t, err)
+		newDistribution := make(map[int]string, numPartitions)
+		for partID := 0; partID < numPartitions; partID++ {
+			newDistribution[partID] = c.GetPartitionOwner(partID).String()
+		}
+		numDiffs := computeDiffBetweenDist(t, distribution, newDistribution)
+		assert.Equal(t, numDiffs, 0)
 	}
 
 	oldMem0 := members[0].String()
@@ -164,5 +189,6 @@ func TestConsistency(t *testing.T) {
 	checkConsistent(t, 120, 20, 30)
 	checkConsistent(t, 100, 20, 25)
 	checkConsistent(t, 128, 70, 26)
+	checkConsistent(t, 256, 30, 70)
 	checkConsistent(t, 17, 5, 7)
 }
