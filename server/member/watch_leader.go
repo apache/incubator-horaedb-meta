@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/metastoragepb"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"go.uber.org/zap"
@@ -25,14 +26,13 @@ type WatchContext interface {
 	ShouldStop() bool
 }
 
+// LeaderWatcher watches the changes of the CeresMeta cluster's leadership.
 type LeaderWatcher struct {
 	watchCtx    WatchContext
 	self        *Member
 	leaseTTLSec int64
 
-	// When watchEtcdLeader is true, the leader watcher will check whether the leader is same as the etcd leader.
-	// Else, the leader watcher will only watch the leader changes.
-	watchEtcdLeader bool
+	leadershipChecker LeadershipChecker
 }
 
 type LeadershipEventCallbacks interface {
@@ -40,34 +40,61 @@ type LeadershipEventCallbacks interface {
 	BeforeTransfer(ctx context.Context)
 }
 
-func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64, watchEtcdLeader bool) *LeaderWatcher {
+// LeadershipChecker tells which member should campaign the CeresMeta cluster's leadership, and whether the current leader is valid.
+type LeadershipChecker interface {
+	ShouldCampaign(self *Member, etcdLeaderID uint64) bool
+	IsValidLeader(memLeader *metastoragepb.Member, etcdLeaderID uint64) bool
+}
+
+// embeddedEtcdLeadershipChecker ensures the CeresMeta cluster's leader as the embedded ETCD cluster's leader.
+type embeddedEtcdLeadershipChecker struct{}
+
+func (c embeddedEtcdLeadershipChecker) ShouldCampaign(self *Member, etcdLeaderID uint64) bool {
+	return self.ID == etcdLeaderID
+}
+
+func (c embeddedEtcdLeadershipChecker) IsValidLeader(memLeader *metastoragepb.Member, etcdLeaderID uint64) bool {
+	return memLeader.Id == etcdLeaderID
+}
+
+// externalEtcdLeadershipChecker has no preference over the leadership of the CeresMeta cluster, that is to say, the leadership is random.
+type externalEtcdLeadershipChecker struct{}
+
+func (c externalEtcdLeadershipChecker) ShouldCampaign(_ *Member, _ uint64) bool {
+	return true
+}
+
+func (c externalEtcdLeadershipChecker) IsValidLeader(_ *metastoragepb.Member, _ uint64) bool {
+	return true
+}
+
+func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64, embedEtcd bool) *LeaderWatcher {
+	var leadershipChecker LeadershipChecker
+	if embedEtcd {
+		leadershipChecker = embeddedEtcdLeadershipChecker{}
+	} else {
+		leadershipChecker = externalEtcdLeadershipChecker{}
+	}
+
 	return &LeaderWatcher{
 		ctx,
 		self,
 		leaseTTLSec,
-		watchEtcdLeader,
-	}
-}
-
-func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCallbacks) {
-	if l.watchEtcdLeader {
-		l.watchWithCheckEtcdLeader(ctx, callbacks)
-	} else {
-		l.watchLeader(ctx, callbacks)
+		leadershipChecker,
 	}
 }
 
 // watchWithCheckEtcdLeader watches the leader changes:
-//  1. Check whether the leader is valid (same as the etcd leader) if leader exists.
+//  1. Check whether the leader is valid if leader exists.
 //     - Leader is valid: wait for the leader changes.
 //     - Leader is not valid: reset the leader by the current leader.
 //  2. Campaign the leadership if leader does not exist.
-//     - Elect the etcd leader as the ceresmeta leader.
+//     - Campaign the leader if this member should.
 //     - The leader keeps the leadership lease alive.
 //     - The other members keeps waiting for the leader changes.
 //
 // The LeadershipCallbacks `callbacks` will be triggered when specific events occur.
-func (l *LeaderWatcher) watchWithCheckEtcdLeader(ctx context.Context, callbacks LeadershipEventCallbacks) {
+func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCallbacks) {
 	var wait string
 	logger := log.With(zap.String("self", l.self.Name))
 
@@ -103,12 +130,13 @@ func (l *LeaderWatcher) watchWithCheckEtcdLeader(ctx context.Context, callbacks 
 			logger.Fatal("fail to get etcd leader", zap.Error(err))
 			break
 		}
-		if resp.Leader == nil {
+		memLeader := resp.Leader
+		if memLeader == nil {
 			// Leader does not exist.
 			// A new leader should be elected and the etcd leader should be elected as the new leader.
-			if l.self.ID == etcdLeaderID {
+			if l.leadershipChecker.ShouldCampaign(l.self, etcdLeaderID) {
 				// Campaign the leader and block until leader changes.
-				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, true, callbacks); err != nil {
+				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, l.leadershipChecker, callbacks); err != nil {
 					logger.Error("fail to campaign and keep leader", zap.Error(err))
 					wait = waitReasonFailEtcd
 				} else {
@@ -121,21 +149,21 @@ func (l *LeaderWatcher) watchWithCheckEtcdLeader(ctx context.Context, callbacks 
 			wait = waitReasonElectLeader
 		} else {
 			// Cache leader in memory.
-			l.self.leader = resp.Leader
-			log.Info("update leader cache", zap.String("endpoint", resp.Leader.Endpoint))
+			l.self.leader = memLeader
+			log.Info("update leader cache", zap.String("endpoint", memLeader.Endpoint))
 
 			// Leader does exist.
 			// A new leader should be elected (the leader should be reset by the current leader itself) if the leader is
 			// not the etcd leader.
-			if etcdLeaderID == resp.Leader.Id {
+			if l.leadershipChecker.IsValidLeader(memLeader, etcdLeaderID) {
 				// watch the leader and block until leader changes.
 				l.self.WaitForLeaderChange(ctx, resp.Revision)
 				logger.Warn("leader changes and stop watching")
 				continue
 			}
 
-			// The leader is not etcd leader and this node is leader so reset it.
-			if resp.Leader.Endpoint == l.self.Endpoint {
+			// This leader is not valid, reset it if this member will campaign this leadership.
+			if l.leadershipChecker.ShouldCampaign(l.self, etcdLeaderID) {
 				if err = l.self.ResetLeader(ctx); err != nil {
 					logger.Error("fail to reset leader", zap.Error(err))
 					wait = waitReasonFailEtcd
@@ -145,68 +173,6 @@ func (l *LeaderWatcher) watchWithCheckEtcdLeader(ctx context.Context, callbacks 
 
 			// The leader is not etcd leader and this node is not the leader so just wait a moment and check leader again.
 			wait = waitReasonResetLeader
-		}
-	}
-}
-
-// Watch watches the leader changes:
-//  1. Check whether the leader is valid if leader exists.
-//     - Leader is valid: wait for the leader changes.
-//     - Leader is not valid: reset the leader by the current leader.
-//  2. Campaign the leadership if leader does not exist.
-//     - The leader keeps the leadership lease alive.
-//     - The other members keeps waiting for the leader changes.
-//
-// The LeadershipCallbacks `callbacks` will be triggered when specific events occur.
-func (l *LeaderWatcher) watchLeader(ctx context.Context, callbacks LeadershipEventCallbacks) {
-	var wait string
-	logger := log.With(zap.String("self", l.self.Name))
-
-	for {
-		if l.watchCtx.ShouldStop() {
-			logger.Warn("stop watching leader because of server is closed")
-			return
-		}
-
-		select {
-		case <-ctx.Done():
-			logger.Warn("stop watching leader because ctx is done")
-			return
-		default:
-		}
-
-		if wait != waitReasonNoWait {
-			logger.Warn("sleep a while during watch", zap.String("wait-reason", wait))
-			time.Sleep(watchLeaderFailInterval)
-			wait = waitReasonNoWait
-		}
-
-		// Check whether leader exists.
-		resp, err := l.self.getLeader(ctx)
-		if err != nil {
-			logger.Error("fail to get leader", zap.Error(err))
-			wait = waitReasonFailEtcd
-			continue
-		}
-
-		if resp.Leader == nil {
-			// Leader does not exist.
-			// A new leader should be elected and the etcd leader should be elected as the new leader.
-			// Campaign the leader and block until leader changes.
-			if err = l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, false, callbacks); err != nil {
-				logger.Error("fail to campaign and keep leader", zap.Error(err))
-				wait = waitReasonFailEtcd
-			} else {
-				logger.Info("stop keeping leader")
-			}
-		} else {
-			// Cache leader in memory.
-			l.self.leader = resp.Leader
-			log.Info("update leader cache", zap.String("endpoint", resp.Leader.Endpoint))
-
-			// watch the leader and block until leader changes.
-			l.self.WaitForLeaderChange(ctx, resp.Revision)
-			logger.Warn("leader changes and stop watching")
 		}
 	}
 }

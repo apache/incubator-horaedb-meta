@@ -148,7 +148,7 @@ func (m *Member) WaitForLeaderChange(ctx context.Context, revision int64) {
 	}
 }
 
-func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, enableEmbedEtcd bool, callbacks LeadershipEventCallbacks) error {
+func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, leadershipChecker LeadershipChecker, callbacks LeadershipEventCallbacks) error {
 	leaderVal, err := m.Marshal()
 	if err != nil {
 		return err
@@ -227,16 +227,14 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, e
 				return nil
 			}
 
-			if enableEmbedEtcd {
-				// Check the etcd leader periodically. If the etcd leader is changed, ceresmeta leader should be re-elected.
-				etcdLeader, err := m.etcdLeaderGetter.EtcdLeaderID()
-				if err != nil {
-					return err
-				}
-				if etcdLeader != m.ID {
-					m.logger.Info("etcd leader changed and should re-assign the leadership", zap.String("old-leader", m.Name), zap.Uint64("new-leader", etcdLeader))
-					return nil
-				}
+			// Check the etcd leader periodically. If this member should not campaign the leader, break this loop.
+			etcdLeaderID, err := m.etcdLeaderGetter.EtcdLeaderID()
+			if err != nil {
+				return err
+			}
+			if leadershipChecker.ShouldCampaign(m, etcdLeaderID) {
+				m.logger.Info("etcd leader changed and should re-assign the leadership", zap.String("old-leader", m.Name), zap.Uint64("new-leader", etcdLeaderID))
+				return nil
 			}
 		case <-ctx.Done():
 			m.logger.Info("server is closed")
