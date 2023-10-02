@@ -227,13 +227,8 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, l
 				return nil
 			}
 
-			// Check the etcd leader periodically. If this member should not campaign the leader, break this loop.
-			etcdLeaderID, err := m.etcdLeaderGetter.EtcdLeaderID()
-			if err != nil {
-				return err
-			}
-			if !leadershipChecker.ShouldCampaign(m, etcdLeaderID) {
-				m.logger.Info("etcd leader changed and should re-assign the leadership", zap.String("old-leader", m.Name), zap.Uint64("new-leader", etcdLeaderID))
+			if !leadershipChecker.ShouldCampaign(m) {
+				m.logger.Info("etcd leader changed and should re-assign the leadership", zap.String("old-leader", m.Name))
 				return nil
 			}
 		case <-ctx.Done():

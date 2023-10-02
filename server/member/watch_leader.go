@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metastoragepb"
+	"github.com/CeresDB/ceresmeta/pkg/assert"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"go.uber.org/zap"
@@ -42,36 +43,44 @@ type LeadershipEventCallbacks interface {
 
 // LeadershipChecker tells which member should campaign the CeresMeta cluster's leadership, and whether the current leader is valid.
 type LeadershipChecker interface {
-	ShouldCampaign(self *Member, etcdLeaderID uint64) bool
-	IsValidLeader(memLeader *metastoragepb.Member, etcdLeaderID uint64) bool
+	ShouldCampaign(self *Member) bool
+	IsValidLeader(memLeader *metastoragepb.Member) bool
 }
 
 // embeddedEtcdLeadershipChecker ensures the CeresMeta cluster's leader as the embedded ETCD cluster's leader.
-type embeddedEtcdLeadershipChecker struct{}
+type embeddedEtcdLeadershipChecker struct {
+	etcdLeaderGetter etcdutil.EtcdLeaderGetter
+}
 
-func (c embeddedEtcdLeadershipChecker) ShouldCampaign(self *Member, etcdLeaderID uint64) bool {
+func (c embeddedEtcdLeadershipChecker) ShouldCampaign(self *Member) bool {
+	etcdLeaderID, err := c.etcdLeaderGetter.EtcdLeaderID()
+	assert.Assertf(err == nil, "EtcdLeaderID must exist")
 	return self.ID == etcdLeaderID
 }
 
-func (c embeddedEtcdLeadershipChecker) IsValidLeader(memLeader *metastoragepb.Member, etcdLeaderID uint64) bool {
+func (c embeddedEtcdLeadershipChecker) IsValidLeader(memLeader *metastoragepb.Member) bool {
+	etcdLeaderID, err := c.etcdLeaderGetter.EtcdLeaderID()
+	assert.Assertf(err == nil, "EtcdLeaderID must exist")
 	return memLeader.Id == etcdLeaderID
 }
 
 // externalEtcdLeadershipChecker has no preference over the leadership of the CeresMeta cluster, that is to say, the leadership is random.
 type externalEtcdLeadershipChecker struct{}
 
-func (c externalEtcdLeadershipChecker) ShouldCampaign(_ *Member, _ uint64) bool {
+func (c externalEtcdLeadershipChecker) ShouldCampaign(_ *Member) bool {
 	return true
 }
 
-func (c externalEtcdLeadershipChecker) IsValidLeader(_ *metastoragepb.Member, _ uint64) bool {
+func (c externalEtcdLeadershipChecker) IsValidLeader(_ *metastoragepb.Member) bool {
 	return true
 }
 
 func NewLeaderWatcher(ctx WatchContext, self *Member, leaseTTLSec int64, embedEtcd bool) *LeaderWatcher {
 	var leadershipChecker LeadershipChecker
 	if embedEtcd {
-		leadershipChecker = embeddedEtcdLeadershipChecker{}
+		leadershipChecker = embeddedEtcdLeadershipChecker{
+			etcdLeaderGetter: ctx,
+		}
 	} else {
 		leadershipChecker = externalEtcdLeadershipChecker{}
 	}
@@ -125,16 +134,11 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 			continue
 		}
 
-		etcdLeaderID, err := l.watchCtx.EtcdLeaderID()
-		if err != nil {
-			logger.Fatal("fail to get etcd leader", zap.Error(err))
-			break
-		}
 		memLeader := resp.Leader
 		if memLeader == nil {
 			// Leader does not exist.
 			// A new leader should be elected and the etcd leader should be elected as the new leader.
-			if l.leadershipChecker.ShouldCampaign(l.self, etcdLeaderID) {
+			if l.leadershipChecker.ShouldCampaign(l.self) {
 				// Campaign the leader and block until leader changes.
 				if err := l.self.CampaignAndKeepLeader(ctx, l.leaseTTLSec, l.leadershipChecker, callbacks); err != nil {
 					logger.Error("fail to campaign and keep leader", zap.Error(err))
@@ -155,7 +159,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 			// Leader does exist.
 			// A new leader should be elected (the leader should be reset by the current leader itself) if the leader is
 			// not the etcd leader.
-			if l.leadershipChecker.IsValidLeader(memLeader, etcdLeaderID) {
+			if l.leadershipChecker.IsValidLeader(memLeader) {
 				// watch the leader and block until leader changes.
 				l.self.WaitForLeaderChange(ctx, resp.Revision)
 				logger.Warn("leader changes and stop watching")
@@ -163,7 +167,7 @@ func (l *LeaderWatcher) Watch(ctx context.Context, callbacks LeadershipEventCall
 			}
 
 			// This leader is not valid, reset it if this member will campaign this leadership.
-			if l.leadershipChecker.ShouldCampaign(l.self, etcdLeaderID) {
+			if l.leadershipChecker.ShouldCampaign(l.self) {
 				if err = l.self.ResetLeader(ctx); err != nil {
 					logger.Error("fail to reset leader", zap.Error(err))
 					wait = waitReasonFailEtcd
