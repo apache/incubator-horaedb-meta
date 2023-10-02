@@ -232,7 +232,7 @@ func (m *Member) CampaignAndKeepLeader(ctx context.Context, leaseTTLSec int64, l
 			if err != nil {
 				return err
 			}
-			if leadershipChecker.ShouldCampaign(m, etcdLeaderID) {
+			if !leadershipChecker.ShouldCampaign(m, etcdLeaderID) {
 				m.logger.Info("etcd leader changed and should re-assign the leadership", zap.String("old-leader", m.Name), zap.Uint64("new-leader", etcdLeaderID))
 				return nil
 			}
