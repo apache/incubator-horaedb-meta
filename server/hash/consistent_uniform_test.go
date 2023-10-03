@@ -32,34 +32,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newConfig() Config {
-	return Config{
-		ReplicationFactor: 127,
-		Hasher:            hasher{},
-	}
-}
-
 type testMember string
 
 func (tm testMember) String() string {
 	return string(tm)
 }
 
-type hasher struct{}
+type testHasher struct{}
 
-func (hs hasher) Sum64(data []byte) uint64 {
+func (hs testHasher) Sum64(data []byte) uint64 {
 	h := fnv.New64()
 	_, _ = h.Write(data)
 	return h.Sum64()
 }
 
-func checkUniform(t *testing.T, numPartitions, numMembers int) {
+func buildTestMembers(n int) []Member {
 	members := []Member{}
-	for i := 0; i < numMembers; i++ {
+	for i := 0; i < n; i++ {
 		member := testMember(fmt.Sprintf("node-%d", i))
 		members = append(members, member)
 	}
-	cfg := newConfig()
+
+	return members
+}
+
+func checkUniform(t *testing.T, numPartitions, numMembers int) {
+	members := buildTestMembers(numMembers)
+	cfg := Config{
+		ReplicationFactor: 127,
+		Hasher:            testHasher{},
+	}
 	c, err := BuildConsistentUniformHash(numPartitions, members, cfg)
 	assert.NoError(t, err)
 
@@ -80,7 +82,7 @@ func checkUniform(t *testing.T, numPartitions, numMembers int) {
 func TestZeroReplicationFactor(t *testing.T) {
 	cfg := Config{
 		ReplicationFactor: 0,
-		Hasher:            hasher{},
+		Hasher:            testHasher{},
 	}
 	_, err := BuildConsistentUniformHash(0, []Member{testMember("")}, cfg)
 	assert.Error(t, err)
@@ -98,7 +100,7 @@ func TestEmptyHasher(t *testing.T) {
 func TestEmptyMembers(t *testing.T) {
 	cfg := Config{
 		ReplicationFactor: 127,
-		Hasher:            hasher{},
+		Hasher:            testHasher{},
 	}
 	_, err := BuildConsistentUniformHash(0, []Member{}, cfg)
 	assert.Error(t, err)
@@ -107,7 +109,7 @@ func TestEmptyMembers(t *testing.T) {
 func TestNegativeNumPartitions(t *testing.T) {
 	cfg := Config{
 		ReplicationFactor: 127,
-		Hasher:            hasher{},
+		Hasher:            testHasher{},
 	}
 	_, err := BuildConsistentUniformHash(-1, []Member{testMember("")}, cfg)
 	assert.Error(t, err)
@@ -137,12 +139,11 @@ func computeDiffBetweenDist(t *testing.T, oldDist, newDist map[int]string) int {
 }
 
 func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
-	members := make([]Member, 0, numMembers)
-	for i := 0; i < numMembers; i++ {
-		member := testMember(fmt.Sprintf("node-%d", i))
-		members = append(members, member)
+	members := buildTestMembers(numMembers)
+	cfg := Config{
+		ReplicationFactor: 127,
+		Hasher:            testHasher{},
 	}
-	cfg := newConfig()
 	c, err := BuildConsistentUniformHash(numPartitions, members, cfg)
 	assert.NoError(t, err)
 
@@ -191,4 +192,55 @@ func TestConsistency(t *testing.T) {
 	checkConsistent(t, 128, 70, 26)
 	checkConsistent(t, 256, 30, 70)
 	checkConsistent(t, 17, 5, 7)
+}
+
+func checkAffinity(t *testing.T, numPartitions, numMembers int, rule AffinityRule, revisedMaxLoad uint) {
+	members := buildTestMembers(numMembers)
+	cfg := Config{
+		ReplicationFactor: 127,
+		Hasher:            testHasher{},
+		AffinityRule:      rule,
+	}
+	c, err := BuildConsistentUniformHash(numPartitions, members, cfg)
+	assert.NoError(t, err)
+
+	minLoad := c.MinLoad()
+	maxLoad := c.MaxLoad()
+	if maxLoad < revisedMaxLoad {
+		maxLoad = revisedMaxLoad
+	}
+	loadDistribution := c.LoadDistribution()
+	for _, mem := range members {
+		load, ok := loadDistribution[mem.String()]
+		if !ok {
+			assert.Equal(t, 0.0, minLoad)
+		}
+		assert.LessOrEqual(t, load, maxLoad)
+	}
+
+	for partID, affinity := range rule.PartitionAffinities {
+		mem := c.GetPartitionOwner(partID)
+		load := loadDistribution[mem.String()]
+		allowedMaxLoad := affinity.NumAllowedOtherPartitions + 1
+		assert.LessOrEqual(t, load, allowedMaxLoad)
+	}
+}
+
+func TestAffinity(t *testing.T) {
+	rule := AffinityRule{
+		PartitionAffinities: map[int]Affinity{},
+	}
+	checkAffinity(t, 120, 72, rule, 0)
+	checkAffinity(t, 0, 72, rule, 0)
+
+	rule = AffinityRule{
+		PartitionAffinities: map[int]Affinity{
+			0: {0},
+			1: {0},
+			2: {120},
+		},
+	}
+	checkAffinity(t, 120, 72, rule, 0)
+	checkAffinity(t, 3, 72, rule, 0)
+	checkAffinity(t, 72, 72, rule, 0)
 }
