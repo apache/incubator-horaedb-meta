@@ -30,8 +30,6 @@ const (
 type Manager interface {
 	ListScheduler() []Scheduler
 
-	GetScheduler() Scheduler
-
 	Start(ctx context.Context) error
 
 	Stop(ctx context.Context) error
@@ -222,11 +220,6 @@ func (m *ManagerImpl) ListScheduler() []Scheduler {
 	defer m.lock.RUnlock()
 
 	return m.registerSchedulers
-}
-
-func (m *ManagerImpl) GetScheduler() Scheduler {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (m *ManagerImpl) Scheduler(ctx context.Context, clusterSnapshot metadata.Snapshot) []ScheduleResult {

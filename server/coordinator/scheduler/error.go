@@ -4,6 +4,4 @@ package scheduler
 
 import "github.com/CeresDB/ceresmeta/pkg/coderr"
 
-var (
-	ErrInvalidTopologyType = coderr.NewCodeError(coderr.Internal, "invalid topology type")
-)
+var ErrInvalidTopologyType = coderr.NewCodeError(coderr.Internal, "invalid topology type")
