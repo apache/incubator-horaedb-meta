@@ -40,6 +40,7 @@ import (
 	"github.com/CeresDB/ceresmeta/pkg/assert"
 )
 
+// TODO: Modify these error definitions to coderr.
 var (
 	// ErrInsufficientMemberCount represents an error which means there are not enough members to complete the task.
 	ErrInsufficientMemberCount = errors.New("insufficient member count")

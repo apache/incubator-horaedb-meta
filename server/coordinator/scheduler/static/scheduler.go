@@ -1,6 +1,6 @@
 // Copyright 2023 CeresDB Project Authors. Licensed under Apache-2.0.
 
-package scheduler
+package static
 
 import (
 	"context"
@@ -8,34 +8,55 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler"
+	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler/nodepicker"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
 
-type StaticTopologyShardScheduler struct {
+var ErrNotImplemented = coderr.NewCodeError(coderr.ErrNotImplemented, "no")
+
+type schedulerImpl struct {
 	factory                     *coordinator.Factory
-	nodePicker                  coordinator.NodePicker
+	nodePicker                  nodepicker.NodePicker
 	procedureExecutingBatchSize uint32
 }
 
-func NewStaticTopologyShardScheduler(factory *coordinator.Factory, nodePicker coordinator.NodePicker, procedureExecutingBatchSize uint32) Scheduler {
-	return StaticTopologyShardScheduler{factory: factory, nodePicker: nodePicker, procedureExecutingBatchSize: procedureExecutingBatchSize}
+func NewShardScheduler(factory *coordinator.Factory, nodePicker nodepicker.NodePicker, procedureExecutingBatchSize uint32) scheduler.Scheduler {
+	return schedulerImpl{factory: factory, nodePicker: nodePicker, procedureExecutingBatchSize: procedureExecutingBatchSize}
 }
 
-func (s StaticTopologyShardScheduler) UpdateDeployMode(_ context.Context, _ bool) {
+func (s schedulerImpl) Name() string {
+	return "static_scheduler"
+}
+
+func (s schedulerImpl) UpdateDeployMode(_ context.Context, _ bool) {
 	// StaticTopologyShardScheduler do not need deployMode.
 }
 
-func (s StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnapshot metadata.Snapshot) (ScheduleResult, error) {
+func (s schedulerImpl) AddShardAffinityRule(_ context.Context, _ scheduler.ShardAffinityRule) error {
+	return ErrNotImplemented.WithCausef("static topology scheduler doesn't support shard affinity")
+}
+
+func (s schedulerImpl) RemoveShardAffinityRule(_ context.Context, _ storage.ShardID) error {
+	return ErrNotImplemented.WithCausef("static topology scheduler doesn't support shard affinity")
+}
+
+func (s schedulerImpl) ListShardAffinityRule(_ context.Context) (scheduler.ShardAffinityRule, error) {
+	return scheduler.ShardAffinityRule{}, ErrNotImplemented.WithCausef("static topology scheduler doesn't support shard affinity")
+}
+
+func (s schedulerImpl) Schedule(ctx context.Context, clusterSnapshot metadata.Snapshot) (scheduler.ScheduleResult, error) {
 	var procedures []procedure.Procedure
 	var reasons strings.Builder
 
 	switch clusterSnapshot.Topology.ClusterView.State {
 	case storage.ClusterStateEmpty:
-		return ScheduleResult{}, nil
+		return scheduler.ScheduleResult{}, nil
 	case storage.ClusterStatePrepare:
 		unassignedShardIds := make([]storage.ShardID, 0, len(clusterSnapshot.Topology.ShardViewsMapping))
 		for _, shardView := range clusterSnapshot.Topology.ShardViewsMapping {
@@ -45,10 +66,13 @@ func (s StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnaps
 			}
 			unassignedShardIds = append(unassignedShardIds, shardView.ShardID)
 		}
+		pickConfig := nodepicker.Config{
+			NumTotalShards: uint32(len(clusterSnapshot.Topology.ShardViewsMapping)),
+		}
 		// Assign shards
-		shardNodeMapping, err := s.nodePicker.PickNode(ctx, unassignedShardIds, uint32(len(clusterSnapshot.Topology.ShardViewsMapping)), clusterSnapshot.RegisteredNodes)
+		shardNodeMapping, err := s.nodePicker.PickNode(ctx, pickConfig, unassignedShardIds, clusterSnapshot.RegisteredNodes)
 		if err != nil {
-			return ScheduleResult{}, err
+			return scheduler.ScheduleResult{}, err
 		}
 		for shardID, node := range shardNodeMapping {
 			// Shard exists and ShardNode not exists.
@@ -59,7 +83,7 @@ func (s StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnaps
 				NewLeaderNodeName: node.Node.Name,
 			})
 			if err != nil {
-				return ScheduleResult{}, err
+				return scheduler.ScheduleResult{}, err
 			}
 			procedures = append(procedures, p)
 			reasons.WriteString(fmt.Sprintf("Cluster initialization, assign shard to node, shardID:%d, nodeName:%s. ", shardID, node.Node.Name))
@@ -72,7 +96,7 @@ func (s StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnaps
 			shardNode := clusterSnapshot.Topology.ClusterView.ShardNodes[i]
 			node, err := findOnlineNodeByName(shardNode.NodeName, clusterSnapshot.RegisteredNodes)
 			if err != nil {
-				return ScheduleResult{}, err
+				return scheduler.ScheduleResult{}, err
 			}
 			if !containsShard(node.ShardInfos, shardNode.ID) {
 				// Shard need to be reopened
@@ -83,7 +107,7 @@ func (s StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnaps
 					NewLeaderNodeName: node.Node.Name,
 				})
 				if err != nil {
-					return ScheduleResult{}, err
+					return scheduler.ScheduleResult{}, err
 				}
 				procedures = append(procedures, p)
 				reasons.WriteString(fmt.Sprintf("Cluster initialization, assign shard to node, shardID:%d, nodeName:%s. ", shardNode.ID, node.Node.Name))
@@ -95,7 +119,7 @@ func (s StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnaps
 	}
 
 	if len(procedures) == 0 {
-		return ScheduleResult{}, nil
+		return scheduler.ScheduleResult{}, nil
 	}
 
 	batchProcedure, err := s.factory.CreateBatchTransferLeaderProcedure(ctx, coordinator.BatchRequest{
@@ -103,10 +127,10 @@ func (s StaticTopologyShardScheduler) Schedule(ctx context.Context, clusterSnaps
 		BatchType: procedure.TransferLeader,
 	})
 	if err != nil {
-		return ScheduleResult{}, err
+		return scheduler.ScheduleResult{}, err
 	}
 
-	return ScheduleResult{batchProcedure, reasons.String()}, nil
+	return scheduler.ScheduleResult{Procedure: batchProcedure, Reason: reasons.String()}, nil
 }
 
 func findOnlineNodeByName(nodeName string, nodes []metadata.RegisteredNode) (metadata.RegisteredNode, error) {
