@@ -11,6 +11,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
 	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler"
 	"github.com/CeresDB/ceresmeta/server/id"
+	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
@@ -84,6 +85,10 @@ func (c *Cluster) GetProcedureFactory() *coordinator.Factory {
 
 func (c *Cluster) GetSchedulerManager() scheduler.Manager {
 	return c.schedulerManager
+}
+
+func (c *Cluster) GetShards() []storage.ShardID {
+	return c.metadata.GetShards()
 }
 
 func (c *Cluster) GetShardNodes() metadata.GetShardNodesResult {
