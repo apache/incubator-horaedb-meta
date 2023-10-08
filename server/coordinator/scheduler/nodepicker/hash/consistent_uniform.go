@@ -38,6 +38,8 @@ import (
 	"sort"
 
 	"github.com/CeresDB/ceresmeta/pkg/assert"
+	"github.com/CeresDB/ceresmeta/pkg/log"
+	"go.uber.org/zap"
 )
 
 // TODO: Modify these error definitions to coderr.
@@ -60,6 +62,8 @@ var (
 	// ErrEmptyMembers will be thrown if no member is provided.
 	ErrEmptyMembers = errors.New("at least one member is required")
 )
+
+const hashSeparator = "@$"
 
 type Hasher interface {
 	Sum64([]byte) uint64
@@ -239,11 +243,22 @@ func (c *ConsistentUniformHash) GetPartitionOwner(partID int) Member {
 }
 
 func (c *ConsistentUniformHash) initializeVirtualNodes(members []Member) {
+	// Ensure the order of members to avoid inconsistency caused by hash collisions.
+	sort.Slice(members, func(i, j int) bool {
+		return members[i].String() < members[j].String()
+	})
+
 	for _, mem := range members {
 		for i := 0; i < c.config.ReplicationFactor; i++ {
 			// TODO: Shall use a more generic hasher which receives multiple slices or string?
-			key := []byte(fmt.Sprintf("%s%d", mem.String(), i))
+			key := []byte(fmt.Sprintf("%s%s%d", mem.String(), hashSeparator, i))
 			h := virtualNode(c.config.Hasher.Sum64(key))
+
+			oldMem, ok := c.nodeToMems[h]
+			if ok {
+				log.Warn("found has collision", zap.String("oldMem", oldMem.String()), zap.String("newMem", mem.String()))
+			}
+
 			c.nodeToMems[h] = mem
 			c.sortedRing = append(c.sortedRing, h)
 		}

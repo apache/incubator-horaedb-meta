@@ -151,10 +151,23 @@ func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
 	for partID := 0; partID < numPartitions; partID++ {
 		distribution[partID] = c.GetPartitionOwner(partID).String()
 	}
+	sortedRing := c.sortedRing
+	nodeToMems := c.nodeToMems
 
 	{
-		c, err := BuildConsistentUniformHash(numPartitions, members, cfg)
+		newMembers := make([]Member, 0, numMembers)
+		for i := numMembers - 1; i >= 0; i-- {
+			newMembers = append(newMembers, members[i])
+		}
+		c, err := BuildConsistentUniformHash(numPartitions, newMembers, cfg)
 		assert.NoError(t, err)
+
+		newSortedRing := c.sortedRing
+		assert.Equal(t, sortedRing, newSortedRing)
+
+		newNodeToMems := c.nodeToMems
+		assert.Equal(t, nodeToMems, newNodeToMems)
+
 		newDistribution := make(map[int]string, numPartitions)
 		for partID := 0; partID < numPartitions; partID++ {
 			newDistribution[partID] = c.GetPartitionOwner(partID).String()
@@ -187,11 +200,11 @@ func checkConsistent(t *testing.T, numPartitions, numMembers, maxDiff int) {
 }
 
 func TestConsistency(t *testing.T) {
-	checkConsistent(t, 120, 20, 30)
-	checkConsistent(t, 100, 20, 25)
-	checkConsistent(t, 128, 70, 26)
-	checkConsistent(t, 256, 30, 70)
-	checkConsistent(t, 17, 5, 7)
+	checkConsistent(t, 120, 20, 12)
+	checkConsistent(t, 100, 20, 11)
+	checkConsistent(t, 128, 70, 10)
+	checkConsistent(t, 256, 30, 42)
+	checkConsistent(t, 17, 5, 10)
 }
 
 func checkAffinity(t *testing.T, numPartitions, numMembers int, rule AffinityRule, revisedMaxLoad uint) {
