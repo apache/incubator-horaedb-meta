@@ -7,6 +7,7 @@ data-dir = "/tmp/ceresmeta0"
 node-name = "meta0"
 initial-cluster = "meta0=http://127.0.0.1:2380"
 default-cluster-node-count = 2
+topology-type = "dynamic"
 
 [log]
 level = "info"

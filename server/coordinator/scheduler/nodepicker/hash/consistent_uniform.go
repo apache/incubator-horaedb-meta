@@ -40,6 +40,7 @@ import (
 	"github.com/CeresDB/ceresmeta/pkg/assert"
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 )
 
 // TODO: Modify these error definitions to coderr.
@@ -74,6 +75,11 @@ type Member interface {
 	String() string
 }
 
+type PartitionAffinity struct {
+	PartitionID               int
+	NumAllowedOtherPartitions uint
+}
+
 // Config represents a structure to control consistent package.
 type Config struct {
 	// Hasher is responsible for generating unsigned, 64 bit hash of provided byte slice.
@@ -85,7 +91,7 @@ type Config struct {
 	ReplicationFactor int
 
 	// The rule describes the partition affinity.
-	AffinityRule AffinityRule
+	PartitionAffinities []PartitionAffinity
 }
 
 type virtualNode uint64
@@ -141,6 +147,11 @@ func BuildConsistentUniformHash(numPartitions int, members []Member, config Conf
 	for _, mem := range members {
 		memPartitions[mem.String()] = make(map[int]struct{}, maxLoad)
 	}
+
+	// Sort the affinity rule to ensure consistency.
+	sort.Slice(config.PartitionAffinities, func(i, j int) bool {
+		return config.PartitionAffinities[i].PartitionID < config.PartitionAffinities[j].PartitionID
+	})
 	c := &ConsistentUniformHash{
 		config:        config,
 		minLoad:       minLoad,
@@ -271,9 +282,10 @@ func (c *ConsistentUniformHash) initializeVirtualNodes(members []Member) {
 }
 
 func (c *ConsistentUniformHash) ensureAffinity() {
-	offloadedMems := make(map[string]struct{}, len(c.config.AffinityRule.PartitionAffinities))
+	offloadedMems := make(map[string]struct{}, len(c.config.PartitionAffinities))
 
-	for partID, affinity := range c.config.AffinityRule.PartitionAffinities {
+	for _, affinity := range c.config.PartitionAffinities {
+		partID := affinity.PartitionID
 		vNodeIdx := c.partitionDist[partID]
 		vNode := c.sortedRing[vNodeIdx]
 		mem, ok := c.nodeToMems[vNode]
@@ -309,6 +321,7 @@ func (c *ConsistentUniformHash) offloadMember(mem Member, memPartitions map[int]
 		partIDsToOffload = append(partIDsToOffload, partID)
 	}
 
+	slices.Sort(partIDsToOffload)
 	for _, partID := range partIDsToOffload {
 		c.offloadPartition(partID, mem, offloadedMems)
 	}

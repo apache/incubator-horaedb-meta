@@ -207,12 +207,12 @@ func TestConsistency(t *testing.T) {
 	checkConsistent(t, 17, 5, 10)
 }
 
-func checkAffinity(t *testing.T, numPartitions, numMembers int, rule AffinityRule, revisedMaxLoad uint) {
+func checkAffinity(t *testing.T, numPartitions, numMembers int, affinities []PartitionAffinity, revisedMaxLoad uint) {
 	members := buildTestMembers(numMembers)
 	cfg := Config{
-		ReplicationFactor: 127,
-		Hasher:            testHasher{},
-		AffinityRule:      rule,
+		ReplicationFactor:   127,
+		Hasher:              testHasher{},
+		PartitionAffinities: affinities,
 	}
 	c, err := BuildConsistentUniformHash(numPartitions, members, cfg)
 	assert.NoError(t, err)
@@ -231,29 +231,57 @@ func checkAffinity(t *testing.T, numPartitions, numMembers int, rule AffinityRul
 		assert.LessOrEqual(t, load, maxLoad)
 	}
 
-	for partID, affinity := range rule.PartitionAffinities {
-		mem := c.GetPartitionOwner(partID)
+	for _, affinity := range affinities {
+		mem := c.GetPartitionOwner(affinity.PartitionID)
 		load := loadDistribution[mem.String()]
 		allowedMaxLoad := affinity.NumAllowedOtherPartitions + 1
 		assert.LessOrEqual(t, load, allowedMaxLoad)
 	}
+
+	distribution := make(map[int]string, numPartitions)
+	for partID := 0; partID < numPartitions; partID++ {
+		distribution[partID] = c.GetPartitionOwner(partID).String()
+	}
+	{
+		newMembers := make([]Member, 0, numMembers)
+		for i := numMembers - 1; i >= 0; i-- {
+			newMembers = append(newMembers, members[i])
+		}
+		c, err := BuildConsistentUniformHash(numPartitions, newMembers, cfg)
+		assert.NoError(t, err)
+
+		newDistribution := make(map[int]string, numPartitions)
+		for partID := 0; partID < numPartitions; partID++ {
+			newDistribution[partID] = c.GetPartitionOwner(partID).String()
+		}
+		numDiffs := computeDiffBetweenDist(t, distribution, newDistribution)
+		assert.Equal(t, numDiffs, 0)
+	}
 }
 
 func TestAffinity(t *testing.T) {
-	rule := AffinityRule{
-		PartitionAffinities: map[int]Affinity{},
-	}
+	rule := []PartitionAffinity{}
 	checkAffinity(t, 120, 72, rule, 0)
 	checkAffinity(t, 0, 72, rule, 0)
 
-	rule = AffinityRule{
-		PartitionAffinities: map[int]Affinity{
-			0: {0},
-			1: {0},
-			2: {120},
-		},
+	rule = []PartitionAffinity{
+		{0, 0},
+		{1, 0},
+		{2, 120},
 	}
-	checkAffinity(t, 120, 72, rule, 0)
 	checkAffinity(t, 3, 72, rule, 0)
 	checkAffinity(t, 72, 72, rule, 0)
+
+	rule = []PartitionAffinity{
+		{7, 0},
+		{31, 0},
+		{41, 0},
+		{45, 0},
+		{58, 0},
+		{81, 0},
+		{87, 0},
+		{88, 0},
+		{89, 0},
+	}
+	checkAffinity(t, 128, 72, rule, 0)
 }

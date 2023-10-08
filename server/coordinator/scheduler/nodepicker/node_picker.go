@@ -23,17 +23,17 @@ type Config struct {
 	ShardAffinityRule map[storage.ShardID]scheduler.ShardAffinity
 }
 
-func (c Config) hashAffinityRule() hash.AffinityRule {
-	affinities := make(map[int]hash.Affinity, len(c.ShardAffinityRule))
+func (c Config) genPartitionAffinities() []hash.PartitionAffinity {
+	affinities := make([]hash.PartitionAffinity, 0, len(c.ShardAffinityRule))
 	for shardID, affinity := range c.ShardAffinityRule {
-		affinities[int(shardID)] = hash.Affinity{
+		partitionID := int(shardID)
+		affinities = append(affinities, hash.PartitionAffinity{
+			PartitionID:               partitionID,
 			NumAllowedOtherPartitions: affinity.NumAllowedOtherShards,
-		}
+		})
 	}
 
-	return hash.AffinityRule{
-		PartitionAffinities: affinities,
-	}
+	return affinities
 }
 
 type NodePicker interface {
@@ -92,9 +92,9 @@ func (p *ConsistentUniformHashNodePicker) PickNode(_ context.Context, config Con
 	}
 
 	hashConf := hash.Config{
-		ReplicationFactor: uniformHashReplicationFactor,
-		Hasher:            hasher{},
-		AffinityRule:      config.hashAffinityRule(),
+		ReplicationFactor:   uniformHashReplicationFactor,
+		Hasher:              hasher{},
+		PartitionAffinities: config.genPartitionAffinities(),
 	}
 	h, err := hash.BuildConsistentUniformHash(int(config.NumTotalShards), mems, hashConf)
 	if err != nil {
