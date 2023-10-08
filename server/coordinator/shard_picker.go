@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
+	"sort"
 
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -98,4 +99,64 @@ func copyNodeShardMapping(nodeShardsMapping map[string][]storage.ShardNode) map[
 		tempNodeShardMapping[nodeName] = tempShardNode
 	}
 	return tempNodeShardMapping
+}
+
+// LeastTableShardPicker selects shards based on the number of tables on the current shard,
+// and always selects the shard with the smallest number of current tables.
+type LeastTableShardPicker struct{}
+
+func NewLeastTableShardPicker() ShardPicker {
+	return &LeastTableShardPicker{}
+}
+
+func (l LeastTableShardPicker) PickShards(_ context.Context, snapshot metadata.Snapshot, expectShardNum int) ([]storage.ShardNode, error) {
+	shardNodeMapping := make(map[storage.ShardID]storage.ShardNode, len(snapshot.Topology.ShardViewsMapping))
+	for _, shardNode := range snapshot.Topology.ClusterView.ShardNodes {
+		shardNodeMapping[shardNode.ID] = shardNode
+	}
+
+	if len(snapshot.Topology.ClusterView.ShardNodes) == 0 {
+		return nil, errors.WithMessage(ErrNodeNumberNotEnough, "no shard is assigned")
+	}
+
+	result := make([]storage.ShardNode, 0, expectShardNum)
+
+	shardTableNumberMapping := make(map[storage.ShardID]int, len(snapshot.Topology.ShardViewsMapping))
+	for shardID, shardView := range snapshot.Topology.ShardViewsMapping {
+		shardTableNumberMapping[shardID] = len(shardView.TableIDs)
+	}
+
+	var sortedMapping []Pair
+	for i := 0; i < expectShardNum; i++ {
+		if i%len(shardTableNumberMapping) == 0 {
+			sortedMapping = sortByTableNumber(shardTableNumberMapping)
+		}
+
+		selectShard := sortedMapping[i%len(shardTableNumberMapping)]
+		shardTableNumberMapping[selectShard.shardID]++
+
+		result = append(result, shardNodeMapping[selectShard.shardID])
+	}
+
+	return result, nil
+}
+
+type Pair struct {
+	shardID     storage.ShardID
+	tableNumber int
+}
+
+// sortByTableNumber sort shard by table number,
+// the shard with the smallest number of tables is at the front of the array.
+func sortByTableNumber(shardTableNumberMapping map[storage.ShardID]int) []Pair {
+	vec := make([]Pair, 0, len(shardTableNumberMapping))
+	for shardID, tableNumber := range shardTableNumberMapping {
+		vec = append(vec, Pair{shardID: shardID, tableNumber: tableNumber})
+	}
+
+	sort.Slice(vec, func(i, j int) bool {
+		return vec[i].tableNumber < vec[j].tableNumber
+	})
+
+	return vec
 }
