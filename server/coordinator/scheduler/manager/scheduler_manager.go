@@ -1,4 +1,4 @@
-// Copyright 2022 CeresDB Project Authors. Licensed under Apache-2.0.
+// Copyright 2023 CeresDB Project Authors. Licensed under Apache-2.0.
 
 package manager
 
@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
@@ -29,8 +28,6 @@ import (
 const (
 	schedulerInterval = time.Second * 5
 )
-
-var ErrInvalidTopologyType = coderr.NewCodeError(coderr.InvalidParams, "invalid topology type")
 
 // SchedulerManager used to manage schedulers, it will register all schedulers when it starts.
 //
@@ -291,39 +288,39 @@ func (m *schedulerManagerImpl) GetDeployMode(_ context.Context) (bool, error) {
 }
 
 func (m *schedulerManagerImpl) AddShardAffinityRule(ctx context.Context, rule scheduler.ShardAffinityRule) error {
-	var firstErr error
+	var lastErr error
 	for _, scheduler := range m.registerSchedulers {
 		if err := scheduler.AddShardAffinityRule(ctx, rule); err != nil {
-			firstErr = err
+			lastErr = err
 		}
 	}
 
-	return firstErr
+	return lastErr
 }
 
 func (m *schedulerManagerImpl) RemoveShardAffinityRule(ctx context.Context, shardID storage.ShardID) error {
-	var firstErr error
+	var lastErr error
 	for _, scheduler := range m.registerSchedulers {
 		if err := scheduler.RemoveShardAffinityRule(ctx, shardID); err != nil {
-			firstErr = err
+			lastErr = err
 		}
 	}
 
-	return firstErr
+	return lastErr
 }
 
 func (m *schedulerManagerImpl) ListShardAffinityRules(ctx context.Context) (map[string]scheduler.ShardAffinityRule, error) {
 	rules := make(map[string]scheduler.ShardAffinityRule, len(m.registerSchedulers))
-	var firstErr error
+	var lastErr error
 
 	for _, scheduler := range m.registerSchedulers {
 		rule, err := scheduler.ListShardAffinityRule(ctx)
 		if err != nil {
-			firstErr = err
+			lastErr = err
 		}
 
 		rules[scheduler.Name()] = rule
 	}
 
-	return rules, firstErr
+	return rules, lastErr
 }

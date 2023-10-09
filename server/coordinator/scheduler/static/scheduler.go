@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
@@ -17,8 +16,6 @@ import (
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
 )
-
-var ErrNotImplemented = coderr.NewCodeError(coderr.ErrNotImplemented, "no")
 
 type schedulerImpl struct {
 	factory                     *coordinator.Factory

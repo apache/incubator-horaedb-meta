@@ -5,7 +5,7 @@
 //
 // This code is licensed under the MIT License.
 //
-// Permission is hereby granted, free G charge, to any person obtaining a copy
+// Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
@@ -64,6 +64,8 @@ var (
 	ErrEmptyMembers = errors.New("at least one member is required")
 )
 
+// hashSeparator is used to building the virtual node name for member.
+// With this special separator, it will be hard to generate duplicate virtual node names.
 const hashSeparator = "@$"
 
 type Hasher interface {
@@ -105,7 +107,7 @@ type ConsistentUniformHash struct {
 	numPartitions uint32
 	// Member name => Member
 	members map[string]Member
-	// Member name => Partition ID
+	// Member name => Partitions allocated to this member
 	memPartitions map[string]map[int]struct{}
 	// Partition ID => index of the virtualNode in the sortedRing
 	partitionDist map[int]int
@@ -267,7 +269,7 @@ func (c *ConsistentUniformHash) initializeVirtualNodes(members []Member) {
 
 			oldMem, ok := c.nodeToMems[h]
 			if ok {
-				log.Warn("found has collision", zap.String("oldMem", oldMem.String()), zap.String("newMem", mem.String()))
+				log.Warn("found hash collision", zap.String("oldMem", oldMem.String()), zap.String("newMem", mem.String()))
 			}
 
 			c.nodeToMems[h] = mem
@@ -302,7 +304,7 @@ func (c *ConsistentUniformHash) ensureAffinity() {
 	}
 }
 
-// offloadMember tries to offload the given member by moving the its partitions to another members.
+// offloadMember tries to offload the given member by moving its partitions to other members.
 func (c *ConsistentUniformHash) offloadMember(mem Member, memPartitions map[int]struct{}, retainedPartID, numAllowedParts int, offloadedMems map[string]struct{}) {
 	assert.Assertf(numAllowedParts >= 1, "At least the partition itself should be allowed")
 	partIDsToOffload := make([]int, 0, len(memPartitions)-numAllowedParts)

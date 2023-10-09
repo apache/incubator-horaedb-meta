@@ -25,13 +25,15 @@ type schedulerImpl struct {
 	nodePicker                  nodepicker.NodePicker
 	procedureExecutingBatchSize uint32
 
-	// Mutex is used to protect following fields.
+	// The lock is used to protect following fields.
 	lock sync.Mutex
 	// latestShardNodeMapping is used to record last stable shard topology,
 	// when deployMode is true, rebalancedShardScheduler will recover cluster according to the topology.
 	latestShardNodeMapping map[storage.ShardID]metadata.RegisteredNode
-	deployMode             bool
-	shardAffinityRule      map[storage.ShardID]scheduler.ShardAffinity
+	// The `latestShardNodeMapping` will be used directly, if deployMode is set.
+	deployMode bool
+	// shardAffinityRule is used to control the shard distribution.
+	shardAffinityRule map[storage.ShardID]scheduler.ShardAffinity
 }
 
 func NewShardScheduler(logger *zap.Logger, factory *coordinator.Factory, nodePicker nodepicker.NodePicker, procedureExecutingBatchSize uint32) scheduler.Scheduler {

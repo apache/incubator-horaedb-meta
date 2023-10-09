@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/assert"
-	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler"
 	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler/nodepicker/hash"
@@ -15,8 +14,6 @@ import (
 	"github.com/spaolacci/murmur3"
 	"go.uber.org/zap"
 )
-
-var ErrNoAliveNodes = coderr.NewCodeError(coderr.InvalidParams, "no alive nodes is found")
 
 type Config struct {
 	NumTotalShards    uint32
