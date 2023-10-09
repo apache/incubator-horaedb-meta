@@ -36,21 +36,21 @@ func (l leastTableShardPicker) PickShards(_ context.Context, snapshot metadata.S
 		return nil, errors.WithMessage(ErrNodeNumberNotEnough, "no shard is assigned")
 	}
 
-	result := make([]storage.ShardNode, 0, expectShardNum)
-
-	ShardIDs := make([]storage.ShardID, 0, len(snapshot.Topology.ShardViewsMapping))
+	sortedShardsByTableCount := make([]storage.ShardID, 0, len(snapshot.Topology.ShardViewsMapping))
 	for shardID := range snapshot.Topology.ShardViewsMapping {
-		ShardIDs = append(ShardIDs, shardID)
+		sortedShardsByTableCount = append(sortedShardsByTableCount, shardID)
 	}
 
 	// sort shard by table number,
 	// the shard with the smallest number of tables is at the front of the array.
-	sort.SliceStable(ShardIDs, func(i, j int) bool {
-		return len(snapshot.Topology.ShardViewsMapping[ShardIDs[i]].TableIDs) < len(snapshot.Topology.ShardViewsMapping[ShardIDs[j]].TableIDs)
+	sort.SliceStable(sortedShardsByTableCount, func(i, j int) bool {
+		return len(snapshot.Topology.ShardViewsMapping[sortedShardsByTableCount[i]].TableIDs) < len(snapshot.Topology.ShardViewsMapping[sortedShardsByTableCount[j]].TableIDs)
 	})
 
+	result := make([]storage.ShardNode, 0, expectShardNum)
+
 	for i := 0; i < expectShardNum; i++ {
-		selectShardID := ShardIDs[i%len(ShardIDs)]
+		selectShardID := sortedShardsByTableCount[i%len(sortedShardsByTableCount)]
 		result = append(result, shardNodeMapping[selectShardID])
 	}
 
