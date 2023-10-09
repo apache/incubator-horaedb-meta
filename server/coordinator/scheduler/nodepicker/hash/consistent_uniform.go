@@ -334,9 +334,11 @@ func (c *ConsistentUniformHash) offloadPartition(sourcePartID int, sourceMem Mem
 	loadUpperBound := c.numPartitions
 	for load := c.maxLoad; load < int(loadUpperBound); load++ {
 		if done := c.offloadPartitionWithAllowedLoad(sourcePartID, sourceMem, load, blackedMembers); done {
-			break
+			return
 		}
 	}
+
+	log.Warn("failed to offload partition")
 }
 
 func (c *ConsistentUniformHash) offloadPartitionWithAllowedLoad(sourcePartID int, sourceMem Member, allowedMaxLoad int, blackedMembers map[string]struct{}) bool {

@@ -285,3 +285,22 @@ func TestAffinity(t *testing.T) {
 	}
 	checkAffinity(t, 128, 72, rule, 0)
 }
+
+func TestInvalidAffinity(t *testing.T) {
+	// This affinity rule requires at least 4 member, but it should work too.
+	rule := []PartitionAffinity{
+		{0, 0},
+		{1, 0},
+		{2, 0},
+		{3, 0},
+	}
+
+	members := buildTestMembers(3)
+	cfg := Config{
+		ReplicationFactor:   127,
+		Hasher:              testHasher{},
+		PartitionAffinities: rule,
+	}
+	_, err := BuildConsistentUniformHash(4, members, cfg)
+	assert.NoError(t, err)
+}
