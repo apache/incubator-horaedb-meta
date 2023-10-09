@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/CeresDB/ceresmeta/pkg/log"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
@@ -291,6 +292,7 @@ func (m *schedulerManagerImpl) AddShardAffinityRule(ctx context.Context, rule sc
 	var lastErr error
 	for _, scheduler := range m.registerSchedulers {
 		if err := scheduler.AddShardAffinityRule(ctx, rule); err != nil {
+			log.Error("failed to add shard affinity rule of a scheduler", zap.String("scheduler", scheduler.Name()), zap.Error(err))
 			lastErr = err
 		}
 	}
@@ -302,6 +304,7 @@ func (m *schedulerManagerImpl) RemoveShardAffinityRule(ctx context.Context, shar
 	var lastErr error
 	for _, scheduler := range m.registerSchedulers {
 		if err := scheduler.RemoveShardAffinityRule(ctx, shardID); err != nil {
+			log.Error("failed to remove shard affinity rule of a scheduler", zap.String("scheduler", scheduler.Name()), zap.Error(err))
 			lastErr = err
 		}
 	}
@@ -316,6 +319,7 @@ func (m *schedulerManagerImpl) ListShardAffinityRules(ctx context.Context) (map[
 	for _, scheduler := range m.registerSchedulers {
 		rule, err := scheduler.ListShardAffinityRule(ctx)
 		if err != nil {
+			log.Error("failed to list shard affinity rule of a scheduler", zap.String("scheduler", scheduler.Name()), zap.Error(err))
 			lastErr = err
 		}
 
