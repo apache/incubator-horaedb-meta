@@ -58,4 +58,17 @@ func TestLeastTableShardPicker(t *testing.T) {
 	for _, shardNode := range shardNodes {
 		re.NotEqual(shardNode.ID, 0)
 	}
+
+	// drop shard node 1, shard 1 should not be picked.
+	for _, shardNode := range snapshot.Topology.ClusterView.ShardNodes {
+		if shardNode.ID == 1 {
+			err = c.GetMetadata().DropShardNode(ctx, []storage.ShardNode{shardNode})
+			re.NoError(err)
+		}
+	}
+	shardNodes, err = shardPicker.PickShards(ctx, snapshot, 8)
+	re.NoError(err)
+	for _, shardNode := range shardNodes {
+		re.NotEqual(shardNode.ID, 1)
+	}
 }

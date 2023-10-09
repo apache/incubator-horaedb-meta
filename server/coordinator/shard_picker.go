@@ -6,6 +6,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/CeresDB/ceresmeta/pkg/assert"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"
@@ -27,18 +28,16 @@ func NewLeastTableShardPicker() ShardPicker {
 }
 
 func (l leastTableShardPicker) PickShards(_ context.Context, snapshot metadata.Snapshot, expectShardNum int) ([]storage.ShardNode, error) {
-	shardNodeMapping := make(map[storage.ShardID]storage.ShardNode, len(snapshot.Topology.ShardViewsMapping))
-	for _, shardNode := range snapshot.Topology.ClusterView.ShardNodes {
-		shardNodeMapping[shardNode.ID] = shardNode
-	}
-
 	if len(snapshot.Topology.ClusterView.ShardNodes) == 0 {
 		return nil, errors.WithMessage(ErrNodeNumberNotEnough, "no shard is assigned")
 	}
 
+	shardNodeMapping := make(map[storage.ShardID]storage.ShardNode, len(snapshot.Topology.ShardViewsMapping))
 	sortedShardsByTableCount := make([]storage.ShardID, 0, len(snapshot.Topology.ShardViewsMapping))
-	for shardID := range snapshot.Topology.ShardViewsMapping {
-		sortedShardsByTableCount = append(sortedShardsByTableCount, shardID)
+	for _, shardNode := range snapshot.Topology.ClusterView.ShardNodes {
+		shardNodeMapping[shardNode.ID] = shardNode
+		// Only collect the shards witch has been allocated to a node.
+		sortedShardsByTableCount = append(sortedShardsByTableCount, shardNode.ID)
 	}
 
 	// sort shard by table number,
@@ -51,7 +50,9 @@ func (l leastTableShardPicker) PickShards(_ context.Context, snapshot metadata.S
 
 	for i := 0; i < expectShardNum; i++ {
 		selectShardID := sortedShardsByTableCount[i%len(sortedShardsByTableCount)]
-		result = append(result, shardNodeMapping[selectShardID])
+		shardNode, ok := shardNodeMapping[selectShardID]
+		assert.Assert(ok)
+		result = append(result, shardNode)
 	}
 
 	return result, nil
