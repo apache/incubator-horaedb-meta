@@ -420,7 +420,7 @@ func (a *API) diagnoseShards(req *http.Request) apiFuncResult {
 		return errResult(ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
 	}
 
-	registerNodes, err := a.clusterManager.ListRegisterNodes(ctx, clusterName)
+	registeredNodes, err := a.clusterManager.ListRegisteredNodes(ctx, clusterName)
 	if err != nil {
 		return errResult(ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", clusterName, err.Error()))
 	}
@@ -431,9 +431,9 @@ func (a *API) diagnoseShards(req *http.Request) apiFuncResult {
 	}
 	shards := c.GetShards()
 
+	registeredShards := make(map[storage.ShardID]struct{}, len(shards))
 	// Check if there are unready shards.
-	registerShards := make(map[storage.ShardID]struct{}, len(shards))
-	for _, node := range registerNodes {
+	for _, node := range registeredNodes {
 		for _, shardInfo := range node.ShardInfos {
 			if shardInfo.Status != storage.ShardStatusReady {
 				ret.UnreadyShards[shardInfo.ID] = DiagnoseShardStatus{
@@ -441,13 +441,13 @@ func (a *API) diagnoseShards(req *http.Request) apiFuncResult {
 					Status:   storage.ConvertShardStatusToString(shardInfo.Status),
 				}
 			}
-			registerShards[shardInfo.ID] = struct{}{}
+			registeredShards[shardInfo.ID] = struct{}{}
 		}
 	}
 
 	// Check if there are unregistered shards.
 	for _, shard := range shards {
-		if _, ok := registerShards[shard]; !ok {
+		if _, ok := registeredShards[shard]; !ok {
 			ret.UnregisteredShards = append(ret.UnregisteredShards, shard)
 		}
 	}
