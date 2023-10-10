@@ -60,8 +60,6 @@ func (a *API) NewAPIRouter() *Router {
 	router.Post(fmt.Sprintf("/clusters/:%s/shardAffinities", clusterNameParam), wrap(a.addShardAffinities, true, a.forwardClient))
 	router.Del(fmt.Sprintf("/clusters/:%s/shardAffinities", clusterNameParam), wrap(a.removeShardAffinities, true, a.forwardClient))
 	router.Post("/table/query", wrap(a.queryTable, true, a.forwardClient))
-	router.Get(fmt.Sprintf("/clusters/:%s/deployMode", clusterNameParam), wrap(a.getDeployMode, true, a.forwardClient))
-	router.Put(fmt.Sprintf("/clusters/:%s/deployMode", clusterNameParam), wrap(a.updateDeployMode, true, a.forwardClient))
 
 	// Register debug API.
 	router.GetWithoutPrefix("/debug/pprof/profile", pprof.Profile)
@@ -74,6 +72,8 @@ func (a *API) NewAPIRouter() *Router {
 	router.GetWithoutPrefix("/debug/pprof/threadCreate", a.pprofThreadcreate)
 	router.GetWithoutPrefix(fmt.Sprintf("/debug/diagnose/:%s/shards", clusterNameParam), wrap(a.diagnoseShards, true, a.forwardClient))
 	router.GetWithoutPrefix("/debug/leader", wrap(a.getLeader, false, a.forwardClient))
+	router.GetWithoutPrefix(fmt.Sprintf("/clusters/:%s/deployMode", clusterNameParam), wrap(a.getDeployMode, true, a.forwardClient))
+	router.PutWithoutPrefix(fmt.Sprintf("/clusters/:%s/deployMode", clusterNameParam), wrap(a.updateDeployMode, true, a.forwardClient))
 
 	// Register ETCD API.
 	router.Post("/etcd/promoteLearner", wrap(a.etcdAPI.promoteLearner, false, a.forwardClient))
