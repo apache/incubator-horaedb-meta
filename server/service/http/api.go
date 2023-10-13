@@ -72,8 +72,8 @@ func (a *API) NewAPIRouter() *Router {
 	router.GetWithoutPrefix("/debug/pprof/threadCreate", a.pprofThreadcreate)
 	router.GetWithoutPrefix(fmt.Sprintf("/debug/diagnose/:%s/shards", clusterNameParam), wrap(a.diagnoseShards, true, a.forwardClient))
 	router.GetWithoutPrefix("/debug/leader", wrap(a.getLeader, false, a.forwardClient))
-	router.GetWithoutPrefix(fmt.Sprintf("/clusters/:%s/deployMode", clusterNameParam), wrap(a.getDeployMode, true, a.forwardClient))
-	router.PutWithoutPrefix(fmt.Sprintf("/clusters/:%s/deployMode", clusterNameParam), wrap(a.updateDeployMode, true, a.forwardClient))
+	router.GetWithoutPrefix(fmt.Sprintf("/debug/clusters/:%s/deployMode", clusterNameParam), wrap(a.getDeployMode, true, a.forwardClient))
+	router.PutWithoutPrefix(fmt.Sprintf("/debug/clusters/:%s/deployMode", clusterNameParam), wrap(a.updateDeployMode, true, a.forwardClient))
 
 	// Register ETCD API.
 	router.Post("/etcd/promoteLearner", wrap(a.etcdAPI.promoteLearner, false, a.forwardClient))
