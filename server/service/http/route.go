@@ -55,7 +55,7 @@ func (r *Router) Get(path string, h http.HandlerFunc) {
 	r.rtr.GET(r.prefix+path, r.handle(path, h))
 }
 
-// GetWithoutPrefix registers a new GET route without prefix.
+// DebugGet registers a new GET route without prefix.
 func (r *Router) DebugGet(path string, h http.HandlerFunc) {
 	r.rtr.GET(DEBUG_PREFIX+path, r.handle(path, h))
 }
@@ -75,7 +75,7 @@ func (r *Router) Put(path string, h http.HandlerFunc) {
 	r.rtr.PUT(r.prefix+path, r.handle(path, h))
 }
 
-// PutWithoutPrefix registers a new PUT route without prefix.
+// DebugPut registers a new PUT route without prefix.
 func (r *Router) DebugPut(path string, h http.HandlerFunc) {
 	r.rtr.PUT(DEBUG_PREFIX+path, r.handle(path, h))
 }
