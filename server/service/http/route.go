@@ -12,7 +12,7 @@ import (
 
 type param string
 
-const DEBUG_PREFIX = "/debug"
+const DebugPrefix = "/debug"
 
 // Router wraps httprouter.Router and adds support for prefixed sub-routers,
 // per-request context injections and instrumentation.
@@ -57,7 +57,7 @@ func (r *Router) Get(path string, h http.HandlerFunc) {
 
 // DebugGet registers a new GET route without prefix.
 func (r *Router) DebugGet(path string, h http.HandlerFunc) {
-	r.rtr.GET(DEBUG_PREFIX+path, r.handle(path, h))
+	r.rtr.GET(DebugPrefix+path, r.handle(path, h))
 }
 
 // Options registers a new OPTIONS route.
@@ -77,7 +77,7 @@ func (r *Router) Put(path string, h http.HandlerFunc) {
 
 // DebugPut registers a new PUT route without prefix.
 func (r *Router) DebugPut(path string, h http.HandlerFunc) {
-	r.rtr.PUT(DEBUG_PREFIX+path, r.handle(path, h))
+	r.rtr.PUT(DebugPrefix+path, r.handle(path, h))
 }
 
 // Post registers a new POST route.
