@@ -7,6 +7,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -59,7 +60,9 @@ func testCreateAndDropTable(ctx context.Context, re *require.Assertions, manager
 	re.NoError(err)
 	re.False(exists)
 
-	t, err := manager.CreateTable(ctx, TestSchemaName, TestTableName, storage.PartitionInfo{})
+	t, err := manager.CreateTable(ctx, TestSchemaName, TestTableName, storage.PartitionInfo{
+		Info: &clusterpb.PartitionInfo{},
+	})
 	re.NoError(err)
 	re.Equal(TestTableName, t.Name)
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/id"
@@ -53,11 +54,13 @@ func TestTopologyManager(t *testing.T) {
 
 func testTableTopology(ctx context.Context, re *require.Assertions, manager metadata.TopologyManager) {
 	updateVersionResult, err := manager.AddTable(ctx, TestShardID, []storage.Table{{
-		ID:            TestTableID,
-		Name:          TestTableName,
-		SchemaID:      TestSchemaID,
-		CreatedAt:     0,
-		PartitionInfo: storage.PartitionInfo{},
+		ID:        TestTableID,
+		Name:      TestTableName,
+		SchemaID:  TestSchemaID,
+		CreatedAt: 0,
+		PartitionInfo: storage.PartitionInfo{
+			Info: &clusterpb.PartitionInfo{},
+		},
 	}})
 	re.NoError(err)
 	re.Equal(updateVersionResult.PrevVersion, updateVersionResult.CurrVersion-1)
@@ -77,11 +80,13 @@ func testTableTopology(ctx context.Context, re *require.Assertions, manager meta
 	re.Equal(false, found)
 
 	updateVersionResult, err = manager.AddTable(ctx, TestShardID, []storage.Table{{
-		ID:            TestTableID,
-		Name:          TestTableName,
-		SchemaID:      TestSchemaID,
-		CreatedAt:     0,
-		PartitionInfo: storage.PartitionInfo{},
+		ID:        TestTableID,
+		Name:      TestTableName,
+		SchemaID:  TestSchemaID,
+		CreatedAt: 0,
+		PartitionInfo: storage.PartitionInfo{
+			Info: &clusterpb.PartitionInfo{},
+		},
 	}})
 	re.NoError(err)
 	re.Equal(updateVersionResult.PrevVersion, updateVersionResult.CurrVersion-1)

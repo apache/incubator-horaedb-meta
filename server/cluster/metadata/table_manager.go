@@ -63,6 +63,11 @@ func NewTableManagerImpl(logger *zap.Logger, storage storage.Storage, clusterID 
 		clusterID:     clusterID,
 		schemaIDAlloc: schemaIDAlloc,
 		tableIDAlloc:  tableIDAlloc,
+		lock:          sync.RWMutex{},
+		// It will be initialized in loadSchemas.
+		schemas: nil,
+		// It will be initialized in loadTables.
+		schemaTables: nil,
 	}
 }
 
@@ -128,13 +133,14 @@ func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, t
 
 	// Create table in storage.
 	schema, ok := m.schemas[schemaName]
+	var emptyTable storage.Table
 	if !ok {
-		return storage.Table{}, ErrSchemaNotFound.WithCausef("schema name:%s", schemaName)
+		return emptyTable, ErrSchemaNotFound.WithCausef("schema name:%s", schemaName)
 	}
 
 	id, err := m.tableIDAlloc.Alloc(ctx)
 	if err != nil {
-		return storage.Table{}, errors.WithMessagef(err, "alloc table id, table name:%s", tableName)
+		return emptyTable, errors.WithMessagef(err, "alloc table id, table name:%s", tableName)
 	}
 
 	table := storage.Table{
@@ -151,7 +157,7 @@ func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, t
 	})
 
 	if err != nil {
-		return storage.Table{}, errors.WithMessage(err, "storage create table")
+		return emptyTable, errors.WithMessage(err, "storage create table")
 	}
 
 	// Update table in memory.
@@ -216,7 +222,9 @@ func (m *TableManagerImpl) GetSchemaByID(schemaID storage.SchemaID) (storage.Sch
 			return schema, true
 		}
 	}
-	return storage.Schema{}, false
+
+	var emptySchema storage.Schema
+	return emptySchema, false
 }
 
 func (m *TableManagerImpl) GetSchemas() []storage.Schema {
@@ -313,13 +321,14 @@ func (m *TableManagerImpl) loadTables(ctx context.Context) error {
 
 func (m *TableManagerImpl) getTable(schemaName, tableName string) (storage.Table, bool, error) {
 	schema, ok := m.schemas[schemaName]
+	var emptyTable storage.Table
 	if !ok {
-		return storage.Table{}, false, ErrSchemaNotFound.WithCausef("schema name", schemaName)
+		return emptyTable, false, ErrSchemaNotFound.WithCausef("schema name", schemaName)
 	}
 
 	tables, ok := m.schemaTables[schema.ID]
 	if !ok {
-		return storage.Table{}, false, nil
+		return emptyTable, false, nil
 	}
 
 	table, ok := tables.tables[tableName]

@@ -15,6 +15,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/eventdispatch"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure"
+	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler"
 	"github.com/CeresDB/ceresmeta/server/coordinator/scheduler/nodepicker"
 	"github.com/CeresDB/ceresmeta/server/etcdutil"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -105,11 +106,13 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 		ID:                          0,
 		Name:                        ClusterName,
 		MinNodeCount:                DefaultNodeCount,
+		ReplicationFactor:           0,
 		ShardTotal:                  DefaultShardTotal,
 		EnableSchedule:              DefaultSchedulerOperator,
 		TopologyType:                DefaultTopologyType,
 		ProcedureExecutingBatchSize: DefaultProcedureExecutingBatchSize,
 		CreatedAt:                   0,
+		ModifiedAt:                  0,
 	}, clusterStorage, client, TestRootPath, DefaultIDAllocatorStep)
 
 	err := clusterMetadata.Init(ctx)
@@ -126,8 +129,14 @@ func InitEmptyCluster(ctx context.Context, t *testing.T) *cluster.Cluster {
 
 	lastTouchTime := time.Now().UnixMilli()
 	for i := 0; i < DefaultNodeCount; i++ {
+		node := storage.Node{
+			Name:          fmt.Sprintf("node%d", i),
+			NodeStats:     storage.NewEmptyNodeStats(),
+			LastTouchTime: uint64(lastTouchTime),
+			State:         storage.NodeStateUnknown,
+		}
 		err = c.GetMetadata().RegisterNode(ctx, metadata.RegisteredNode{
-			Node:       storage.Node{Name: fmt.Sprintf("node%d", i), LastTouchTime: uint64(lastTouchTime)},
+			Node:       node,
 			ShardInfos: nil,
 		})
 		re.NoError(err)
@@ -150,11 +159,13 @@ func InitEmptyClusterWithConfig(ctx context.Context, t *testing.T, shardNumber i
 		ID:                          0,
 		Name:                        ClusterName,
 		MinNodeCount:                uint32(nodeNumber),
+		ReplicationFactor:           0,
 		ShardTotal:                  uint32(shardNumber),
 		EnableSchedule:              DefaultSchedulerOperator,
 		TopologyType:                DefaultTopologyType,
 		ProcedureExecutingBatchSize: DefaultProcedureExecutingBatchSize,
 		CreatedAt:                   0,
+		ModifiedAt:                  0,
 	}, clusterStorage, client, TestRootPath, DefaultIDAllocatorStep)
 
 	err := clusterMetadata.Init(ctx)
@@ -171,9 +182,15 @@ func InitEmptyClusterWithConfig(ctx context.Context, t *testing.T, shardNumber i
 
 	lastTouchTime := time.Now().UnixMilli()
 	for i := 0; i < nodeNumber; i++ {
+		node := storage.Node{
+			Name:          fmt.Sprintf("node%d", i),
+			NodeStats:     storage.NewEmptyNodeStats(),
+			LastTouchTime: uint64(lastTouchTime),
+			State:         storage.NodeStateUnknown,
+		}
 		err = c.GetMetadata().RegisterNode(ctx, metadata.RegisteredNode{
-			Node:       storage.Node{Name: fmt.Sprintf("node%d", i), LastTouchTime: uint64(lastTouchTime)},
-			ShardInfos: nil,
+			Node:       node,
+			ShardInfos: []metadata.ShardInfo{},
 		})
 		re.NoError(err)
 	}
@@ -224,7 +241,10 @@ func InitStableClusterWithConfig(ctx context.Context, t *testing.T, nodeNumber i
 	for i := 0; i < shardNumber; i++ {
 		unAssignedShardIDs = append(unAssignedShardIDs, storage.ShardID(i))
 	}
-	shardNodeMapping, err := nodePicker.PickNode(ctx, nodepicker.Config{NumTotalShards: uint32(shardNumber)}, unAssignedShardIDs, snapshot.RegisteredNodes)
+	shardNodeMapping, err := nodePicker.PickNode(ctx, nodepicker.Config{
+		NumTotalShards:    uint32(shardNumber),
+		ShardAffinityRule: map[storage.ShardID]scheduler.ShardAffinity{},
+	}, unAssignedShardIDs, snapshot.RegisteredNodes)
 	re.NoError(err)
 
 	for shardID, node := range shardNodeMapping {

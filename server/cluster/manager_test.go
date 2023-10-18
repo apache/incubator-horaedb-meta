@@ -124,10 +124,12 @@ func testInitShardView(ctx context.Context, re *require.Assertions, manager clus
 
 func testCreateCluster(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string) {
 	_, err := manager.CreateCluster(ctx, clusterName, metadata.CreateClusterOpts{
-		NodeCount:         defaultNodeCount,
-		ReplicationFactor: defaultReplicationFactor,
-		ShardTotal:        defaultShardTotal,
-		TopologyType:      defaultTopologyType,
+		NodeCount:                   defaultNodeCount,
+		ReplicationFactor:           defaultReplicationFactor,
+		EnableSchedule:              false,
+		ShardTotal:                  defaultShardTotal,
+		TopologyType:                defaultTopologyType,
+		ProcedureExecutingBatchSize: 0,
 	})
 	re.NoError(err)
 }
@@ -135,13 +137,16 @@ func testCreateCluster(ctx context.Context, re *require.Assertions, manager clus
 func testRegisterNode(ctx context.Context, re *require.Assertions, manager cluster.Manager,
 	clusterName, nodeName string,
 ) {
-	err := manager.RegisterNode(ctx, clusterName, metadata.RegisteredNode{
+	var nodeStats storage.NodeStats
+	node := metadata.RegisteredNode{
 		Node: storage.Node{
 			Name:          nodeName,
 			LastTouchTime: uint64(time.Now().UnixMilli()),
 			State:         storage.NodeStateOnline,
+			NodeStats:     nodeStats,
 		}, ShardInfos: []metadata.ShardInfo{},
-	})
+	}
+	err := manager.RegisterNode(ctx, clusterName, node)
 	re.NoError(err)
 }
 
@@ -162,7 +167,7 @@ func testCreateTable(ctx context.Context, re *require.Assertions, manager cluste
 		ShardID:       shardID,
 		SchemaName:    schema,
 		TableName:     tableName,
-		PartitionInfo: storage.PartitionInfo{},
+		PartitionInfo: storage.PartitionInfo{Info: nil},
 	})
 	re.NoError(err)
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/test"
 	"github.com/CeresDB/ceresmeta/server/storage"
@@ -65,7 +66,7 @@ func testRegisterNode(ctx context.Context, re *require.Assertions, m *metadata.C
 	err := m.RegisterNode(ctx, metadata.RegisteredNode{
 		Node: storage.Node{
 			Name:          newNodeName,
-			NodeStats:     storage.NodeStats{},
+			NodeStats:     storage.NewEmptyNodeStats(),
 			LastTouchTime: lastTouchTime,
 			State:         0,
 		},
@@ -103,9 +104,13 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 
 	// Test create table metadata.
 	createMetadataResult, err := m.CreateTableMetadata(ctx, metadata.CreateTableMetadataRequest{
-		SchemaName:    testSchema,
-		TableName:     testTableName,
-		PartitionInfo: storage.PartitionInfo{},
+		SchemaName: testSchema,
+		TableName:  testTableName,
+		PartitionInfo: storage.PartitionInfo{
+			Info: &clusterpb.PartitionInfo{
+				Info: nil,
+			},
+		},
 	})
 	re.NoError(err)
 	re.Equal(createMetadataResult.Table.Name, testTableName)
@@ -134,10 +139,12 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 
 	// Test create table.
 	createResult, err := m.CreateTable(ctx, metadata.CreateTableRequest{
-		ShardID:       0,
-		SchemaName:    testSchema,
-		TableName:     testTableName,
-		PartitionInfo: storage.PartitionInfo{},
+		ShardID:    0,
+		SchemaName: testSchema,
+		TableName:  testTableName,
+		PartitionInfo: storage.PartitionInfo{
+			Info: &clusterpb.PartitionInfo{},
+		},
 	})
 	re.NoError(err)
 	re.Equal(testTableName, createResult.Table.Name)

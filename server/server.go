@@ -69,9 +69,17 @@ func CreateServer(cfg *config.Config) (*Server, error) {
 	srv := &Server{
 		isClosed: 0,
 		status:   status.NewServerStatus(),
+		cfg:      cfg,
+		etcdCfg:  etcdCfg,
 
-		cfg:     cfg,
-		etcdCfg: etcdCfg,
+		clusterManager: nil,
+		flowLimiter:    nil,
+		member:         nil,
+		etcdCli:        nil,
+		etcdSrv:        nil,
+		httpService:    nil,
+		bgJobWg:        sync.WaitGroup{},
+		bgJobCancel:    nil,
 	}
 
 	grpcService := metagrpc.NewService(cfg.GrpcHandleTimeout(), srv)
