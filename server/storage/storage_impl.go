@@ -4,6 +4,8 @@ package storage
 
 import (
 	"context"
+	"github.com/CeresDB/ceresmeta/pkg/log"
+	"go.uber.org/zap"
 	"math"
 	"strconv"
 	"strings"
@@ -478,18 +480,23 @@ func (s *metaStorageImpl) UpdateShardView(ctx context.Context, req UpdateShardVi
 	latestVersionEquals := clientv3.Compare(clientv3.Value(latestVersionKey), "=", fmtID(req.LatestVersion))
 	opPutLatestVersion := clientv3.OpPut(latestVersionKey, fmtID(shardViewPB.Version))
 	opPutShardTopology := clientv3.OpPut(key, string(value))
-	// Delete expired shard topology.
+	// Delete expired shard view.
 	opDelShardTopology := clientv3.OpDelete(oldTopologyKey)
 
 	resp, err := s.client.Txn(ctx).
 		If(latestVersionEquals).
-		Then(opPutLatestVersion, opPutShardTopology, opDelShardTopology).
+		Then(opPutLatestVersion, opPutShardTopology).
 		Commit()
 	if err != nil {
 		return errors.WithMessagef(err, "fail to put shard clusterView, clusterID:%d, shardID:%d, key:%s", req.ClusterID, shardViewPB.ShardId, key)
 	}
 	if !resp.Succeeded {
 		return ErrUpdateShardViewConflict.WithCausef("shard view may have been modified, clusterID:%d, shardID:%d, key:%s, resp:%v", req.ClusterID, shardViewPB.ShardId, key, resp)
+	}
+
+	// Try to remove expired shard view.
+	if _, err := s.client.Do(ctx, opDelShardTopology); err != nil {
+		log.Warn("remove expired shard view failed", zap.Error(err))
 	}
 
 	return nil
