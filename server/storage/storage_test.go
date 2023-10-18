@@ -41,7 +41,7 @@ func TestStorage_CreateAndListCluster(t *testing.T) {
 			ShardTotal:                  uint32(i),
 			EnableSchedule:              false,
 			TopologyType:                TopologyTypeStatic,
-			ProcedureExecutingBatchSize: 0,
+			ProcedureExecutingBatchSize: 100,
 			CreatedAt:                   uint64(time.Now().UnixMilli()),
 			ModifiedAt:                  0,
 		}

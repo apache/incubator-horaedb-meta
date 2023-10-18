@@ -122,18 +122,19 @@ func (m *TableManagerImpl) GetTablesByIDs(tableIDs []storage.TableID) []storage.
 func (m *TableManagerImpl) CreateTable(ctx context.Context, schemaName string, tableName string, partitionInfo storage.PartitionInfo) (storage.Table, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
+	var emptyTable storage.Table
 	_, exists, err := m.getTable(schemaName, tableName)
 	if err != nil {
-		return storage.Table{}, errors.WithMessage(err, "get table")
+		return emptyTable, errors.WithMessage(err, "get table")
 	}
 
 	if exists {
-		return storage.Table{}, errors.WithMessagef(ErrTableAlreadyExists, "tableName:%s", tableName)
+		return emptyTable, errors.WithMessagef(ErrTableAlreadyExists, "tableName:%s", tableName)
 	}
 
 	// Create table in storage.
 	schema, ok := m.schemas[schemaName]
-	var emptyTable storage.Table
 	if !ok {
 		return emptyTable, ErrSchemaNotFound.WithCausef("schema name:%s", schemaName)
 	}

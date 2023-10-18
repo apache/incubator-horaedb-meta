@@ -239,11 +239,8 @@ type NodeStats struct {
 }
 
 func NewEmptyNodeStats() NodeStats {
-	return NodeStats{
-		Lease:       0,
-		Zone:        "",
-		NodeVersion: "",
-	}
+	var stats NodeStats
+	return stats
 }
 
 type Node struct {

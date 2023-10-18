@@ -19,18 +19,17 @@ import (
 )
 
 const (
-	defaultTimeout           = time.Second * 20
-	cluster1                 = "ceresdbCluster1"
-	defaultSchema            = "ceresdbSchema"
-	defaultNodeCount         = 2
-	defaultReplicationFactor = 1
-	defaultShardTotal        = 8
-	defaultTopologyType      = storage.TopologyTypeStatic
-	node1                    = "127.0.0.1:8081"
-	node2                    = "127.0.0.2:8081"
-	defaultSchemaID          = 0
-	testRootPath             = "/rootPath"
-	defaultIDAllocatorStep   = 20
+	defaultTimeout         = time.Second * 20
+	cluster1               = "ceresdbCluster1"
+	defaultSchema          = "ceresdbSchema"
+	defaultNodeCount       = 2
+	defaultShardTotal      = 8
+	defaultTopologyType    = storage.TopologyTypeStatic
+	node1                  = "127.0.0.1:8081"
+	node2                  = "127.0.0.2:8081"
+	defaultSchemaID        = 0
+	testRootPath           = "/rootPath"
+	defaultIDAllocatorStep = 20
 )
 
 func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, *clientv3.Client, etcdutil.CloseFn) {
@@ -125,11 +124,10 @@ func testInitShardView(ctx context.Context, re *require.Assertions, manager clus
 func testCreateCluster(ctx context.Context, re *require.Assertions, manager cluster.Manager, clusterName string) {
 	_, err := manager.CreateCluster(ctx, clusterName, metadata.CreateClusterOpts{
 		NodeCount:                   defaultNodeCount,
-		ReplicationFactor:           defaultReplicationFactor,
 		EnableSchedule:              false,
 		ShardTotal:                  defaultShardTotal,
 		TopologyType:                defaultTopologyType,
-		ProcedureExecutingBatchSize: 0,
+		ProcedureExecutingBatchSize: 100,
 	})
 	re.NoError(err)
 }
@@ -137,13 +135,12 @@ func testCreateCluster(ctx context.Context, re *require.Assertions, manager clus
 func testRegisterNode(ctx context.Context, re *require.Assertions, manager cluster.Manager,
 	clusterName, nodeName string,
 ) {
-	var nodeStats storage.NodeStats
 	node := metadata.RegisteredNode{
 		Node: storage.Node{
 			Name:          nodeName,
 			LastTouchTime: uint64(time.Now().UnixMilli()),
 			State:         storage.NodeStateOnline,
-			NodeStats:     nodeStats,
+			NodeStats:     storage.NewEmptyNodeStats(),
 		}, ShardInfos: []metadata.ShardInfo{},
 	}
 	err := manager.RegisterNode(ctx, clusterName, node)

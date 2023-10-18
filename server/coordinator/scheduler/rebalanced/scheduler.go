@@ -43,9 +43,9 @@ func NewShardScheduler(logger *zap.Logger, factory *coordinator.Factory, nodePic
 		nodePicker:                  nodePicker,
 		procedureExecutingBatchSize: procedureExecutingBatchSize,
 		lock:                        sync.Mutex{},
-		latestShardNodeMapping:      make(map[storage.ShardID]metadata.RegisteredNode),
+		latestShardNodeMapping:      map[storage.ShardID]metadata.RegisteredNode{},
 		deployMode:                  false,
-		shardAffinityRule:           make(map[storage.ShardID]scheduler.ShardAffinity),
+		shardAffinityRule:           map[storage.ShardID]scheduler.ShardAffinity{},
 	}
 }
 

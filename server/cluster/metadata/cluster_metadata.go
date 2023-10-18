@@ -180,33 +180,33 @@ func (c *ClusterMetadata) GetShardTables(shardIDs []storage.ShardID) map[storage
 func (c *ClusterMetadata) DropTable(ctx context.Context, schemaName, tableName string) (DropTableResult, error) {
 	c.logger.Info("drop table start", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
 
-	var emptyDropRes DropTableResult
+	var dropRes DropTableResult
 	if !c.ensureClusterStable() {
-		return emptyDropRes, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
+		return dropRes, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
 	}
 
 	table, ok, err := c.tableManager.GetTable(schemaName, tableName)
 	if err != nil {
-		return emptyDropRes, errors.WithMessage(err, "get table")
+		return dropRes, errors.WithMessage(err, "get table")
 	}
 
 	if !ok {
-		return emptyDropRes, ErrTableNotFound
+		return dropRes, ErrTableNotFound
 	}
 
 	// Drop table.
 	err = c.tableManager.DropTable(ctx, schemaName, tableName)
 	if err != nil {
-		return emptyDropRes, errors.WithMessage(err, "table manager drop table")
+		return dropRes, errors.WithMessage(err, "table manager drop table")
 	}
 
 	// Remove dropped table in shard view.
 	updateVersions, err := c.topologyManager.EvictTable(ctx, table.ID)
 	if err != nil {
-		return emptyDropRes, errors.WithMessage(err, "topology manager remove table")
+		return dropRes, errors.WithMessage(err, "topology manager remove table")
 	}
 
-	dropRes := DropTableResult{
+	dropRes = DropTableResult{
 		ShardVersionUpdate: updateVersions,
 	}
 	c.logger.Info("drop table success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("dropResult", fmt.Sprintf("%+v", dropRes)))
@@ -320,27 +320,28 @@ func (c *ClusterMetadata) AddTableTopology(ctx context.Context, shardID storage.
 func (c *ClusterMetadata) DropTableMetadata(ctx context.Context, schemaName, tableName string) (DropTableMetadataResult, error) {
 	c.logger.Info("drop table start", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName))
 
-	var emptyDropRes DropTableMetadataResult
+	var dropRes DropTableMetadataResult
 	if !c.ensureClusterStable() {
-		return emptyDropRes, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
+		return dropRes, errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
 	}
 
 	table, ok, err := c.tableManager.GetTable(schemaName, tableName)
 	if err != nil {
-		return emptyDropRes, errors.WithMessage(err, "get table")
+		return dropRes, errors.WithMessage(err, "get table")
 	}
 
 	if !ok {
-		return emptyDropRes, ErrTableNotFound
+		return dropRes, ErrTableNotFound
 	}
 
 	err = c.tableManager.DropTable(ctx, schemaName, tableName)
 	if err != nil {
-		return emptyDropRes, errors.WithMessage(err, "table manager drop table")
+		return dropRes, errors.WithMessage(err, "table manager drop table")
 	}
 
 	c.logger.Info("drop table metadata success", zap.String("cluster", c.Name()), zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.String("result", fmt.Sprintf("%+v", table)))
-	return DropTableMetadataResult{Table: table}, nil
+	dropRes = DropTableMetadataResult{Table: table}
+	return dropRes, nil
 }
 
 func (c *ClusterMetadata) CreateTable(ctx context.Context, request CreateTableRequest) (CreateTableResult, error) {

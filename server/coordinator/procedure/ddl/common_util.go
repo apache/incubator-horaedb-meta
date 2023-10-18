@@ -51,7 +51,7 @@ func BuildCreateTableRequest(table storage.Table, shardVersionUpdate metadata.Sh
 				Role:    storage.ShardRoleLeader,
 				Version: shardVersionUpdate.CurrVersion,
 				// FIXME: There is no need to update status here, but it must be set. Shall we provide another struct without status field?
-				Status: storage.ShardStatusReady,
+				Status: storage.ShardStatusUnknown,
 			},
 			PrevVersion: shardVersionUpdate.PrevVersion,
 		},
@@ -144,7 +144,7 @@ func DispatchDropTable(ctx context.Context, clusterMetadata *metadata.ClusterMet
 					Role:    storage.ShardRoleLeader,
 					Version: version.CurrVersion,
 					// FIXME: We have no need to update the status, but it must be set. Maybe we should provide another struct without status field.
-					Status: storage.ShardStatusReady,
+					Status: storage.ShardStatusUnknown,
 				},
 				PrevVersion: version.PrevVersion,
 			},

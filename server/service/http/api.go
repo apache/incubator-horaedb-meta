@@ -38,7 +38,7 @@ func NewAPI(clusterManager cluster.Manager, serverStatus *status.ServerStatus, f
 }
 
 func (a *API) NewAPIRouter() *Router {
-	router := New(apiPrefix).WithInstrumentation(printRequestInfo)
+	router := New().WithPrefix(apiPrefix).WithInstrumentation(printRequestInfo)
 
 	// Register API.
 	router.Post("/getShardTables", wrap(a.getShardTables, true, a.forwardClient))
@@ -286,7 +286,6 @@ func (a *API) createCluster(req *http.Request) apiFuncResult {
 	}
 	c, err := a.clusterManager.CreateCluster(req.Context(), createClusterRequest.Name, metadata.CreateClusterOpts{
 		NodeCount:                   createClusterRequest.NodeCount,
-		ReplicationFactor:           1,
 		ShardTotal:                  createClusterRequest.ShardTotal,
 		EnableSchedule:              createClusterRequest.EnableSchedule,
 		TopologyType:                topologyType,

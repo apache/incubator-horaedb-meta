@@ -107,8 +107,8 @@ func prepareCallback(event *fsm.Event) {
 
 func successCallback(event *fsm.Event) {
 	req := event.Args[0].(*callbackRequest)
-	assert.Assert(req.droppedTable != nil)
 
+	assert.Assert(req.droppedTable != nil)
 	if err := req.p.params.OnSucceeded(*req.droppedTable); err != nil {
 		log.Error("exec success callback failed")
 	}

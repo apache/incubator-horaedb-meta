@@ -297,13 +297,10 @@ func finishCallback(event *fsm.Event) {
 	log.Info("create partition table finish", zap.String("tableName", req.p.params.SourceReq.GetName()))
 
 	assert.Assert(req.p.createPartitionTableResult != nil)
+	var versionUpdate metadata.ShardVersionUpdate
 	if err := req.p.params.OnSucceeded(metadata.CreateTableResult{
-		Table: req.p.createPartitionTableResult.Table,
-		ShardVersionUpdate: metadata.ShardVersionUpdate{
-			ShardID:     0,
-			CurrVersion: 0,
-			PrevVersion: 0,
-		},
+		Table:              req.p.createPartitionTableResult.Table,
+		ShardVersionUpdate: versionUpdate,
 	}); err != nil {
 		procedure.CancelEventWithLog(event, err, "create partition table on succeeded")
 		return

@@ -315,7 +315,6 @@ func (srv *Server) createDefaultCluster(ctx context.Context) error {
 		defaultCluster, err := srv.clusterManager.CreateCluster(ctx, srv.cfg.DefaultClusterName,
 			metadata.CreateClusterOpts{
 				NodeCount:                   uint32(srv.cfg.DefaultClusterNodeCount),
-				ReplicationFactor:           uint32(srv.cfg.DefaultClusterReplicationFactor),
 				ShardTotal:                  uint32(srv.cfg.DefaultClusterShardTotal),
 				EnableSchedule:              srv.cfg.EnableSchedule,
 				TopologyType:                topologyType,

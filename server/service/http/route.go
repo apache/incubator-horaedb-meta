@@ -22,13 +22,17 @@ type Router struct {
 	instrh func(handlerName string, handler http.HandlerFunc) http.HandlerFunc
 }
 
-// New returns a new Router.
-func New(prefix string) *Router {
+func New() *Router {
 	return &Router{
 		rtr:    httprouter.New(),
-		prefix: prefix,
+		prefix: "",
 		instrh: nil,
 	}
+}
+
+// WithPrefix returns a router that prefixes all registered routes with prefix.
+func (r *Router) WithPrefix(prefix string) *Router {
+	return &Router{rtr: r.rtr, prefix: r.prefix + prefix, instrh: r.instrh}
 }
 
 // WithInstrumentation returns a router with instrumentation support.

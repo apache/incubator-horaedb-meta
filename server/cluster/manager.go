@@ -313,16 +313,16 @@ func (m *managerImpl) RegisterNode(ctx context.Context, clusterName string, regi
 }
 
 func (m *managerImpl) GetRegisteredNode(_ context.Context, clusterName string, nodeName string) (metadata.RegisteredNode, error) {
-	var node metadata.RegisteredNode
+	var registeredNode metadata.RegisteredNode
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {
 		log.Error("get cluster", zap.Error(err), zap.String("clusterName", clusterName))
-		return node, errors.WithMessage(err, "get cluster")
+		return registeredNode, errors.WithMessage(err, "get cluster")
 	}
 
 	registeredNode, ok := cluster.metadata.GetRegisteredNodeByName(nodeName)
 	if !ok {
-		return node, metadata.ErrNodeNotFound.WithCausef("registeredNode is not found, registeredNode:%s, cluster:%s", nodeName, clusterName)
+		return registeredNode, metadata.ErrNodeNotFound.WithCausef("registeredNode is not found, registeredNode:%s, cluster:%s", nodeName, clusterName)
 	}
 
 	return registeredNode, nil
