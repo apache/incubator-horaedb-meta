@@ -473,6 +473,13 @@ func (m *TopologyManagerImpl) InitClusterView(ctx context.Context) error {
 	if err != nil {
 		return errors.WithMessage(err, "storage create cluster view")
 	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	// Load cluster view into memory.
+	if err := m.loadClusterView(ctx); err != nil {
+		return errors.WithMessage(err, "load cluster view")
+	}
 	return nil
 }
 
