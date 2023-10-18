@@ -6,7 +6,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/split"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/test"
@@ -28,21 +27,17 @@ func TestSplit(t *testing.T) {
 
 	// Create some tables in this shard.
 	_, err := c.GetMetadata().CreateTable(ctx, metadata.CreateTableRequest{
-		ShardID:    createTableNodeShard.ID,
-		SchemaName: test.TestSchemaName,
-		TableName:  test.TestTableName0,
-		PartitionInfo: storage.PartitionInfo{
-			Info: &clusterpb.PartitionInfo{},
-		},
+		ShardID:       createTableNodeShard.ID,
+		SchemaName:    test.TestSchemaName,
+		TableName:     test.TestTableName0,
+		PartitionInfo: storage.PartitionInfo{Info: nil},
 	})
 	re.NoError(err)
 	_, err = c.GetMetadata().CreateTable(ctx, metadata.CreateTableRequest{
-		ShardID:    createTableNodeShard.ID,
-		SchemaName: test.TestSchemaName,
-		TableName:  test.TestTableName1,
-		PartitionInfo: storage.PartitionInfo{
-			Info: &clusterpb.PartitionInfo{},
-		},
+		ShardID:       createTableNodeShard.ID,
+		SchemaName:    test.TestSchemaName,
+		TableName:     test.TestTableName1,
+		PartitionInfo: storage.PartitionInfo{Info: nil},
 	})
 	re.NoError(err)
 

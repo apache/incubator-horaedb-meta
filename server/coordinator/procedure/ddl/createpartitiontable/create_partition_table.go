@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/pkg/assert"
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -230,11 +229,9 @@ func createDataTablesCallback(event *fsm.Event) {
 	shardTableMetaDatas := make(map[storage.ShardID][]metadata.CreateTableMetadataRequest, 0)
 	for i, subTableShard := range params.SubTablesShards {
 		tableMetaData := metadata.CreateTableMetadataRequest{
-			SchemaName: params.SourceReq.GetSchemaName(),
-			TableName:  params.SourceReq.GetPartitionTableInfo().SubTableNames[i],
-			PartitionInfo: storage.PartitionInfo{
-				Info: &clusterpb.PartitionInfo{},
-			},
+			SchemaName:    params.SourceReq.GetSchemaName(),
+			TableName:     params.SourceReq.GetPartitionTableInfo().SubTableNames[i],
+			PartitionInfo: storage.PartitionInfo{Info: nil},
 		}
 		shardTableMetaDatas[subTableShard.ShardInfo.ID] = append(shardTableMetaDatas[subTableShard.ShardInfo.ID], tableMetaData)
 	}

@@ -100,7 +100,7 @@ func prepareCallback(event *fsm.Event) {
 	log.Debug("drop table finish", zap.String("tableName", params.SourceReq.GetName()), zap.Uint64("procedureID", params.ID))
 
 	if len(result.ShardVersionUpdate) != 1 {
-		procedure.CancelEventWithLog(event, procedure.ErrDropTableResult, fmt.Sprintf("legnth of shardVersionResult is %d", len(result.ShardVersionUpdate)))
+		procedure.CancelEventWithLog(event, procedure.ErrDropTableResult, fmt.Sprintf("length of shardVersionResult is %d", len(result.ShardVersionUpdate)))
 		return
 	}
 }

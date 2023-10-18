@@ -158,11 +158,9 @@ type CreateOrUpdateNodeRequest struct {
 }
 
 type Cluster struct {
-	ID           ClusterID
-	Name         string
-	MinNodeCount uint32
-	// Deprecated: ReplicationFactor is deprecated after CeresMeta v1.2.0
-	ReplicationFactor           uint32
+	ID                          ClusterID
+	Name                        string
+	MinNodeCount                uint32
 	ShardTotal                  uint32
 	EnableSchedule              bool
 	TopologyType                TopologyType
@@ -286,7 +284,6 @@ func convertClusterPB(cluster *clusterpb.Cluster) Cluster {
 		ProcedureExecutingBatchSize: cluster.ProcedureExecutingBatchSize,
 		CreatedAt:                   cluster.CreatedAt,
 		ModifiedAt:                  cluster.ModifiedAt,
-		ReplicationFactor:           0,
 	}
 }
 

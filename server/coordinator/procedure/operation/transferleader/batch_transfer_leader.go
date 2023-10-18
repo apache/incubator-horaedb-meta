@@ -70,7 +70,7 @@ func buildBatchRelatedVersionInfo(batch []procedure.Procedure) (procedure.Relate
 		for shardID, version := range p.RelatedVersionInfo().ShardWithVersion {
 			if resultVersion, exists := result.ShardWithVersion[shardID]; exists {
 				if version != resultVersion {
-					return emptyInfo, errors.WithMessage(procedure.ErrMergeBatchProcedure, fmt.Sprintf("procedure shardVersion in the same batch is inconsistent, shardID:%d, expetcdShardVersion:%d, shardVersion:%d", shardID, version, resultVersion))
+					return emptyInfo, errors.WithMessage(procedure.ErrMergeBatchProcedure, fmt.Sprintf("procedure shardVersion in the same batch is inconsistent, shardID:%d, expectedShardVersion:%d, shardVersion:%d", shardID, version, resultVersion))
 				}
 			} else {
 				result.ShardWithVersion[shardID] = version

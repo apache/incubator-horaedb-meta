@@ -38,7 +38,6 @@ func TestStorage_CreateAndListCluster(t *testing.T) {
 			ID:                          ClusterID(i),
 			Name:                        fmt.Sprintf(nameFormat, i),
 			MinNodeCount:                uint32(i),
-			ReplicationFactor:           0,
 			ShardTotal:                  uint32(i),
 			EnableSchedule:              false,
 			TopologyType:                TopologyTypeStatic,

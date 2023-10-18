@@ -133,7 +133,7 @@ func testDropPartitionTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cl
 	re := require.New(t)
 	// Create DropPartitionTableProcedure to drop table.
 	partitionTableInfo := &metaservicepb.PartitionTableInfo{
-		PartitionInfo: &clusterpb.PartitionInfo{},
+		PartitionInfo: nil,
 		SubTableNames: subTableNames,
 	}
 	req := droppartitiontable.ProcedureParams{
