@@ -274,6 +274,10 @@ func (a *API) createCluster(req *http.Request) apiFuncResult {
 
 	log.Info("create cluster request", zap.String("request", fmt.Sprintf("%+v", createClusterRequest)))
 
+	if createClusterRequest.ProcedureExecutingBatchSize == 0 {
+		return errResult(ErrInvalidParamsForCreateCluster, "expect positive procedureExecutingBatchSize")
+	}
+
 	if _, err := a.clusterManager.GetCluster(req.Context(), createClusterRequest.Name); err == nil {
 		log.Error("cluster already exists", zap.String("clusterName", createClusterRequest.Name))
 		return errResult(ErrGetCluster, fmt.Sprintf("cluster: %s already exists", createClusterRequest.Name))
@@ -289,7 +293,7 @@ func (a *API) createCluster(req *http.Request) apiFuncResult {
 		ShardTotal:                  createClusterRequest.ShardTotal,
 		EnableSchedule:              createClusterRequest.EnableSchedule,
 		TopologyType:                topologyType,
-		ProcedureExecutingBatchSize: 1000,
+		ProcedureExecutingBatchSize: createClusterRequest.ProcedureExecutingBatchSize,
 	})
 	if err != nil {
 		log.Error("create cluster failed", zap.Error(err))

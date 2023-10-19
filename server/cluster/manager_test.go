@@ -19,17 +19,18 @@ import (
 )
 
 const (
-	defaultTimeout         = time.Second * 20
-	cluster1               = "ceresdbCluster1"
-	defaultSchema          = "ceresdbSchema"
-	defaultNodeCount       = 2
-	defaultShardTotal      = 8
-	defaultTopologyType    = storage.TopologyTypeStatic
-	node1                  = "127.0.0.1:8081"
-	node2                  = "127.0.0.2:8081"
-	defaultSchemaID        = 0
-	testRootPath           = "/rootPath"
-	defaultIDAllocatorStep = 20
+	defaultTimeout                     = time.Second * 20
+	cluster1                           = "ceresdbCluster1"
+	defaultSchema                      = "ceresdbSchema"
+	defaultNodeCount                   = 2
+	defaultShardTotal                  = 8
+	defaultProcedureExecutingBatchSize = 100
+	defaultTopologyType                = storage.TopologyTypeStatic
+	node1                              = "127.0.0.1:8081"
+	node2                              = "127.0.0.2:8081"
+	defaultSchemaID                    = 0
+	testRootPath                       = "/rootPath"
+	defaultIDAllocatorStep             = 20
 )
 
 func newTestStorage(t *testing.T) (storage.Storage, clientv3.KV, *clientv3.Client, etcdutil.CloseFn) {
@@ -127,7 +128,7 @@ func testCreateCluster(ctx context.Context, re *require.Assertions, manager clus
 		EnableSchedule:              false,
 		ShardTotal:                  defaultShardTotal,
 		TopologyType:                defaultTopologyType,
-		ProcedureExecutingBatchSize: 100,
+		ProcedureExecutingBatchSize: defaultProcedureExecutingBatchSize,
 	})
 	re.NoError(err)
 }
