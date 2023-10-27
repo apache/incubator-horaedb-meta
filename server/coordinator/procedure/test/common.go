@@ -61,12 +61,12 @@ func (m MockDispatch) CloseShard(_ context.Context, _ string, _ eventdispatch.Cl
 	return nil
 }
 
-func (m MockDispatch) CreateTableOnShard(_ context.Context, _ string, _ eventdispatch.CreateTableOnShardRequest) error {
-	return nil
+func (m MockDispatch) CreateTableOnShard(_ context.Context, _ string, _ eventdispatch.CreateTableOnShardRequest) (error, uint64) {
+	return nil, 0
 }
 
-func (m MockDispatch) DropTableOnShard(_ context.Context, _ string, _ eventdispatch.DropTableOnShardRequest) error {
-	return nil
+func (m MockDispatch) DropTableOnShard(_ context.Context, _ string, _ eventdispatch.DropTableOnShardRequest) (error, uint64) {
+	return nil, 0
 }
 
 func (m MockDispatch) CloseTableOnShard(_ context.Context, _ string, _ eventdispatch.CloseTableOnShardRequest) error {

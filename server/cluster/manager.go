@@ -296,7 +296,11 @@ func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 		return errors.WithMessage(err, "get cluster")
 	}
 
-	_, err = cluster.metadata.DropTable(ctx, schemaName, tableName)
+	// TODO:
+	_, err = cluster.metadata.DropTable(ctx, schemaName, tableName, metadata.ShardVersionUpdate{
+		ShardID:     0,
+		PrevVersion: 0,
+	})
 	if err != nil {
 		return errors.WithMessage(err, "cluster drop table")
 	}

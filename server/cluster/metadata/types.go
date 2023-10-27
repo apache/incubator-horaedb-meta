@@ -99,7 +99,7 @@ type CreateTableResult struct {
 }
 
 type DropTableResult struct {
-	ShardVersionUpdate []ShardVersionUpdate
+	ShardVersionUpdate ShardVersionUpdate
 }
 
 type DropTableMetadataResult struct {
@@ -121,15 +121,16 @@ type CloseTableRequest struct {
 }
 
 type MigrateTableRequest struct {
-	SchemaName string
-	TableNames []string
-	OldShardID storage.ShardID
-	NewShardID storage.ShardID
+	SchemaName            string
+	TableNames            []string
+	OldShardID            storage.ShardID
+	latestOldShardVersion uint64
+	NewShardID            storage.ShardID
+	latestNewShardVersion uint64
 }
 
 type ShardVersionUpdate struct {
 	ShardID     storage.ShardID
-	CurrVersion uint64
 	PrevVersion uint64
 }
 

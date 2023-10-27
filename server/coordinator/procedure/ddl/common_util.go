@@ -29,11 +29,11 @@ import (
 	"go.uber.org/zap"
 )
 
-func CreateTableOnShard(ctx context.Context, c *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, shardID storage.ShardID, request eventdispatch.CreateTableOnShardRequest) error {
-	log.Debug("CreateTableOnShard", zap.Uint64("curVersion", request.UpdateShardInfo.CurrShardInfo.Version), zap.Uint64("preVersion", request.UpdateShardInfo.PrevVersion))
+func CreateTableOnShard(ctx context.Context, c *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, shardID storage.ShardID, request eventdispatch.CreateTableOnShardRequest) (error, uint64) {
+	log.Debug("CreateTableOnShard", zap.Uint64("version", request.UpdateShardInfo.CurrShardInfo.Version))
 	shardNodes, err := c.GetShardNodesByShardID(shardID)
 	if err != nil {
-		return errors.WithMessage(err, "cluster get shardNode by id")
+		return errors.WithMessage(err, "cluster get shardNode by id"), 0
 	}
 	// TODO: consider followers
 	var leader storage.ShardNode
@@ -46,14 +46,14 @@ func CreateTableOnShard(ctx context.Context, c *metadata.ClusterMetadata, dispat
 		}
 	}
 	if !found {
-		return errors.WithMessagef(procedure.ErrShardLeaderNotFound, "shard node can't find leader, shardID:%d", shardID)
+		return errors.WithMessagef(procedure.ErrShardLeaderNotFound, "shard node can't find leader, shardID:%d", shardID), 0
 	}
 
-	err = dispatch.CreateTableOnShard(ctx, leader.NodeName, request)
+	err, curVersion := dispatch.CreateTableOnShard(ctx, leader.NodeName, request)
 	if err != nil {
-		return errors.WithMessage(err, "create table on shard")
+		return errors.WithMessage(err, "create table on shard"), 0
 	}
-	return nil
+	return nil, curVersion
 }
 
 func BuildCreateTableRequest(table storage.Table, shardVersionUpdate metadata.ShardVersionUpdate, req *metaservicepb.CreateTableRequest) eventdispatch.CreateTableOnShardRequest {
@@ -63,11 +63,10 @@ func BuildCreateTableRequest(table storage.Table, shardVersionUpdate metadata.Sh
 				ID: shardVersionUpdate.ShardID,
 				// TODO: dispatch CreateTableOnShard to followers?
 				Role:    storage.ShardRoleLeader,
-				Version: shardVersionUpdate.CurrVersion,
+				Version: shardVersionUpdate.PrevVersion,
 				// FIXME: There is no need to update status here, but it must be set. Shall we provide another struct without status field?
 				Status: storage.ShardStatusUnknown,
 			},
-			PrevVersion: shardVersionUpdate.PrevVersion,
 		},
 		TableInfo: metadata.TableInfo{
 			ID:            table.ID,
@@ -126,19 +125,17 @@ func BuildShardVersionUpdate(table storage.Table, clusterMetadata *metadata.Clus
 		return versionUpdate, false, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
 	}
 
-	currVersion := prevVersion + 1
 	versionUpdate = metadata.ShardVersionUpdate{
 		ShardID:     leader.ID,
-		CurrVersion: currVersion,
 		PrevVersion: prevVersion,
 	}
 	return versionUpdate, true, nil
 }
 
-func DispatchDropTable(ctx context.Context, clusterMetadata *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, schemaName string, table storage.Table, version metadata.ShardVersionUpdate) error {
+func DropTableOnShard(ctx context.Context, clusterMetadata *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, schemaName string, table storage.Table, version metadata.ShardVersionUpdate) (error, uint64) {
 	shardNodes, err := clusterMetadata.GetShardNodesByShardID(version.ShardID)
 	if err != nil {
-		return errors.WithMessage(err, "cluster get shard by shard id")
+		return errors.WithMessage(err, "cluster get shard by shard id"), 0
 	}
 
 	tableInfo := metadata.TableInfo{
@@ -150,24 +147,24 @@ func DispatchDropTable(ctx context.Context, clusterMetadata *metadata.ClusterMet
 		CreatedAt:     0,
 	}
 
+	var curVersion uint64
 	for _, shardNode := range shardNodes {
-		err = dispatch.DropTableOnShard(ctx, shardNode.NodeName, eventdispatch.DropTableOnShardRequest{
+		err, curVersion = dispatch.DropTableOnShard(ctx, shardNode.NodeName, eventdispatch.DropTableOnShardRequest{
 			UpdateShardInfo: eventdispatch.UpdateShardInfo{
 				CurrShardInfo: metadata.ShardInfo{
 					ID:      version.ShardID,
 					Role:    storage.ShardRoleLeader,
-					Version: version.CurrVersion,
+					Version: version.PrevVersion,
 					// FIXME: We have no need to update the status, but it must be set. Maybe we should provide another struct without status field.
 					Status: storage.ShardStatusUnknown,
 				},
-				PrevVersion: version.PrevVersion,
 			},
 			TableInfo: tableInfo,
 		})
 		if err != nil {
-			return errors.WithMessage(err, "dispatch drop table on shard")
+			return errors.WithMessage(err, "dispatch drop table on shard"), 0
 		}
 	}
 
-	return nil
+	return nil, curVersion
 }
