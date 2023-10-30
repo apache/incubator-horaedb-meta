@@ -235,7 +235,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 			},
 		}, nil
 	case err = <-errorCh:
-		log.Warn("create table failed", zap.String("tableName", req.Name), zap.Int64("costTime", time.Since(start).Milliseconds()))
+		log.Warn("create table failed", zap.String("tableName", req.Name), zap.Int64("costTime", time.Since(start).Milliseconds()), zap.Error(err))
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
 	}
 }
