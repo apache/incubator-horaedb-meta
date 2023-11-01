@@ -422,6 +422,8 @@ func (c *ClusterMetadata) RegisterNode(ctx context.Context, registeredNode Regis
 		return nil
 	}
 	if exists && !needUpdate(oldCache, registeredNode) {
+		// Check whether the shard versions need to be corrected.
+		c.maybeCorrectShardVersion(ctx, registeredNode)
 		return nil
 	}
 
@@ -751,4 +753,21 @@ L1:
 	}
 
 	return true
+}
+
+func (c *ClusterMetadata) maybeCorrectShardVersion(ctx context.Context, node RegisteredNode) {
+	topology := c.topologyManager.GetTopology()
+	for _, shardInfo := range node.ShardInfos {
+		oldShardView := topology.ShardViewsMapping[shardInfo.ID]
+		if oldShardView.Version != shardInfo.Version {
+			// Shard version in ceresMeta not equal to ceresDB, it is needed to be corrected.
+			// TODO: Maybe we need to consider whether the version is larger or smaller.
+			c.logger.Warn("shard version mismatch", zap.Uint32("shardID", uint32(shardInfo.ID)), zap.Uint64("", oldShardView.Version), zap.Uint64("nodeVersion", shardInfo.Version))
+			// Update with expect value.
+			if err := c.topologyManager.UpdateShardVersionWithExpect(ctx, shardInfo.ID, shardInfo.Version, oldShardView.Version); err != nil {
+				c.logger.Warn("update shard version with expect failed", zap.Uint32("shardID", uint32(shardInfo.ID)), zap.Uint64("expectVersion", oldShardView.Version), zap.Uint64("newVersion", shardInfo.Version))
+			}
+			// TODO: Maybe we need do some thing to ensure ceresDB status after update shard version.
+		}
+	}
 }
