@@ -22,5 +22,5 @@ excludes = [
 ]
 
 [properties]
-inceptionYear = 2023
+inceptionYear = 2022
 copyrightOwner = "The CeresDB Authors"
