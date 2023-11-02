@@ -14,6 +14,13 @@
 
 headerPath = "Apache-2.0.txt"
 
+excludes = [
+    # Derived
+    "server/service/http/route.go",
+    "server/coordinator/scheduler/nodepicker/hash/consistent_uniform_test.go",
+    "server/coordinator/scheduler/nodepicker/hash/consistent_uniform.go",
+]
+
 [properties]
 inceptionYear = 2023
 copyrightOwner = "The CeresDB Authors"
