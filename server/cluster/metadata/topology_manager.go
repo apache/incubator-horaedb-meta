@@ -577,6 +577,8 @@ func (m *TopologyManagerImpl) UpdateShardVersionWithExpect(ctx context.Context, 
 		return errors.WithMessage(err, "storage update shard view")
 	}
 
+	m.updateShardView(shardID, newShardView)
+
 	return nil
 }
 
