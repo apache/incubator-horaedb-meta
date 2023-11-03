@@ -84,7 +84,7 @@ func prepareCallback(event *fsm.Event) {
 	}
 
 	createTableRequest := ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq)
-	err, latestShardVersion := ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.ShardID, createTableRequest)
+	latestShardVersion, err := ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.ShardID, createTableRequest)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "dispatch create table on shard")
 		return

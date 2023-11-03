@@ -400,7 +400,7 @@ func dispatchDropDataTable(req *callbackRequest, dispatch eventdispatch.Dispatch
 			PrevVersion: shardVersion,
 		}
 
-		err, latestShardVersion := ddl.DropTableOnShard(req.ctx, clusterMetadata, dispatch, schema, table, shardVersionUpdate)
+		latestShardVersion, err := ddl.DropTableOnShard(req.ctx, clusterMetadata, dispatch, schema, table, shardVersionUpdate)
 		if err != nil {
 			return errors.WithMessagef(err, "drop table, table:%s", tableName)
 		}

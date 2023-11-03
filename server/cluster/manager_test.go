@@ -180,7 +180,7 @@ func testCreateTable(ctx context.Context, re *require.Assertions, manager cluste
 		SchemaName:    schema,
 		TableName:     tableName,
 		PartitionInfo: storage.PartitionInfo{Info: nil},
-	})
+	}, 0)
 	re.NoError(err)
 }
 

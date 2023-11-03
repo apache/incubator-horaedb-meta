@@ -45,14 +45,14 @@ func TestSplit(t *testing.T) {
 		SchemaName:    test.TestSchemaName,
 		TableName:     test.TestTableName0,
 		PartitionInfo: storage.PartitionInfo{Info: nil},
-	})
+	}, 0)
 	re.NoError(err)
 	_, err = c.GetMetadata().CreateTable(ctx, metadata.CreateTableRequest{
 		ShardID:       createTableNodeShard.ID,
 		SchemaName:    test.TestSchemaName,
 		TableName:     test.TestTableName1,
 		PartitionInfo: storage.PartitionInfo{Info: nil},
-	})
+	}, 0)
 	re.NoError(err)
 
 	// Split one table from this shard.

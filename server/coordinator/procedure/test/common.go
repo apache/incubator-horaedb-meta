@@ -53,27 +53,27 @@ const (
 
 type MockDispatch struct{}
 
-func (m MockDispatch) OpenShard(_ context.Context, _ string, _ eventdispatch.OpenShardRequest) error {
+func (m MockDispatch) OpenShard(context context.Context, address string, request eventdispatch.OpenShardRequest) error {
 	return nil
 }
 
-func (m MockDispatch) CloseShard(_ context.Context, _ string, _ eventdispatch.CloseShardRequest) error {
+func (m MockDispatch) CloseShard(context context.Context, address string, request eventdispatch.CloseShardRequest) error {
 	return nil
 }
 
-func (m MockDispatch) CreateTableOnShard(_ context.Context, _ string, _ eventdispatch.CreateTableOnShardRequest) (error, uint64) {
-	return nil, 0
+func (m MockDispatch) CreateTableOnShard(context context.Context, address string, request eventdispatch.CreateTableOnShardRequest) (uint64, error) {
+	return 0, nil
 }
 
-func (m MockDispatch) DropTableOnShard(_ context.Context, _ string, _ eventdispatch.DropTableOnShardRequest) (error, uint64) {
-	return nil, 0
+func (m MockDispatch) DropTableOnShard(context context.Context, address string, request eventdispatch.DropTableOnShardRequest) (uint64, error) {
+	return 0, nil
 }
 
-func (m MockDispatch) CloseTableOnShard(_ context.Context, _ string, _ eventdispatch.CloseTableOnShardRequest) error {
+func (m MockDispatch) OpenTableOnShard(ctx context.Context, address string, request eventdispatch.OpenTableOnShardRequest) error {
 	return nil
 }
 
-func (m MockDispatch) OpenTableOnShard(_ context.Context, _ string, _ eventdispatch.OpenTableOnShardRequest) error {
+func (m MockDispatch) CloseTableOnShard(context context.Context, address string, request eventdispatch.CloseTableOnShardRequest) error {
 	return nil
 }
 

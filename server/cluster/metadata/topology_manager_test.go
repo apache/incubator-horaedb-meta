@@ -66,7 +66,7 @@ func TestTopologyManager(t *testing.T) {
 }
 
 func testTableTopology(ctx context.Context, re *require.Assertions, manager metadata.TopologyManager) {
-	updateVersionResult, err := manager.AddTable(ctx, TestShardID, []storage.Table{{
+	addResult, err := manager.AddTable(ctx, TestShardID, 0, []storage.Table{{
 		ID:            TestTableID,
 		Name:          TestTableName,
 		SchemaID:      TestSchemaID,
@@ -74,23 +74,20 @@ func testTableTopology(ctx context.Context, re *require.Assertions, manager meta
 		PartitionInfo: storage.PartitionInfo{Info: nil},
 	}})
 	re.NoError(err)
-	re.Equal(updateVersionResult.PrevVersion, updateVersionResult.CurrVersion-1)
 
-	shardTables := manager.GetTableIDs([]storage.ShardID{updateVersionResult.ShardID})
-	found := foundTable(TestTableID, shardTables, updateVersionResult)
+	shardTables := manager.GetTableIDs([]storage.ShardID{addResult.ShardID})
+	found := foundTable(TestTableID, shardTables, addResult.ShardID)
 	re.Equal(true, found)
 
-	evictVersionResult, err := manager.EvictTable(ctx, TestTableID)
+	removeResult, err := manager.RemoveTable(ctx, addResult.ShardID, 0, []storage.TableID{TestTableID})
 	re.NoError(err)
-	re.Equal(1, len(evictVersionResult))
-	re.Equal(updateVersionResult.ShardID, evictVersionResult[0].ShardID)
-	re.Equal(updateVersionResult.CurrVersion, evictVersionResult[0].PrevVersion)
+	re.Equal(addResult.ShardID, removeResult.ShardID)
 
-	shardTables = manager.GetTableIDs([]storage.ShardID{updateVersionResult.ShardID})
-	found = foundTable(TestTableID, shardTables, updateVersionResult)
+	shardTables = manager.GetTableIDs([]storage.ShardID{removeResult.ShardID})
+	found = foundTable(TestTableID, shardTables, removeResult.ShardID)
 	re.Equal(false, found)
 
-	updateVersionResult, err = manager.AddTable(ctx, TestShardID, []storage.Table{{
+	addResult, err = manager.AddTable(ctx, TestShardID, 0, []storage.Table{{
 		ID:            TestTableID,
 		Name:          TestTableName,
 		SchemaID:      TestSchemaID,
@@ -98,19 +95,19 @@ func testTableTopology(ctx context.Context, re *require.Assertions, manager meta
 		PartitionInfo: storage.PartitionInfo{Info: nil},
 	}})
 	re.NoError(err)
-	re.Equal(updateVersionResult.PrevVersion, updateVersionResult.CurrVersion-1)
+	re.Equal(storage.ShardID(TestShardID), addResult.ShardID)
 
-	shardTables = manager.GetTableIDs([]storage.ShardID{updateVersionResult.ShardID})
-	found = foundTable(TestTableID, shardTables, updateVersionResult)
+	shardTables = manager.GetTableIDs([]storage.ShardID{addResult.ShardID})
+	found = foundTable(TestTableID, shardTables, addResult.ShardID)
 	re.Equal(true, found)
 
-	updateVersionResult, err = manager.RemoveTable(ctx, updateVersionResult.ShardID, []storage.TableID{TestTableID})
+	removeResult, err = manager.RemoveTable(ctx, addResult.ShardID, 0, []storage.TableID{TestTableID})
 	re.NoError(err)
-	re.Equal(updateVersionResult.PrevVersion, updateVersionResult.CurrVersion-1)
+	re.Equal(addResult.ShardID, removeResult.ShardID)
 }
 
-func foundTable(targetTableID storage.TableID, shardTables map[storage.ShardID]metadata.ShardTableIDs, updateVersionResult metadata.ShardVersionUpdate) bool {
-	tableIDs := shardTables[updateVersionResult.ShardID].TableIDs
+func foundTable(targetTableID storage.TableID, shardTables map[storage.ShardID]metadata.ShardTableIDs, shardID storage.ShardID) bool {
+	tableIDs := shardTables[shardID].TableIDs
 	for _, tableID := range tableIDs {
 		if tableID == targetTableID {
 			return true

@@ -286,7 +286,7 @@ func createDataTables(req *callbackRequest, shardID storage.ShardID, tableMetaDa
 			PrevVersion: shardVersion,
 		}
 
-		err, latestShardVersion := ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, shardID, ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq))
+		latestShardVersion, err := ddl.CreateTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, shardID, ddl.BuildCreateTableRequest(result.Table, shardVersionUpdate, params.SourceReq))
 		if err != nil {
 			errCh <- errors.WithMessage(err, "dispatch create table on shard")
 			return

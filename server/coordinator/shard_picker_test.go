@@ -65,7 +65,7 @@ func TestLeastTableShardPicker(t *testing.T) {
 		PartitionInfo: storage.PartitionInfo{
 			Info: nil,
 		},
-	})
+	}, 0)
 	re.NoError(err)
 
 	// shard 0 should not exist in pick result.

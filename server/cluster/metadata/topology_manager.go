@@ -128,7 +128,6 @@ type TopologyManagerImpl struct {
 	shardNodesMapping map[storage.ShardID][]storage.ShardNode // ShardID -> nodes of the shard
 	nodeShardsMapping map[string][]storage.ShardNode          // nodeName -> shards of the NodeName
 	// ShardView in memory.
-	shardViews         []storage.ShardView
 	shardTablesMapping map[storage.ShardID]*storage.ShardView // ShardID -> shardTopology
 	tableShardMapping  map[storage.TableID][]storage.ShardID  // tableID -> ShardID
 
@@ -146,7 +145,6 @@ func NewTopologyManagerImpl(logger *zap.Logger, storage storage.Storage, cluster
 		clusterView:        nil,
 		shardNodesMapping:  nil,
 		nodeShardsMapping:  nil,
-		shardViews:         nil,
 		shardTablesMapping: nil,
 		tableShardMapping:  nil,
 		nodes:              nil,
@@ -245,21 +243,10 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 		}
 	}
 
-	m.updateShardView(shardID, newShardView)
-
 	return ShardVersionUpdate{
 		ShardID:     shardID,
 		PrevVersion: prevVersion,
 	}, nil
-}
-
-func (m *TopologyManagerImpl) updateShardView(shardID storage.ShardID, newShardView storage.ShardView) {
-	for i := range m.shardViews {
-		if m.shardViews[i].ShardID == shardID {
-			m.shardViews[i] = newShardView
-			break
-		}
-	}
 }
 
 func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.ShardID, latestShardVersion uint64, tableIDs []storage.TableID) (ShardVersionUpdate, error) {
@@ -294,7 +281,7 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 
 	// Update shardView in memory.
 	shardView.Version = latestShardVersion
-	shardView.TableIDs = tableIDs
+	shardView.TableIDs = newTableIDs
 	for _, tableID := range tableIDs {
 		delete(m.tableShardMapping, tableID)
 	}
@@ -309,8 +296,6 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 		}
 	}
 
-	m.updateShardView(shardID, newShardView)
-
 	return ShardVersionUpdate{
 		ShardID:     shardID,
 		PrevVersion: prevVersion,
@@ -321,8 +306,8 @@ func (m *TopologyManagerImpl) GetShards() []storage.ShardID {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	shards := make([]storage.ShardID, 0, len(m.shardViews))
-	for _, shardView := range m.shardViews {
+	shards := make([]storage.ShardID, 0, len(m.shardTablesMapping))
+	for _, shardView := range m.shardTablesMapping {
 		shards = append(shards, shardView.ShardID)
 	}
 
@@ -543,9 +528,14 @@ func (m *TopologyManagerImpl) GetTopology() Topology {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	shardViewsMapping := make(map[storage.ShardID]storage.ShardView, len(m.shardViews))
-	for i := 0; i < len(m.shardViews); i++ {
-		shardViewsMapping[m.shardViews[i].ShardID] = m.shardViews[i]
+	shardViewsMapping := make(map[storage.ShardID]storage.ShardView, len(m.shardTablesMapping))
+	for shardID, view := range m.shardTablesMapping {
+		shardViewsMapping[shardID] = storage.ShardView{
+			ShardID:   view.ShardID,
+			Version:   view.Version,
+			TableIDs:  view.TableIDs,
+			CreatedAt: view.CreatedAt,
+		}
 	}
 
 	return Topology{
@@ -585,7 +575,6 @@ func (m *TopologyManagerImpl) loadShardViews(ctx context.Context) error {
 	m.logger.Debug("load shard views", zap.Int32("clusterID", int32(m.clusterID)), zap.String("shardViews", fmt.Sprintf("%+v", shardViewsResult)))
 
 	// Reset data in memory.
-	m.shardViews = shardViewsResult.ShardViews
 	m.shardTablesMapping = make(map[storage.ShardID]*storage.ShardView, len(shardViewsResult.ShardViews))
 	m.tableShardMapping = make(map[storage.TableID][]storage.ShardID, 0)
 	for _, shardView := range shardViewsResult.ShardViews {

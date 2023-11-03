@@ -74,34 +74,34 @@ func (d *DispatchImpl) CloseShard(ctx context.Context, addr string, request Clos
 	return nil
 }
 
-func (d *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, request CreateTableOnShardRequest) (error, uint64) {
+func (d *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, request CreateTableOnShardRequest) (uint64, error) {
 	client, err := d.getMetaEventClient(ctx, addr)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	resp, err := client.CreateTableOnShard(ctx, convertCreateTableOnShardRequestToPB(request))
 	if err != nil {
-		return errors.WithMessagef(err, "create table on shard, addr:%s, request:%v", addr, request), 0
+		return 0, errors.WithMessagef(err, "create table on shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return ErrDispatch.WithCausef("create table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError()), 0
+		return 0, ErrDispatch.WithCausef("create table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
-	return nil, resp.GetCurVersion()
+	return resp.GetCurVersion(), nil
 }
 
-func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, request DropTableOnShardRequest) (error, uint64) {
+func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, request DropTableOnShardRequest) (uint64, error) {
 	client, err := d.getMetaEventClient(ctx, addr)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	resp, err := client.DropTableOnShard(ctx, convertDropTableOnShardRequestToPB(request))
 	if err != nil {
-		return errors.WithMessagef(err, "drop table on shard, addr:%s, request:%v", addr, request), 0
+		return 0, errors.WithMessagef(err, "drop table on shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return ErrDispatch.WithCausef("drop table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError()), 0
+		return 0, ErrDispatch.WithCausef("drop table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
-	return nil, resp.GetCurVersion()
+	return resp.GetCurVersion(), nil
 }
 
 func (d *DispatchImpl) OpenTableOnShard(ctx context.Context, addr string, request OpenTableOnShardRequest) error {

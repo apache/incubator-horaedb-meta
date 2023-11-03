@@ -29,11 +29,11 @@ import (
 	"go.uber.org/zap"
 )
 
-func CreateTableOnShard(ctx context.Context, c *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, shardID storage.ShardID, request eventdispatch.CreateTableOnShardRequest) (error, uint64) {
+func CreateTableOnShard(ctx context.Context, c *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, shardID storage.ShardID, request eventdispatch.CreateTableOnShardRequest) (uint64, error) {
 	log.Debug("CreateTableOnShard", zap.Uint64("version", request.UpdateShardInfo.CurrShardInfo.Version))
 	shardNodes, err := c.GetShardNodesByShardID(shardID)
 	if err != nil {
-		return errors.WithMessage(err, "cluster get shardNode by id"), 0
+		return 0, errors.WithMessage(err, "cluster get shardNode by id")
 	}
 	// TODO: consider followers
 	var leader storage.ShardNode
@@ -46,14 +46,14 @@ func CreateTableOnShard(ctx context.Context, c *metadata.ClusterMetadata, dispat
 		}
 	}
 	if !found {
-		return errors.WithMessagef(procedure.ErrShardLeaderNotFound, "shard node can't find leader, shardID:%d", shardID), 0
+		return 0, errors.WithMessagef(procedure.ErrShardLeaderNotFound, "shard node can't find leader, shardID:%d", shardID)
 	}
 
-	err, curVersion := dispatch.CreateTableOnShard(ctx, leader.NodeName, request)
+	curVersion, err := dispatch.CreateTableOnShard(ctx, leader.NodeName, request)
 	if err != nil {
-		return errors.WithMessage(err, "create table on shard"), 0
+		return 0, errors.WithMessage(err, "create table on shard")
 	}
-	return nil, curVersion
+	return curVersion, nil
 }
 
 func BuildCreateTableRequest(table storage.Table, shardVersionUpdate metadata.ShardVersionUpdate, req *metaservicepb.CreateTableRequest) eventdispatch.CreateTableOnShardRequest {
@@ -132,10 +132,10 @@ func BuildShardVersionUpdate(table storage.Table, clusterMetadata *metadata.Clus
 	return versionUpdate, true, nil
 }
 
-func DropTableOnShard(ctx context.Context, clusterMetadata *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, schemaName string, table storage.Table, version metadata.ShardVersionUpdate) (error, uint64) {
+func DropTableOnShard(ctx context.Context, clusterMetadata *metadata.ClusterMetadata, dispatch eventdispatch.Dispatch, schemaName string, table storage.Table, version metadata.ShardVersionUpdate) (uint64, error) {
 	shardNodes, err := clusterMetadata.GetShardNodesByShardID(version.ShardID)
 	if err != nil {
-		return errors.WithMessage(err, "cluster get shard by shard id"), 0
+		return 0, errors.WithMessage(err, "cluster get shard by shard id")
 	}
 
 	tableInfo := metadata.TableInfo{
@@ -149,7 +149,7 @@ func DropTableOnShard(ctx context.Context, clusterMetadata *metadata.ClusterMeta
 
 	var curVersion uint64
 	for _, shardNode := range shardNodes {
-		err, curVersion = dispatch.DropTableOnShard(ctx, shardNode.NodeName, eventdispatch.DropTableOnShardRequest{
+		curVersion, err = dispatch.DropTableOnShard(ctx, shardNode.NodeName, eventdispatch.DropTableOnShardRequest{
 			UpdateShardInfo: eventdispatch.UpdateShardInfo{
 				CurrShardInfo: metadata.ShardInfo{
 					ID:      version.ShardID,
@@ -162,9 +162,9 @@ func DropTableOnShard(ctx context.Context, clusterMetadata *metadata.ClusterMeta
 			TableInfo: tableInfo,
 		})
 		if err != nil {
-			return errors.WithMessage(err, "dispatch drop table on shard"), 0
+			return 0, errors.WithMessage(err, "dispatch drop table on shard")
 		}
 	}
 
-	return nil, curVersion
+	return curVersion, nil
 }

@@ -97,7 +97,7 @@ func prepareCallback(event *fsm.Event) {
 		return
 	}
 
-	err, latestShardVersion := ddl.DropTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.SourceReq.GetSchemaName(), table, shardVersionUpdate)
+	latestShardVersion, err := ddl.DropTableOnShard(req.ctx, params.ClusterMetadata, params.Dispatch, params.SourceReq.GetSchemaName(), table, shardVersionUpdate)
 	if err != nil {
 		procedure.CancelEventWithLog(event, err, "dispatch drop table on shard")
 		return
