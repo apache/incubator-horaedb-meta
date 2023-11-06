@@ -121,9 +121,10 @@ type CloseTableRequest struct {
 }
 
 type MigrateTableRequest struct {
-	SchemaName            string
-	TableNames            []string
-	OldShardID            storage.ShardID
+	SchemaName string
+	TableNames []string
+	OldShardID storage.ShardID
+	// TODO: refactor migrate table request, simplify params.
 	latestOldShardVersion uint64
 	NewShardID            storage.ShardID
 	latestNewShardVersion uint64
