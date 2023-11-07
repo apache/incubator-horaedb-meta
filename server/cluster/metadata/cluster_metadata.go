@@ -318,7 +318,7 @@ func (c *ClusterMetadata) AddTableTopology(ctx context.Context, shardVersionUpda
 	}
 
 	// Add table to topology manager.
-	result, err := c.topologyManager.AddTable(ctx, shardVersionUpdate.ShardID, shardVersionUpdate.PrevVersion, []storage.Table{table})
+	result, err := c.topologyManager.AddTable(ctx, shardVersionUpdate.ShardID, shardVersionUpdate.LatestVersion, []storage.Table{table})
 	if err != nil {
 		return CreateTableResult{}, errors.WithMessage(err, "topology manager add table")
 	}

@@ -396,8 +396,8 @@ func dispatchDropDataTable(req *callbackRequest, dispatch eventdispatch.Dispatch
 		}
 
 		shardVersionUpdate := metadata.ShardVersionUpdate{
-			ShardID:     shardID,
-			PrevVersion: shardVersion,
+			ShardID:       shardID,
+			LatestVersion: shardVersion,
 		}
 
 		latestShardVersion, err := ddl.DropTableOnShard(req.ctx, clusterMetadata, dispatch, schema, table, shardVersionUpdate)

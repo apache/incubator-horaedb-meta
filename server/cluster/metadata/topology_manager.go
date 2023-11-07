@@ -209,7 +209,7 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 		return emptyUpdate, ErrShardNotFound.WithCausef("shard id:%d", shardID)
 	}
 
-	prevVersion := shardView.Version
+	latestVersion := shardView.Version
 
 	tableIDsToAdd := make([]storage.TableID, 0, len(tables))
 	for _, table := range tables {
@@ -226,7 +226,7 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 	err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
 		ClusterID:     m.clusterID,
 		ShardView:     newShardView,
-		LatestVersion: prevVersion,
+		LatestVersion: latestShardVersion,
 	})
 	if err != nil {
 		return emptyUpdate, errors.WithMessage(err, "storage update shard view")
@@ -244,8 +244,8 @@ func (m *TopologyManagerImpl) AddTable(ctx context.Context, shardID storage.Shar
 	}
 
 	return ShardVersionUpdate{
-		ShardID:     shardID,
-		PrevVersion: prevVersion,
+		ShardID:       shardID,
+		LatestVersion: latestVersion,
 	}, nil
 }
 
@@ -258,7 +258,7 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 	if !ok {
 		return emptyUpdate, ErrShardNotFound.WithCausef("shard id:%d", shardID)
 	}
-	prevVersion := shardView.Version
+	latestVersion := shardView.Version
 
 	newTableIDs := make([]storage.TableID, 0, len(shardView.TableIDs))
 	for _, tableID := range shardView.TableIDs {
@@ -274,7 +274,7 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 	if err := m.storage.UpdateShardView(ctx, storage.UpdateShardViewRequest{
 		ClusterID:     m.clusterID,
 		ShardView:     newShardView,
-		LatestVersion: prevVersion,
+		LatestVersion: latestShardVersion,
 	}); err != nil {
 		return emptyUpdate, errors.WithMessage(err, "storage update shard view")
 	}
@@ -297,8 +297,8 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 	}
 
 	return ShardVersionUpdate{
-		ShardID:     shardID,
-		PrevVersion: prevVersion,
+		ShardID:       shardID,
+		LatestVersion: latestVersion,
 	}, nil
 }
 

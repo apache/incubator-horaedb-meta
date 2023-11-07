@@ -93,7 +93,7 @@ func prepareCallback(event *fsm.Event) {
 			SchemaName:    params.SourceReq.GetSchemaName(),
 			TableName:     params.SourceReq.GetName(),
 			ShardID:       shardVersionUpdate.ShardID,
-			LatestVersion: shardVersionUpdate.PrevVersion,
+			LatestVersion: shardVersionUpdate.LatestVersion,
 		})
 		if err != nil {
 			procedure.CancelEventWithLog(event, err, "drop table metadata", zap.String("tableName", params.SourceReq.GetName()))

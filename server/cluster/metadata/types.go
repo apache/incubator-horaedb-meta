@@ -139,8 +139,8 @@ type MigrateTableRequest struct {
 }
 
 type ShardVersionUpdate struct {
-	ShardID     storage.ShardID
-	PrevVersion uint64
+	ShardID       storage.ShardID
+	LatestVersion uint64
 }
 
 type RouteEntry struct {

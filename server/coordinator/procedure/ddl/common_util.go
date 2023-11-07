@@ -63,7 +63,7 @@ func BuildCreateTableRequest(table storage.Table, shardVersionUpdate metadata.Sh
 				ID: shardVersionUpdate.ShardID,
 				// TODO: dispatch CreateTableOnShard to followers?
 				Role:    storage.ShardRoleLeader,
-				Version: shardVersionUpdate.PrevVersion,
+				Version: shardVersionUpdate.LatestVersion,
 				// FIXME: There is no need to update status here, but it must be set. Shall we provide another struct without status field?
 				Status: storage.ShardStatusUnknown,
 			},
@@ -120,14 +120,14 @@ func BuildShardVersionUpdate(table storage.Table, clusterMetadata *metadata.Clus
 		return versionUpdate, false, nil
 	}
 
-	prevVersion, exists := shardVersions[leader.ID]
+	latestVersion, exists := shardVersions[leader.ID]
 	if !exists {
 		return versionUpdate, false, errors.WithMessagef(metadata.ErrShardNotFound, "shard not found in shardVersions, shardID:%d", leader.ID)
 	}
 
 	versionUpdate = metadata.ShardVersionUpdate{
-		ShardID:     leader.ID,
-		PrevVersion: prevVersion,
+		ShardID:       leader.ID,
+		LatestVersion: latestVersion,
 	}
 	return versionUpdate, true, nil
 }
@@ -154,7 +154,7 @@ func DropTableOnShard(ctx context.Context, clusterMetadata *metadata.ClusterMeta
 				CurrShardInfo: metadata.ShardInfo{
 					ID:      version.ShardID,
 					Role:    storage.ShardRoleLeader,
-					Version: version.PrevVersion,
+					Version: version.LatestVersion,
 					// FIXME: We have no need to update the status, but it must be set. Maybe we should provide another struct without status field.
 					Status: storage.ShardStatusUnknown,
 				},
