@@ -89,7 +89,12 @@ func prepareCallback(event *fsm.Event) {
 	// In order to ensure that the table can be deleted normally, we need to directly delete the metadata of the table.
 	if !shardExists {
 		// Try to drop table with the latest shard version.
-		_, err = params.ClusterMetadata.DropTable(req.ctx, params.SourceReq.GetSchemaName(), params.SourceReq.GetName(), shardVersionUpdate)
+		_, err = params.ClusterMetadata.DropTable(req.ctx, metadata.DropTableRequest{
+			SchemaName:    params.SourceReq.GetSchemaName(),
+			TableName:     params.SourceReq.GetName(),
+			ShardID:       shardVersionUpdate.ShardID,
+			LatestVersion: shardVersionUpdate.PrevVersion,
+		})
 		if err != nil {
 			procedure.CancelEventWithLog(event, err, "drop table metadata", zap.String("tableName", params.SourceReq.GetName()))
 			return
@@ -105,9 +110,11 @@ func prepareCallback(event *fsm.Event) {
 
 	log.Debug("dispatch dropTableOnShard finish", zap.String("tableName", params.SourceReq.GetName()), zap.Uint64("procedureID", params.ID))
 
-	if _, err = params.ClusterMetadata.DropTable(req.ctx, params.SourceReq.GetSchemaName(), params.SourceReq.GetName(), metadata.ShardVersionUpdate{
-		ShardID:     shardVersionUpdate.ShardID,
-		PrevVersion: latestShardVersion,
+	if _, err = params.ClusterMetadata.DropTable(req.ctx, metadata.DropTableRequest{
+		SchemaName:    params.SourceReq.GetSchemaName(),
+		TableName:     params.SourceReq.GetName(),
+		ShardID:       shardVersionUpdate.ShardID,
+		LatestVersion: latestShardVersion,
 	}); err != nil {
 		procedure.CancelEventWithLog(event, err, "cluster drop table")
 		return

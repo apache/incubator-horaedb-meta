@@ -405,9 +405,11 @@ func dispatchDropDataTable(req *callbackRequest, dispatch eventdispatch.Dispatch
 			return errors.WithMessagef(err, "drop table, table:%s", tableName)
 		}
 
-		_, err = clusterMetadata.DropTable(req.ctx, req.schemaName(), tableName, metadata.ShardVersionUpdate{
-			ShardID:     shardID,
-			PrevVersion: latestShardVersion,
+		_, err = clusterMetadata.DropTable(req.ctx, metadata.DropTableRequest{
+			SchemaName:    req.schemaName(),
+			TableName:     tableName,
+			ShardID:       shardID,
+			LatestVersion: latestShardVersion,
 		})
 		if err != nil {
 			return errors.WithMessagef(err, "drop table, table:%s", tableName)

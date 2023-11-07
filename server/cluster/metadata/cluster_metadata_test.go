@@ -148,11 +148,12 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 
 	// Test create table.
 	createResult, err := m.CreateTable(ctx, metadata.CreateTableRequest{
-		ShardID:       0,
-		SchemaName:    testSchema,
-		TableName:     testTableName,
-		PartitionInfo: storage.PartitionInfo{Info: nil},
-	}, 0)
+		ShardID:            0,
+		LatestShardVersion: 0,
+		SchemaName:         testSchema,
+		TableName:          testTableName,
+		PartitionInfo:      storage.PartitionInfo{Info: nil},
+	})
 	re.NoError(err)
 	re.Equal(testTableName, createResult.Table.Name)
 
@@ -177,9 +178,11 @@ func testTableOperation(ctx context.Context, re *require.Assertions, m *metadata
 	re.Equal(storage.ShardID(1), routeResult.RouteEntries[testTableName].NodeShards[0].ShardInfo.ID)
 
 	// Drop table already created.
-	dropResult, err := m.DropTable(ctx, testSchema, testTableName, metadata.ShardVersionUpdate{
-		ShardID:     storage.ShardID(1),
-		PrevVersion: 0,
+	dropResult, err := m.DropTable(ctx, metadata.DropTableRequest{
+		SchemaName:    testSchema,
+		TableName:     testTableName,
+		ShardID:       storage.ShardID(1),
+		LatestVersion: 0,
 	})
 	re.NoError(err)
 	re.Equal(storage.ShardID(1), dropResult.ShardVersionUpdate.ShardID)

@@ -87,15 +87,23 @@ type CreateTableMetadataResult struct {
 }
 
 type CreateTableRequest struct {
-	ShardID       storage.ShardID
-	SchemaName    string
-	TableName     string
-	PartitionInfo storage.PartitionInfo
+	ShardID            storage.ShardID
+	LatestShardVersion uint64
+	SchemaName         string
+	TableName          string
+	PartitionInfo      storage.PartitionInfo
 }
 
 type CreateTableResult struct {
 	Table              storage.Table
 	ShardVersionUpdate ShardVersionUpdate
+}
+
+type DropTableRequest struct {
+	SchemaName    string
+	TableName     string
+	ShardID       storage.ShardID
+	LatestVersion uint64
 }
 
 type DropTableResult struct {

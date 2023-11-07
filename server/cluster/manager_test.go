@@ -176,11 +176,12 @@ func testCreateTable(ctx context.Context, re *require.Assertions, manager cluste
 	c, err := manager.GetCluster(ctx, clusterName)
 	re.NoError(err)
 	_, err = c.GetMetadata().CreateTable(ctx, metadata.CreateTableRequest{
-		ShardID:       shardID,
-		SchemaName:    schema,
-		TableName:     tableName,
-		PartitionInfo: storage.PartitionInfo{Info: nil},
-	}, 0)
+		ShardID:            shardID,
+		LatestShardVersion: 0,
+		SchemaName:         schema,
+		TableName:          tableName,
+		PartitionInfo:      storage.PartitionInfo{Info: nil},
+	})
 	re.NoError(err)
 }
 

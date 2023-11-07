@@ -54,7 +54,6 @@ func TestCreateAndDropPartitionTable(t *testing.T) {
 		tableName := fmt.Sprintf("%s_%d", test.TestTableName0, i)
 		subTableNames := genSubTables(tableName, testSubTableNum)
 		testCreatePartitionTable(ctx, t, dispatch, c, s, shardPicker, shardNode.NodeName, tableName, subTableNames)
-		println("create partition table finish %s", tableName)
 	}
 
 	// Check get table.

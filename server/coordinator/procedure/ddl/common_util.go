@@ -147,9 +147,9 @@ func DropTableOnShard(ctx context.Context, clusterMetadata *metadata.ClusterMeta
 		CreatedAt:     0,
 	}
 
-	var curVersion uint64
+	var latestVersion uint64
 	for _, shardNode := range shardNodes {
-		curVersion, err = dispatch.DropTableOnShard(ctx, shardNode.NodeName, eventdispatch.DropTableOnShardRequest{
+		latestVersion, err = dispatch.DropTableOnShard(ctx, shardNode.NodeName, eventdispatch.DropTableOnShardRequest{
 			UpdateShardInfo: eventdispatch.UpdateShardInfo{
 				CurrShardInfo: metadata.ShardInfo{
 					ID:      version.ShardID,
@@ -166,5 +166,5 @@ func DropTableOnShard(ctx context.Context, clusterMetadata *metadata.ClusterMeta
 		}
 	}
 
-	return curVersion, nil
+	return latestVersion, nil
 }
