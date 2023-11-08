@@ -86,7 +86,7 @@ func (d *DispatchImpl) CreateTableOnShard(ctx context.Context, addr string, requ
 	if resp.GetHeader().Code != 0 {
 		return 0, ErrDispatch.WithCausef("create table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
-	return resp.GetLatestVersion(), nil
+	return resp.GetLatestShardVersion(), nil
 }
 
 func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, request DropTableOnShardRequest) (uint64, error) {
@@ -101,7 +101,7 @@ func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, reques
 	if resp.GetHeader().Code != 0 {
 		return 0, ErrDispatch.WithCausef("drop table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
-	return resp.GetLatestVersion(), nil
+	return resp.GetLatestShardVersion(), nil
 }
 
 func (d *DispatchImpl) OpenTableOnShard(ctx context.Context, addr string, request OpenTableOnShardRequest) error {

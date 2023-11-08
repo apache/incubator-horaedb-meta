@@ -3,7 +3,7 @@ module github.com/CeresDB/ceresmeta
 go 1.21
 
 require (
-	github.com/CeresDB/ceresdbproto/golang v0.0.0-20231012091414-cdaeab9f7f4d
+	github.com/CeresDB/ceresdbproto/golang v0.0.0-20231108080833-ca110f5a966a
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/looplab/fsm v0.3.0
@@ -83,5 +83,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
-
-replace github.com/CeresDB/ceresdbproto/golang => github.com/zuliangwang/ceresdbproto/golang v0.0.0-20231106082618-b7e1fc49a3de
