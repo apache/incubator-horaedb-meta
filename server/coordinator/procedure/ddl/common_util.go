@@ -49,11 +49,11 @@ func CreateTableOnShard(ctx context.Context, c *metadata.ClusterMetadata, dispat
 		return 0, errors.WithMessagef(procedure.ErrShardLeaderNotFound, "shard node can't find leader, shardID:%d", shardID)
 	}
 
-	curVersion, err := dispatch.CreateTableOnShard(ctx, leader.NodeName, request)
+	latestVersion, err := dispatch.CreateTableOnShard(ctx, leader.NodeName, request)
 	if err != nil {
 		return 0, errors.WithMessage(err, "create table on shard")
 	}
-	return curVersion, nil
+	return latestVersion, nil
 }
 
 func BuildCreateTableRequest(table storage.Table, shardVersionUpdate metadata.ShardVersionUpdate, req *metaservicepb.CreateTableRequest) eventdispatch.CreateTableOnShardRequest {

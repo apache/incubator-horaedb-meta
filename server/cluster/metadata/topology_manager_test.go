@@ -66,7 +66,7 @@ func TestTopologyManager(t *testing.T) {
 }
 
 func testTableTopology(ctx context.Context, re *require.Assertions, manager metadata.TopologyManager) {
-	addResult, err := manager.AddTable(ctx, TestShardID, 0, []storage.Table{{
+	err := manager.AddTable(ctx, TestShardID, 0, []storage.Table{{
 		ID:            TestTableID,
 		Name:          TestTableName,
 		SchemaID:      TestSchemaID,
@@ -75,19 +75,18 @@ func testTableTopology(ctx context.Context, re *require.Assertions, manager meta
 	}})
 	re.NoError(err)
 
-	shardTables := manager.GetTableIDs([]storage.ShardID{addResult.ShardID})
-	found := foundTable(TestTableID, shardTables, addResult.ShardID)
+	shardTables := manager.GetTableIDs([]storage.ShardID{TestShardID})
+	found := foundTable(TestTableID, shardTables, TestTableID)
 	re.Equal(true, found)
 
-	removeResult, err := manager.RemoveTable(ctx, addResult.ShardID, 0, []storage.TableID{TestTableID})
+	err = manager.RemoveTable(ctx, TestShardID, 0, []storage.TableID{TestTableID})
 	re.NoError(err)
-	re.Equal(addResult.ShardID, removeResult.ShardID)
 
-	shardTables = manager.GetTableIDs([]storage.ShardID{removeResult.ShardID})
-	found = foundTable(TestTableID, shardTables, removeResult.ShardID)
+	shardTables = manager.GetTableIDs([]storage.ShardID{TestTableID})
+	found = foundTable(TestTableID, shardTables, TestTableID)
 	re.Equal(false, found)
 
-	addResult, err = manager.AddTable(ctx, TestShardID, 0, []storage.Table{{
+	err = manager.AddTable(ctx, TestShardID, 0, []storage.Table{{
 		ID:            TestTableID,
 		Name:          TestTableName,
 		SchemaID:      TestSchemaID,
@@ -95,15 +94,13 @@ func testTableTopology(ctx context.Context, re *require.Assertions, manager meta
 		PartitionInfo: storage.PartitionInfo{Info: nil},
 	}})
 	re.NoError(err)
-	re.Equal(storage.ShardID(TestShardID), addResult.ShardID)
 
-	shardTables = manager.GetTableIDs([]storage.ShardID{addResult.ShardID})
-	found = foundTable(TestTableID, shardTables, addResult.ShardID)
+	shardTables = manager.GetTableIDs([]storage.ShardID{TestTableID})
+	found = foundTable(TestTableID, shardTables, TestTableID)
 	re.Equal(true, found)
 
-	removeResult, err = manager.RemoveTable(ctx, addResult.ShardID, 0, []storage.TableID{TestTableID})
+	err = manager.RemoveTable(ctx, TestTableID, 0, []storage.TableID{TestTableID})
 	re.NoError(err)
-	re.Equal(addResult.ShardID, removeResult.ShardID)
 }
 
 func foundTable(targetTableID storage.TableID, shardTables map[storage.ShardID]metadata.ShardTableIDs, shardID storage.ShardID) bool {

@@ -292,7 +292,7 @@ func createDataTables(req *callbackRequest, shardID storage.ShardID, tableMetaDa
 			return
 		}
 
-		_, err = params.ClusterMetadata.AddTableTopology(req.ctx, metadata.ShardVersionUpdate{
+		err = params.ClusterMetadata.AddTableTopology(req.ctx, metadata.ShardVersionUpdate{
 			ShardID:       shardID,
 			LatestVersion: latestShardVersion,
 		}, result.Table)

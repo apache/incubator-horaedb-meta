@@ -41,19 +41,19 @@ func TestSplit(t *testing.T) {
 
 	// Create some tables in this shard.
 	_, err := c.GetMetadata().CreateTable(ctx, metadata.CreateTableRequest{
-		ShardID:            createTableNodeShard.ID,
-		LatestShardVersion: 0,
-		SchemaName:         test.TestSchemaName,
-		TableName:          test.TestTableName0,
-		PartitionInfo:      storage.PartitionInfo{Info: nil},
+		ShardID:       createTableNodeShard.ID,
+		LatestVersion: 0,
+		SchemaName:    test.TestSchemaName,
+		TableName:     test.TestTableName0,
+		PartitionInfo: storage.PartitionInfo{Info: nil},
 	})
 	re.NoError(err)
 	_, err = c.GetMetadata().CreateTable(ctx, metadata.CreateTableRequest{
-		ShardID:            createTableNodeShard.ID,
-		LatestShardVersion: 0,
-		SchemaName:         test.TestSchemaName,
-		TableName:          test.TestTableName1,
-		PartitionInfo:      storage.PartitionInfo{Info: nil},
+		ShardID:       createTableNodeShard.ID,
+		LatestVersion: 0,
+		SchemaName:    test.TestSchemaName,
+		TableName:     test.TestTableName1,
+		PartitionInfo: storage.PartitionInfo{Info: nil},
 	})
 	re.NoError(err)
 

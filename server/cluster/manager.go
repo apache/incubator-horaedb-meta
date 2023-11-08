@@ -321,12 +321,11 @@ func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 
 	shardID := getShardNodeResult.ShardNodes[table.ID][0].ID
 	version, ok := getShardNodeResult.Version[shardID]
-
 	if !ok {
 		return metadata.ErrVersionNotFound
 	}
 
-	_, err = cluster.metadata.DropTable(ctx, metadata.DropTableRequest{
+	err = cluster.metadata.DropTable(ctx, metadata.DropTableRequest{
 		SchemaName:    schemaName,
 		TableName:     tableName,
 		ShardID:       shardID,
