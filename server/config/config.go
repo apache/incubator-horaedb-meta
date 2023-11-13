@@ -80,7 +80,7 @@ const (
 	defaultClusterShardTotal = 8
 	enableSchedule           = true
 	// topologyType is used to determine the scheduling cluster strategy of CeresMeta. It should be determined according to the storage method of CeresDB. The default is static to support local storage.
-	defaultTopologyType                = "static"
+	defaultTopologyType                = "dynamic"
 	defaultProcedureExecutingBatchSize = math.MaxUint32
 
 	defaultHTTPPort = 8080
