@@ -30,4 +30,4 @@ build:
 	@ go build -ldflags="-X main.commitID=$(COMMIT_ID) -X main.branchName=$(BRANCH_NAME) -X main.buildDate=$(BUILD_DATE)" -o bin/ceresmeta-server ./cmd/ceresmeta-server
 
 integration-test: build
-	@ sh ./scripts/run-integration-test.sh
+	@ bash ./scripts/run-integration-test.sh
