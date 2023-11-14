@@ -33,8 +33,8 @@ import (
 )
 
 const (
-	AllocSchemaIDPrefix = "SchemaID"
-	AllocTableIDPrefix  = "TableID"
+	allocSchemaIDPrefix = "SchemaID"
+	allocTableIDPrefix  = "TableID"
 )
 
 type ClusterMetadata struct {
@@ -58,8 +58,8 @@ type ClusterMetadata struct {
 }
 
 func NewClusterMetadata(logger *zap.Logger, meta storage.Cluster, storage storage.Storage, kv clientv3.KV, rootPath string, idAllocatorStep uint) *ClusterMetadata {
-	schemaIDAlloc := id.NewAllocatorImpl(logger, kv, path.Join(rootPath, meta.Name, AllocSchemaIDPrefix), idAllocatorStep)
-	tableIDAlloc := id.NewAllocatorImpl(logger, kv, path.Join(rootPath, meta.Name, AllocTableIDPrefix), idAllocatorStep)
+	schemaIDAlloc := id.NewAllocatorImpl(logger, kv, getSchemaIDPath(rootPath, meta.Name), idAllocatorStep)
+	tableIDAlloc := id.NewAllocatorImpl(logger, kv, getTableIDPath(rootPath, meta.Name), idAllocatorStep)
 	// FIXME: Load ShardTopology when cluster create, pass exist ShardID to allocator.
 	shardIDAlloc := id.NewReusableAllocatorImpl([]uint64{}, MinShardID)
 
@@ -785,4 +785,12 @@ func (c *ClusterMetadata) maybeCorrectShardVersion(ctx context.Context, node Reg
 			// TODO: Maybe we need do some thing to ensure ceresDB status after update shard version.
 		}
 	}
+}
+
+func getSchemaIDPath(rootPath, clusterName string) string {
+	return path.Join(rootPath, allocSchemaIDPrefix)
+}
+
+func getTableIDPath(rootPath, clusterName string) string {
+	return path.Join(rootPath, allocTableIDPrefix)
 }

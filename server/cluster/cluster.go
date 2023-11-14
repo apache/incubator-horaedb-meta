@@ -18,6 +18,7 @@ package cluster
 
 import (
 	"context"
+	"path"
 
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 	"github.com/CeresDB/ceresmeta/server/coordinator"
@@ -52,7 +53,7 @@ func NewCluster(logger *zap.Logger, metadata *metadata.ClusterMetadata, client *
 		return nil, errors.WithMessage(err, "create procedure manager")
 	}
 	dispatch := eventdispatch.NewDispatchImpl()
-	procedureFactory := coordinator.NewFactory(logger, id.NewAllocatorImpl(logger, client, defaultProcedurePrefixKey, defaultAllocStep), dispatch, procedureStorage)
+	procedureFactory := coordinator.NewFactory(logger, id.NewAllocatorImpl(logger, client, getProcedureIDPath(rootPath), defaultAllocStep), dispatch, procedureStorage)
 
 	schedulerManager := manager.NewManager(logger, procedureManager, procedureFactory, metadata, client, rootPath, metadata.GetEnableSchedule(), metadata.GetTopologyType(), metadata.GetProcedureExecutingBatchSize())
 
@@ -107,4 +108,8 @@ func (c *Cluster) GetShards() []storage.ShardID {
 
 func (c *Cluster) GetShardNodes() metadata.GetShardNodesResult {
 	return c.metadata.GetShardNodes()
+}
+
+func getProcedureIDPath(rootPath string) string {
+	return path.Join(rootPath, defaultProcedurePrefixKey)
 }

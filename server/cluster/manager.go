@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	AllocClusterIDPrefix = "ClusterID"
+	allocClusterIDPrefix = "ClusterID"
 )
 
 type Manager interface {
@@ -79,7 +79,7 @@ type managerImpl struct {
 }
 
 func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, topologyType storage.TopologyType) (Manager, error) {
-	alloc := id.NewAllocatorImpl(log.GetLogger(), kv, path.Join(rootPath, AllocClusterIDPrefix), idAllocatorStep)
+	alloc := id.NewAllocatorImpl(log.GetLogger(), kv, getClusterIDPath(rootPath), idAllocatorStep)
 
 	manager := &managerImpl{
 		lock:     sync.RWMutex{},
@@ -514,4 +514,8 @@ func (m *managerImpl) GetNodeShards(ctx context.Context, clusterName string) (me
 	}
 
 	return ret, nil
+}
+
+func getClusterIDPath(rootPath string) string {
+	return path.Join(rootPath, allocClusterIDPrefix)
 }
