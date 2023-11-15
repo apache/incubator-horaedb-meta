@@ -79,7 +79,7 @@ type managerImpl struct {
 }
 
 func NewManagerImpl(storage storage.Storage, kv clientv3.KV, client *clientv3.Client, rootPath string, idAllocatorStep uint, topologyType storage.TopologyType) (Manager, error) {
-	alloc := id.NewAllocatorImpl(log.GetLogger(), kv, getClusterIDPath(rootPath), idAllocatorStep)
+	alloc := id.NewAllocatorImpl(log.GetLogger(), kv, makeClusterIDPath(rootPath), idAllocatorStep)
 
 	manager := &managerImpl{
 		lock:     sync.RWMutex{},
@@ -516,6 +516,6 @@ func (m *managerImpl) GetNodeShards(ctx context.Context, clusterName string) (me
 	return ret, nil
 }
 
-func getClusterIDPath(rootPath string) string {
+func makeClusterIDPath(rootPath string) string {
 	return path.Join(rootPath, allocClusterIDPrefix)
 }

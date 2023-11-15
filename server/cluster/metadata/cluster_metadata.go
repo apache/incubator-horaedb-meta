@@ -58,8 +58,8 @@ type ClusterMetadata struct {
 }
 
 func NewClusterMetadata(logger *zap.Logger, meta storage.Cluster, storage storage.Storage, kv clientv3.KV, rootPath string, idAllocatorStep uint) *ClusterMetadata {
-	schemaIDAlloc := id.NewAllocatorImpl(logger, kv, getSchemaIDPath(rootPath, meta.Name), idAllocatorStep)
-	tableIDAlloc := id.NewAllocatorImpl(logger, kv, getTableIDPath(rootPath, meta.Name), idAllocatorStep)
+	schemaIDAlloc := id.NewAllocatorImpl(logger, kv, makeSchemaIDPath(rootPath, meta.Name), idAllocatorStep)
+	tableIDAlloc := id.NewAllocatorImpl(logger, kv, makeTableIDPath(rootPath, meta.Name), idAllocatorStep)
 	// FIXME: Load ShardTopology when cluster create, pass exist ShardID to allocator.
 	shardIDAlloc := id.NewReusableAllocatorImpl([]uint64{}, MinShardID)
 
@@ -787,10 +787,10 @@ func (c *ClusterMetadata) maybeCorrectShardVersion(ctx context.Context, node Reg
 	}
 }
 
-func getSchemaIDPath(rootPath, clusterName string) string {
-	return path.Join(rootPath, allocSchemaIDPrefix)
+func makeSchemaIDPath(rootPath, clusterName string) string {
+	return path.Join(rootPath, clusterName, allocSchemaIDPrefix)
 }
 
-func getTableIDPath(rootPath, clusterName string) string {
-	return path.Join(rootPath, allocTableIDPrefix)
+func makeTableIDPath(rootPath, clusterName string) string {
+	return path.Join(rootPath, clusterName, allocTableIDPrefix)
 }
