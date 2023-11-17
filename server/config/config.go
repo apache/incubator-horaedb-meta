@@ -86,7 +86,7 @@ const (
 	defaultHTTPPort = 8080
 	defaultGrpcPort = 2379
 
-	defaultDataDir = "/tmp/meta"
+	defaultDataDir = "/tmp/ceresmeta"
 
 	defaultEtcdDataDir = "/etcd"
 	defaultWalDir      = "/wal"
