@@ -65,9 +65,9 @@ type Handler interface {
 	// TODO: define the methods for handling other grpc requests.
 }
 
-// NodeHeartbeat implements gRPC HoreametaServer.
+// NodeHeartbeat implements gRPC HoraeMetaServer.
 func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHeartbeatRequest) (*metaservicepb.NodeHeartbeatResponse, error) {
-	metaClient, err := s.getForwardedHoraemetaClient(ctx)
+	metaClient, err := s.getForwardedMetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.NodeHeartbeatResponse{Header: responseHeader(err, "grpc heartbeat")}, nil
 	}
@@ -107,9 +107,9 @@ func (s *Service) NodeHeartbeat(ctx context.Context, req *metaservicepb.NodeHear
 	}, nil
 }
 
-// AllocSchemaID implements gRPC HoreametaServer.
+// AllocSchemaID implements gRPC HoraeMetaServer.
 func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSchemaIdRequest) (*metaservicepb.AllocSchemaIdResponse, error) {
-	metaClient, err := s.getForwardedHoraemetaClient(ctx)
+	metaClient, err := s.getForwardedMetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.AllocSchemaIdResponse{Header: responseHeader(err, "grpc alloc schema id")}, nil
 	}
@@ -133,9 +133,9 @@ func (s *Service) AllocSchemaID(ctx context.Context, req *metaservicepb.AllocSch
 	}, nil
 }
 
-// GetTablesOfShards implements gRPC HoreametaServer.
+// GetTablesOfShards implements gRPC HoraeMetaServer.
 func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetTablesOfShardsRequest) (*metaservicepb.GetTablesOfShardsResponse, error) {
-	metaClient, err := s.getForwardedHoraemetaClient(ctx)
+	metaClient, err := s.getForwardedMetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.GetTablesOfShardsResponse{Header: responseHeader(err, "grpc get tables of shards")}, nil
 	}
@@ -161,7 +161,7 @@ func (s *Service) GetTablesOfShards(ctx context.Context, req *metaservicepb.GetT
 	return result, nil
 }
 
-// CreateTable implements gRPC HoreametaServer.
+// CreateTable implements gRPC HoraeMetaServer.
 func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTableRequest) (*metaservicepb.CreateTableResponse, error) {
 	start := time.Now()
 	// Since there may be too many table creation requests, a flow limiter is added here.
@@ -169,7 +169,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table grpc request is rejected by flow limiter")}, nil
 	}
 
-	metaClient, err := s.getForwardedHoraemetaClient(ctx)
+	metaClient, err := s.getForwardedMetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.CreateTableResponse{Header: responseHeader(err, "create table")}, nil
 	}
@@ -240,7 +240,7 @@ func (s *Service) CreateTable(ctx context.Context, req *metaservicepb.CreateTabl
 	}
 }
 
-// DropTable implements gRPC HoreametaServer.
+// DropTable implements gRPC HoraeMetaServer.
 func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableRequest) (*metaservicepb.DropTableResponse, error) {
 	start := time.Now()
 	// Since there may be too many table dropping requests, a flow limiter is added here.
@@ -248,7 +248,7 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "drop table grpc request is rejected by flow limiter")}, nil
 	}
 
-	metaClient, err := s.getForwardedHoraemetaClient(ctx)
+	metaClient, err := s.getForwardedMetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.DropTableResponse{Header: responseHeader(err, "drop table")}, nil
 	}
@@ -313,14 +313,14 @@ func (s *Service) DropTable(ctx context.Context, req *metaservicepb.DropTableReq
 	}
 }
 
-// RouteTables implements gRPC HoreametaServer.
+// RouteTables implements gRPC HoraeMetaServer.
 func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTablesRequest) (*metaservicepb.RouteTablesResponse, error) {
 	// Since there may be too many table routing requests, a flow limiter is added here.
 	if ok, err := s.allow(); !ok {
 		return &metaservicepb.RouteTablesResponse{Header: responseHeader(err, "routeTables grpc request is rejected by flow limiter")}, nil
 	}
 
-	metaClient, err := s.getForwardedHoraemetaClient(ctx)
+	metaClient, err := s.getForwardedMetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.RouteTablesResponse{Header: responseHeader(err, "grpc routeTables")}, nil
 	}
@@ -340,9 +340,9 @@ func (s *Service) RouteTables(ctx context.Context, req *metaservicepb.RouteTable
 	return convertRouteTableResult(routeTableResult), nil
 }
 
-// GetNodes implements gRPC HoreametaServer.
+// GetNodes implements gRPC HoraeMetaServer.
 func (s *Service) GetNodes(ctx context.Context, req *metaservicepb.GetNodesRequest) (*metaservicepb.GetNodesResponse, error) {
-	metaClient, err := s.getForwardedHoraemetaClient(ctx)
+	metaClient, err := s.getForwardedMetaClient(ctx)
 	if err != nil {
 		return &metaservicepb.GetNodesResponse{Header: responseHeader(err, "grpc get nodes")}, nil
 	}
