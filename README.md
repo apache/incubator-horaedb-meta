@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/CeresDB/horaemeta/branch/main/graph/badge.svg?token=VTYXEAB2WU)](https://codecov.io/gh/CeresDB/horaemeta)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)
 
-Horaemeta is the meta service for managing the CeresDB cluster.
+Horaemeta is the meta service for managing the HoraeDB cluster.
 
 ## Status
 The project is in a very early stage.
@@ -17,27 +17,27 @@ make build
 ### Standalone Mode
 Although Horaemeta is designed to deployed as a cluster with three or more instances, it can also be started standalone:
 ```bash
-# ceresmeta0
-mkdir /tmp/ceresmeta0
-./ceresmeta --config ./config/example-standalone.toml
+# Horaemeta0
+mkdir /tmp/horaemeta0
+./bin/horaemeta-server --config ./config/example-standalone.toml
 ```
 
 ### Cluster mode
 Here is an example for starting Horaemeta in cluster mode (three instances) on single machine by using different ports:
 ```bash
 # Create directories.
-mkdir /tmp/ceresmeta0
-mkdir /tmp/ceresmeta1
-mkdir /tmp/ceresmeta2
+mkdir /tmp/horaemeta0
+mkdir /tmp/horaemeta1
+mkdir /tmp/horaemeta2
 
-# Ceresmeta0
-./ceresmeta --config ./config/exampl-cluster0.toml
+# Horaemeta0
+./bin/horaemeta-server --config ./config/exampl-cluster0.toml
 
-# Ceresmeta1
-./ceresmeta --config ./config/exampl-cluster1.toml
+# Horaemeta1
+./bin/horaemeta-server --config ./config/exampl-cluster1.toml
 
-# Ceresmeta2
-./ceresmeta --config ./config/exampl-cluster2.toml
+# Horaemeta2
+./bin/horaemeta-server --config ./config/exampl-cluster2.toml
 ```
 
 ## Acknowledgment

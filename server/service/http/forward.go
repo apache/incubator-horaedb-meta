@@ -63,7 +63,7 @@ func (s *ForwardClient) getForwardedAddr(ctx context.Context) (string, bool, err
 	if resp.IsLocal {
 		return "", true, nil
 	}
-	// TODO: In the current implementation, if the HTTP port of each node of CeresMeta is inconsistent, the forwarding address will be wrong
+	// TODO: In the current implementation, if the HTTP port of each node of HoraeMeta is inconsistent, the forwarding address will be wrong
 	httpAddr, err := formatHTTPAddr(resp.LeaderEndpoint, s.port)
 	if err != nil {
 		return "", false, errors.WithMessage(err, "format http addr")

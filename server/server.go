@@ -59,7 +59,7 @@ type Server struct {
 	clusterManager cluster.Manager
 	flowLimiter    *limiter.FlowLimiter
 
-	// member describes membership in ceresmeta cluster.
+	// member describes membership in horaemeta cluster.
 	member  *member.Member
 	etcdCli *clientv3.Client
 	etcdSrv *embed.Etcd

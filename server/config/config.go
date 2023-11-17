@@ -79,14 +79,14 @@ const (
 	defaultClusterNodeCount  = 2
 	defaultClusterShardTotal = 8
 	enableSchedule           = true
-	// topologyType is used to determine the scheduling cluster strategy of HoraeMeta. It should be determined according to the storage method of CeresDB. The default is static to support local storage.
+	// topologyType is used to determine the scheduling cluster strategy of HoraeMeta. It should be determined according to the storage method of HoraeDB. The default is static to support local storage.
 	defaultTopologyType                = "static"
 	defaultProcedureExecutingBatchSize = math.MaxUint32
 
 	defaultHTTPPort = 8080
 	defaultGrpcPort = 2379
 
-	defaultDataDir = "/tmp/ceresmeta"
+	defaultDataDir = "/tmp/meta"
 
 	defaultEtcdDataDir = "/etcd"
 	defaultWalDir      = "/wal"
@@ -162,9 +162,9 @@ type Config struct {
 	DefaultClusterNodeCount  int    `toml:"default-cluster-node-count" env:"DEFAULT_CLUSTER_NODE_COUNT"`
 	DefaultClusterShardTotal int    `toml:"default-cluster-shard-total" env:"DEFAULT_CLUSTER_SHARD_TOTAL"`
 
-	// When the EnableSchedule is turned on, the failover scheduling will be turned on, which is used for CeresDB cluster publishing and using local storage.
+	// When the EnableSchedule is turned on, the failover scheduling will be turned on, which is used for HoraeDB cluster publishing and using local storage.
 	EnableSchedule bool `toml:"enable-schedule" env:"ENABLE_SCHEDULE"`
-	// TopologyType indicates the schedule type used by the CeresDB cluster, it will determine the strategy of HoraeMeta scheduling cluster.
+	// TopologyType indicates the schedule type used by the HoraeDB cluster, it will determine the strategy of HoraeMeta scheduling cluster.
 	TopologyType string `toml:"topology-type" env:"TOPOLOGY_TYPE"`
 	// ProcedureExecutingBatchSize determines the maximum number of shards in a single batch when opening shards concurrently.
 	ProcedureExecutingBatchSize uint32 `toml:"procedure-executing-batch-size" env:"PROCEDURE_EXECUTING_BATCH_SIZE"`

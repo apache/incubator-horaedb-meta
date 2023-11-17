@@ -38,7 +38,7 @@ var (
 )
 
 func buildVersion() string {
-	return fmt.Sprintf("CeresMeta Server\nGit commit:%s\nGit branch:%s\nBuild date:%s", commitID, branchName, buildDate)
+	return fmt.Sprintf("HoraeMeta Server\nGit commit:%s\nGit branch:%s\nBuild date:%s", commitID, branchName, buildDate)
 }
 
 func panicf(format string, args ...any) {

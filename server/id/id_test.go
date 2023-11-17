@@ -30,7 +30,7 @@ import (
 const (
 	defaultRequestTimeout = time.Second * 30
 	defaultStep           = 100
-	defaultRootPath       = "/ceresmeta"
+	defaultRootPath       = "/meta"
 	defaultAllocIDKey     = "/id"
 )
 

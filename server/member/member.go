@@ -34,7 +34,7 @@ import (
 
 const leaderCheckInterval = time.Duration(100) * time.Millisecond
 
-// Member manages the leadership and the role of the node in the ceresmeta cluster.
+// Member manages the leadership and the role of the node in the horaemeta cluster.
 type Member struct {
 	ID               uint64
 	Name             string

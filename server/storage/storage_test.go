@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	defaultRootPath       = "/ceresmeta"
+	defaultRootPath       = "/meta"
 	name0                 = "name0"
 	nameFormat            = "name%d"
 	defaultClusterID      = 1
