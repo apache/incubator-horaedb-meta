@@ -25,9 +25,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CeresDB/ceresmeta/pkg/log"
-	"github.com/CeresDB/ceresmeta/server/member"
-	"github.com/CeresDB/ceresmeta/server/service"
+	"github.com/CeresDB/horaemeta/pkg/log"
+	"github.com/CeresDB/horaemeta/server/member"
+	"github.com/CeresDB/horaemeta/server/service"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )

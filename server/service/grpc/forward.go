@@ -20,8 +20,8 @@ import (
 	"context"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
-	"github.com/CeresDB/ceresmeta/pkg/log"
-	"github.com/CeresDB/ceresmeta/server/service"
+	"github.com/CeresDB/horaemeta/pkg/log"
+	"github.com/CeresDB/horaemeta/server/service"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"

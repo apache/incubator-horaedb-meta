@@ -1,21 +1,21 @@
-# Ceresmeta
+# Horaemeta
 
-[![codecov](https://codecov.io/gh/CeresDB/ceresmeta/branch/main/graph/badge.svg?token=VTYXEAB2WU)](https://codecov.io/gh/CeresDB/ceresmeta)
+[![codecov](https://codecov.io/gh/CeresDB/horaemeta/branch/main/graph/badge.svg?token=VTYXEAB2WU)](https://codecov.io/gh/CeresDB/horaemeta)
 ![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)
 
-CeresMeta is the meta service for managing the CeresDB cluster.
+Horaemeta is the meta service for managing the CeresDB cluster.
 
 ## Status
 The project is in a very early stage.
 
 ## Quick Start
-### Build ceresmeta binary
+### Build Horaemeta binary
 ```bash
 make build
 ```
 
 ### Standalone Mode
-Although CeresMeta is designed to deployed as a cluster with three or more instances, it can also be started standalone:
+Although Horaemeta is designed to deployed as a cluster with three or more instances, it can also be started standalone:
 ```bash
 # ceresmeta0
 mkdir /tmp/ceresmeta0
@@ -23,7 +23,7 @@ mkdir /tmp/ceresmeta0
 ```
 
 ### Cluster mode
-Here is an example for starting CeresMeta in cluster mode (three instances) on single machine by using different ports:
+Here is an example for starting Horaemeta in cluster mode (three instances) on single machine by using different ports:
 ```bash
 # Create directories.
 mkdir /tmp/ceresmeta0
@@ -41,11 +41,11 @@ mkdir /tmp/ceresmeta2
 ```
 
 ## Acknowledgment
-CeresMeta refers to the excellent project [pd](https://github.com/tikv/pd) in design and some module and codes are forked from [pd](https://github.com/tikv/pd), thanks to the TiKV team.
+Horaemeta refers to the excellent project [pd](https://github.com/tikv/pd) in design and some module and codes are forked from [pd](https://github.com/tikv/pd), thanks to the TiKV team.
 
 ## Contributing
 The project is under rapid development so that any contribution is welcome.
-Check our [Contributing Guide](https://github.com/CeresDB/ceresmeta/blob/main/CONTRIBUTING.md) and make your first contribution!
+Check our [Contributing Guide](https://github.com/CeresDB/horaemeta/blob/main/CONTRIBUTING.md) and make your first contribution!
 
 ## License
-CeresMeta is under [Apache License 2.0](./LICENSE).
+Horaemeta is under [Apache License 2.0](./LICENSE).

@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metastoragepb"
-	"github.com/CeresDB/ceresmeta/pkg/assert"
-	"github.com/CeresDB/ceresmeta/pkg/log"
-	"github.com/CeresDB/ceresmeta/server/etcdutil"
+	"github.com/CeresDB/horaemeta/pkg/assert"
+	"github.com/CeresDB/horaemeta/pkg/log"
+	"github.com/CeresDB/horaemeta/server/etcdutil"
 	"go.uber.org/zap"
 )
 

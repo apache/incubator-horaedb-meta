@@ -25,8 +25,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/CeresDB/ceresmeta/server/id"
-	"github.com/CeresDB/ceresmeta/server/storage"
+	"github.com/CeresDB/horaemeta/server/id"
+	"github.com/CeresDB/horaemeta/server/storage"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
