@@ -97,6 +97,7 @@ func testCreateTable(t *testing.T, dispatch eventdispatch.Dispatch, c *cluster.C
 	// New CreateTableProcedure to create a new table.
 	p, err := createtable.NewProcedure(createtable.ProcedureParams{
 		Dispatch:        dispatch,
+		Storage:         test.MockStorage{},
 		ClusterMetadata: c.GetMetadata(),
 		ClusterSnapshot: snapshot,
 		ID:              uint64(1),

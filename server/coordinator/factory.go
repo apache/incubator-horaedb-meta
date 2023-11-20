@@ -138,6 +138,7 @@ func (f *Factory) makeCreateTableProcedure(ctx context.Context, request CreateTa
 
 	return createtable.NewProcedure(createtable.ProcedureParams{
 		Dispatch:        f.dispatch,
+		Storage:         f.storage,
 		ClusterMetadata: request.ClusterMetadata,
 		ClusterSnapshot: snapshot,
 		ID:              id,
