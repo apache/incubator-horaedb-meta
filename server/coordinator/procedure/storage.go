@@ -21,7 +21,7 @@ import (
 )
 
 type Write interface {
-	CreateOrUpdate(ctx context.Context, meta Meta) error
+	CreateOrUpdate(ctx context.Context, meta Meta, ttl int64) error
 }
 
 type Meta struct {
@@ -33,6 +33,7 @@ type Meta struct {
 
 type Storage interface {
 	Write
-	List(ctx context.Context, batchSize int) ([]*Meta, error)
-	MarkDeleted(ctx context.Context, id uint64) error
+	List(ctx context.Context, procedureType Typ, batchSize int) ([]*Meta, error)
+	Delete(ctx context.Context, procedureType Typ, id uint64) error
+	MarkDeleted(ctx context.Context, procedureType Typ, id uint64) error
 }

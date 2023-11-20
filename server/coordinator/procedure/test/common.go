@@ -79,15 +79,19 @@ func (m MockDispatch) CloseTableOnShard(_ context.Context, _ string, _ eventdisp
 
 type MockStorage struct{}
 
-func (m MockStorage) CreateOrUpdate(_ context.Context, _ procedure.Meta) error {
+func (m MockStorage) CreateOrUpdate(_ context.Context, _ procedure.Meta, _ int64) error {
 	return nil
 }
 
-func (m MockStorage) List(_ context.Context, _ int) ([]*procedure.Meta, error) {
+func (m MockStorage) List(_ context.Context, _ procedure.Typ, _ int) ([]*procedure.Meta, error) {
 	return nil, nil
 }
 
-func (m MockStorage) MarkDeleted(_ context.Context, _ uint64) error {
+func (m MockStorage) Delete(_ context.Context, _ procedure.Typ, _ uint64) error {
+	return nil
+}
+
+func (m MockStorage) MarkDeleted(_ context.Context, _ procedure.Typ, _ uint64) error {
 	return nil
 }
 

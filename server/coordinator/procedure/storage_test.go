@@ -45,7 +45,7 @@ func testWrite(t *testing.T, storage Storage) {
 	}
 
 	// Test create new procedure
-	err := storage.CreateOrUpdate(ctx, testMeta1)
+	err := storage.CreateOrUpdate(ctx, testMeta1, 0)
 	re.NoError(err)
 
 	testMeta2 := Meta{
@@ -54,12 +54,12 @@ func testWrite(t *testing.T, storage Storage) {
 		State:   StateInit,
 		RawData: []byte("test"),
 	}
-	err = storage.CreateOrUpdate(ctx, testMeta2)
+	err = storage.CreateOrUpdate(ctx, testMeta2, 0)
 	re.NoError(err)
 
 	// Test update procedure
 	testMeta2.RawData = []byte("test update")
-	err = storage.CreateOrUpdate(ctx, testMeta2)
+	err = storage.CreateOrUpdate(ctx, testMeta2, 0)
 	re.NoError(err)
 }
 
@@ -68,7 +68,7 @@ func testScan(t *testing.T, storage Storage) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 
-	metas, err := storage.List(ctx, DefaultScanBatchSie)
+	metas, err := storage.List(ctx, TransferLeader, DefaultScanBatchSie)
 	re.NoError(err)
 	re.Equal(2, len(metas))
 	re.Equal("test", string(metas[0].RawData))
@@ -86,12 +86,25 @@ func testDelete(t *testing.T, storage Storage) {
 		State:   StateInit,
 		RawData: []byte("test"),
 	}
-	err := storage.MarkDeleted(ctx, testMeta1.ID)
+	err := storage.MarkDeleted(ctx, TransferLeader, testMeta1.ID)
 	re.NoError(err)
 
-	metas, err := storage.List(ctx, DefaultScanBatchSie)
+	metas, err := storage.List(ctx, TransferLeader, DefaultScanBatchSie)
 	re.NoError(err)
 	re.Equal(1, len(metas))
+
+	testMeta2 := Meta{
+		ID:      uint64(2),
+		Typ:     TransferLeader,
+		State:   StateInit,
+		RawData: []byte("test"),
+	}
+	err = storage.Delete(ctx, TransferLeader, testMeta2.ID)
+	re.NoError(err)
+
+	metas, err = storage.List(ctx, TransferLeader, DefaultScanBatchSie)
+	re.NoError(err)
+	re.Equal(0, len(metas))
 }
 
 func NewTestStorage(t *testing.T) Storage {

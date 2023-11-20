@@ -323,7 +323,7 @@ func (p *Procedure) persist(ctx context.Context) error {
 	if err != nil {
 		return errors.WithMessage(err, "convert to meta")
 	}
-	err = p.params.Storage.CreateOrUpdate(ctx, meta)
+	err = p.params.Storage.CreateOrUpdate(ctx, meta, 0)
 	if err != nil {
 		return errors.WithMessage(err, "createOrUpdate procedure storage")
 	}
