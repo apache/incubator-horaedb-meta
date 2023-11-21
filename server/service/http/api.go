@@ -302,7 +302,8 @@ func (a *API) createCluster(req *http.Request) apiFuncResult {
 		log.Error("parse topology type failed", zap.Error(err))
 		return errResult(ErrParseRequest, err.Error())
 	}
-	c, err := a.clusterManager.CreateCluster(req.Context(), createClusterRequest.Name, metadata.CreateClusterOpts{
+
+	c, err := a.clusterManager.CreateCluster(context.Background(), createClusterRequest.Name, metadata.CreateClusterOpts{
 		NodeCount:                   createClusterRequest.NodeCount,
 		ShardTotal:                  createClusterRequest.ShardTotal,
 		EnableSchedule:              createClusterRequest.EnableSchedule,
