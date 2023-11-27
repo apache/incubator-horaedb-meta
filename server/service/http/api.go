@@ -303,13 +303,15 @@ func (a *API) createCluster(req *http.Request) apiFuncResult {
 		return errResult(ErrParseRequest, err.Error())
 	}
 
-	c, err := a.clusterManager.CreateCluster(context.Background(), createClusterRequest.Name, metadata.CreateClusterOpts{
+	ctx := context.Background()
+	createClusterOpts := metadata.CreateClusterOpts{
 		NodeCount:                   createClusterRequest.NodeCount,
 		ShardTotal:                  createClusterRequest.ShardTotal,
 		EnableSchedule:              createClusterRequest.EnableSchedule,
 		TopologyType:                topologyType,
 		ProcedureExecutingBatchSize: createClusterRequest.ProcedureExecutingBatchSize,
-	})
+	}
+	c, err := a.clusterManager.CreateCluster(ctx, createClusterRequest.Name, createClusterOpts)
 	if err != nil {
 		log.Error("create cluster failed", zap.Error(err))
 		return errResult(metadata.ErrCreateCluster, err.Error())
