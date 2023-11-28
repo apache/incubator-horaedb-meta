@@ -27,14 +27,14 @@ type Write interface {
 
 type Meta struct {
 	ID      uint64
-	Typ     Typ
+	Typ     Kind
 	State   State
 	RawData []byte
 }
 
 type Storage interface {
 	Write
-	List(ctx context.Context, procedureType Typ, batchSize int) ([]*Meta, error)
-	Delete(ctx context.Context, procedureType Typ, id uint64) error
-	MarkDeleted(ctx context.Context, procedureType Typ, id uint64) error
+	List(ctx context.Context, procedureType Kind, batchSize int) ([]*Meta, error)
+	Delete(ctx context.Context, procedureType Kind, id uint64) error
+	MarkDeleted(ctx context.Context, procedureType Kind, id uint64) error
 }

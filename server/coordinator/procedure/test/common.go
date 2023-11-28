@@ -87,15 +87,15 @@ func (m MockStorage) CreateOrUpdateWithTTL(_ context.Context, _ procedure.Meta, 
 	return nil
 }
 
-func (m MockStorage) List(_ context.Context, _ procedure.Typ, _ int) ([]*procedure.Meta, error) {
+func (m MockStorage) List(_ context.Context, _ procedure.Kind, _ int) ([]*procedure.Meta, error) {
 	return nil, nil
 }
 
-func (m MockStorage) Delete(_ context.Context, _ procedure.Typ, _ uint64) error {
+func (m MockStorage) Delete(_ context.Context, _ procedure.Kind, _ uint64) error {
 	return nil
 }
 
-func (m MockStorage) MarkDeleted(_ context.Context, _ procedure.Typ, _ uint64) error {
+func (m MockStorage) MarkDeleted(_ context.Context, _ procedure.Kind, _ uint64) error {
 	return nil
 }
 

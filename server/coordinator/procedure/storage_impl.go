@@ -97,7 +97,7 @@ func (e EtcdStorageImpl) CreateOrUpdateWithTTL(ctx context.Context, meta Meta, t
 }
 
 // Delete will delete the specified procedure, and try to delete its corresponding history procedure if it exists.
-func (e EtcdStorageImpl) Delete(ctx context.Context, procedureType Typ, id uint64) error {
+func (e EtcdStorageImpl) Delete(ctx context.Context, procedureType Kind, id uint64) error {
 	keyPath := e.generaNormalKeyPath(procedureType, id)
 	opDelete := clientv3.OpDelete(keyPath)
 
@@ -118,7 +118,7 @@ func (e EtcdStorageImpl) Delete(ctx context.Context, procedureType Typ, id uint6
 
 // MarkDeleted Do a soft deletion, and the deleted key's format is:
 // /{rootPath}/v1/historyProcedure/{clusterID}/{procedureID}
-func (e EtcdStorageImpl) MarkDeleted(ctx context.Context, procedureType Typ, id uint64) error {
+func (e EtcdStorageImpl) MarkDeleted(ctx context.Context, procedureType Kind, id uint64) error {
 	keyPath := e.generaNormalKeyPath(procedureType, id)
 	meta, err := etcdutil.Get(ctx, e.client, keyPath)
 	if err != nil {
@@ -134,7 +134,7 @@ func (e EtcdStorageImpl) MarkDeleted(ctx context.Context, procedureType Typ, id 
 	return err
 }
 
-func (e EtcdStorageImpl) List(ctx context.Context, procedureType Typ, batchSize int) ([]*Meta, error) {
+func (e EtcdStorageImpl) List(ctx context.Context, procedureType Kind, batchSize int) ([]*Meta, error) {
 	var metas []*Meta
 	do := func(key string, value []byte) error {
 		meta, err := decodeMeta(string(value))
@@ -156,15 +156,15 @@ func (e EtcdStorageImpl) List(ctx context.Context, procedureType Typ, batchSize 
 	return metas, nil
 }
 
-func (e EtcdStorageImpl) generaNormalKeyPath(procedureType Typ, procedureID uint64) string {
+func (e EtcdStorageImpl) generaNormalKeyPath(procedureType Kind, procedureID uint64) string {
 	return e.generateKeyPath(procedureID, procedureType, false)
 }
 
-func (e EtcdStorageImpl) generaDeletedKeyPath(procedureType Typ, procedureID uint64) string {
+func (e EtcdStorageImpl) generaDeletedKeyPath(procedureType Kind, procedureID uint64) string {
 	return e.generateKeyPath(procedureID, procedureType, true)
 }
 
-func (e EtcdStorageImpl) generateKeyPath(procedureID uint64, procedureType Typ, isDeleted bool) string {
+func (e EtcdStorageImpl) generateKeyPath(procedureID uint64, procedureType Kind, isDeleted bool) string {
 	var procedurePath string
 	if isDeleted {
 		procedurePath = PathDeletedProcedure
