@@ -374,7 +374,7 @@ func (p *Procedure) convertToMeta() (procedure.Meta, error) {
 
 	meta := procedure.Meta{
 		ID:    p.params.ID,
-		Typ:   procedure.CreatePartitionTable,
+		Kind:  procedure.CreatePartitionTable,
 		State: p.state,
 
 		RawData: rawDataBytes,

@@ -39,7 +39,7 @@ func testWrite(t *testing.T, storage Storage) {
 
 	testMeta1 := Meta{
 		ID:      uint64(1),
-		Typ:     TransferLeader,
+		Kind:    TransferLeader,
 		State:   StateInit,
 		RawData: []byte("test"),
 	}
@@ -50,7 +50,7 @@ func testWrite(t *testing.T, storage Storage) {
 
 	testMeta2 := Meta{
 		ID:      uint64(2),
-		Typ:     TransferLeader,
+		Kind:    TransferLeader,
 		State:   StateInit,
 		RawData: []byte("test"),
 	}
@@ -82,7 +82,7 @@ func testDelete(t *testing.T, storage Storage) {
 
 	testMeta1 := &Meta{
 		ID:      uint64(1),
-		Typ:     TransferLeader,
+		Kind:    TransferLeader,
 		State:   StateInit,
 		RawData: []byte("test"),
 	}
@@ -95,7 +95,7 @@ func testDelete(t *testing.T, storage Storage) {
 
 	testMeta2 := Meta{
 		ID:      uint64(2),
-		Typ:     TransferLeader,
+		Kind:    TransferLeader,
 		State:   StateInit,
 		RawData: []byte("test"),
 	}

@@ -61,7 +61,7 @@ func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta Meta) error {
 		return errors.WithMessage(err, "encode meta failed")
 	}
 
-	keyPath := e.generaNormalKeyPath(meta.Typ, meta.ID)
+	keyPath := e.generaNormalKeyPath(meta.Kind, meta.ID)
 
 	opPut := clientv3.OpPut(keyPath, s)
 
@@ -80,7 +80,7 @@ func (e EtcdStorageImpl) CreateOrUpdateWithTTL(ctx context.Context, meta Meta, t
 		return errors.WithMessage(err, "encode meta failed")
 	}
 
-	keyPath := e.generaNormalKeyPath(meta.Typ, meta.ID)
+	keyPath := e.generaNormalKeyPath(meta.Kind, meta.ID)
 
 	// TODO: This implementation will cause each procedure to correspond to an etcd lease, which may cause too much pressure on etcd? May need to optimize implementation.
 	resp, err := e.client.Grant(ctx, ttlSec)

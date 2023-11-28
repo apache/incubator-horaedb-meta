@@ -27,7 +27,7 @@ type Write interface {
 
 type Meta struct {
 	ID      uint64
-	Typ     Kind
+	Kind    Kind
 	State   State
 	RawData []byte
 }

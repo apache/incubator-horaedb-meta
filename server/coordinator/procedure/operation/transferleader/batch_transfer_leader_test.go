@@ -29,7 +29,7 @@ import (
 type mockProcedure struct {
 	ClusterID        storage.ClusterID
 	clusterVersion   uint64
-	typ              procedure.Kind
+	kind             procedure.Kind
 	ShardWithVersion map[storage.ShardID]uint64
 }
 
@@ -38,7 +38,7 @@ func (m mockProcedure) ID() uint64 {
 }
 
 func (m mockProcedure) Kind() procedure.Kind {
-	return m.typ
+	return m.kind
 }
 
 func (m mockProcedure) Start(_ context.Context) error {
@@ -114,7 +114,7 @@ func CreateMockProcedure(clusterID storage.ClusterID, clusterVersion uint64, typ
 	return mockProcedure{
 		ClusterID:        clusterID,
 		clusterVersion:   clusterVersion,
-		typ:              typ,
+		kind:             typ,
 		ShardWithVersion: shardWithVersion,
 	}
 }
