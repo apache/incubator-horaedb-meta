@@ -55,7 +55,7 @@ func NewEtcdStorageImpl(client *clientv3.Client, rootPath string, clusterID uint
 // CreateOrUpdate example:
 // /{rootPath}/v1/procedure/{procedureType}/{procedureID} ->  {procedureState} + {data}
 // ttl is only valid when greater than 0, if it is less than or equal to 0, it will be ignored.
-func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta Meta, ttlSec int64) error {
+func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta Meta) error {
 	s, err := encode(&meta)
 	if err != nil {
 		return errors.WithMessage(err, "encode meta failed")
@@ -63,17 +63,7 @@ func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta Meta, ttlSec i
 
 	keyPath := e.generaNormalKeyPath(meta.Typ, meta.ID)
 
-	var opPut clientv3.Op
-	if ttlSec <= 0 {
-		opPut = clientv3.OpPut(keyPath, s)
-	} else {
-		// TODO: This implementation will cause each procedure to correspond to an etcd lease, which may cause too much pressure on etcd? May need to optimize implementation.
-		resp, err := e.client.Grant(ctx, ttlSec)
-		if err != nil {
-			return errors.WithMessage(err, "etcd get lease failed")
-		}
-		opPut = clientv3.OpPut(keyPath, s, clientv3.WithLease(resp.ID))
-	}
+	opPut := clientv3.OpPut(keyPath, s)
 
 	if _, err = e.client.Do(ctx, opPut); err != nil {
 		return errors.WithMessage(err, "etcd put data failed")
@@ -82,8 +72,31 @@ func (e EtcdStorageImpl) CreateOrUpdate(ctx context.Context, meta Meta, ttlSec i
 	return nil
 }
 
-// Delete will delete the specified procedure,
-// and try to delete its corresponding history procedure if it exists.
+// CreateOrUpdateWithTTL
+// ttl is only valid when greater than 0, if it is less than or equal to 0, it will be ignored.
+func (e EtcdStorageImpl) CreateOrUpdateWithTTL(ctx context.Context, meta Meta, ttlSec int64) error {
+	s, err := encode(&meta)
+	if err != nil {
+		return errors.WithMessage(err, "encode meta failed")
+	}
+
+	keyPath := e.generaNormalKeyPath(meta.Typ, meta.ID)
+
+	// TODO: This implementation will cause each procedure to correspond to an etcd lease, which may cause too much pressure on etcd? May need to optimize implementation.
+	resp, err := e.client.Grant(ctx, ttlSec)
+	if err != nil {
+		return errors.WithMessage(err, "etcd get lease failed")
+	}
+	opPut := clientv3.OpPut(keyPath, s, clientv3.WithLease(resp.ID))
+
+	if _, err = e.client.Do(ctx, opPut); err != nil {
+		return errors.WithMessage(err, "etcd put data failed")
+	}
+
+	return nil
+}
+
+// Delete will delete the specified procedure, and try to delete its corresponding history procedure if it exists.
 func (e EtcdStorageImpl) Delete(ctx context.Context, procedureType Typ, id uint64) error {
 	keyPath := e.generaNormalKeyPath(procedureType, id)
 	opDelete := clientv3.OpDelete(keyPath)

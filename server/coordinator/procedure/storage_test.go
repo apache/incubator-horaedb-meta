@@ -45,7 +45,7 @@ func testWrite(t *testing.T, storage Storage) {
 	}
 
 	// Test create new procedure
-	err := storage.CreateOrUpdate(ctx, testMeta1, 0)
+	err := storage.CreateOrUpdate(ctx, testMeta1)
 	re.NoError(err)
 
 	testMeta2 := Meta{
@@ -54,12 +54,12 @@ func testWrite(t *testing.T, storage Storage) {
 		State:   StateInit,
 		RawData: []byte("test"),
 	}
-	err = storage.CreateOrUpdate(ctx, testMeta2, 0)
+	err = storage.CreateOrUpdate(ctx, testMeta2)
 	re.NoError(err)
 
 	// Test update procedure
 	testMeta2.RawData = []byte("test update")
-	err = storage.CreateOrUpdate(ctx, testMeta2, 0)
+	err = storage.CreateOrUpdate(ctx, testMeta2)
 	re.NoError(err)
 }
 

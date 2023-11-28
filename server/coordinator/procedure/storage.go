@@ -21,7 +21,8 @@ import (
 )
 
 type Write interface {
-	CreateOrUpdate(ctx context.Context, meta Meta, ttlSec int64) error
+	CreateOrUpdate(ctx context.Context, meta Meta) error
+	CreateOrUpdateWithTTL(ctx context.Context, meta Meta, ttlSec int64) error
 }
 
 type Meta struct {

@@ -79,7 +79,11 @@ func (m MockDispatch) CloseTableOnShard(_ context.Context, _ string, _ eventdisp
 
 type MockStorage struct{}
 
-func (m MockStorage) CreateOrUpdate(_ context.Context, _ procedure.Meta, _ int64) error {
+func (m MockStorage) CreateOrUpdate(_ context.Context, _ procedure.Meta) error {
+	return nil
+}
+
+func (m MockStorage) CreateOrUpdateWithTTL(_ context.Context, _ procedure.Meta, _ int64) error {
 	return nil
 }
 
