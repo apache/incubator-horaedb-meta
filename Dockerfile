@@ -21,8 +21,8 @@ USER root
 
 RUN apt update && apt install --yes gcc g++ libssl-dev pkg-config cmake && rm -rf /var/lib/apt/lists/*
 
-COPY . /ceresmeta
-WORKDIR /ceresmeta
+COPY . /horaemeta
+WORKDIR /horaemeta
 
 RUN make build
 
@@ -35,11 +35,11 @@ RUN apt update && \
     apt install --yes curl gdb iotop cron vim less net-tools && \
     apt clean
 
-COPY --from=build /ceresmeta/bin/ceresmeta-server /usr/bin/ceresmeta-server
-RUN chmod +x /usr/bin/ceresmeta-server
+COPY --from=build /horaemeta/bin/horaemeta-server /usr/bin/horaemeta-server
+RUN chmod +x /usr/bin/horaemeta-server
 
 COPY ./docker/entrypoint.sh /entrypoint.sh
-COPY ./config/example-standalone.toml /etc/ceresmeta/ceresmeta.toml
+COPY ./config/example-standalone.toml /etc/horaemeta/horaemeta.toml
 
 COPY ./docker/tini /tini
 RUN chmod +x /tini
