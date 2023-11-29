@@ -17,7 +17,7 @@
 
 set -exo
 
-META_BIN_PATH="$(pwd)/bin/ceresmeta-server"
+META_BIN_PATH="$(pwd)/bin/horaemeta-server"
 INTEGRATION_TEST_PATH=$(mktemp -d)
 
 # Download HoraeDB Code
