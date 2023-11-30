@@ -3,7 +3,7 @@ module github.com/CeresDB/horaemeta
 go 1.21
 
 require (
-	github.com/CeresDB/horaedbproto/golang v0.0.0-20231129131648-5d5d868218c3
+	github.com/CeresDB/horaedbproto/golang v0.0.0-20231130070551-6f27270143a8
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/looplab/fsm v0.3.0
