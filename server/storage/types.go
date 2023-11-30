@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/clusterpb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
 )
 
 type (

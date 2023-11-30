@@ -22,7 +22,7 @@ INTEGRATION_TEST_PATH=$(mktemp -d)
 
 # Download HoraeDB Code
 cd $INTEGRATION_TEST_PATH
-git clone --depth 1 https://github.com/ceresdb/horaedb.git --branch main
+git clone --depth 1 https://github.com/CeresDB/horaedb.git --branch main
 
 # Run integration_test
 cd horaedb/integration_tests

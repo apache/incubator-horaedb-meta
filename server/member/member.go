@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metastoragepb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metastoragepb"
 	"github.com/CeresDB/horaemeta/pkg/log"
 	"github.com/CeresDB/horaemeta/server/etcdutil"
 	"github.com/pkg/errors"

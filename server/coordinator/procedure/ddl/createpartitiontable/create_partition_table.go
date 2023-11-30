@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/horaemeta/pkg/assert"
 	"github.com/CeresDB/horaemeta/pkg/log"
 	"github.com/CeresDB/horaemeta/server/cluster/metadata"

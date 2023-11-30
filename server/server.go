@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/horaemeta/pkg/coderr"
 	"github.com/CeresDB/horaemeta/pkg/log"
 	"github.com/CeresDB/horaemeta/server/cluster"
@@ -98,7 +98,7 @@ func CreateServer(cfg *config.Config) (*Server, error) {
 
 	grpcService := metagrpc.NewService(cfg.GrpcHandleTimeout(), srv)
 	etcdCfg.ServiceRegister = func(grpcSrv *grpc.Server) {
-		grpcSrv.RegisterService(&metaservicepb.CeresmetaRpcService_ServiceDesc, grpcService)
+		grpcSrv.RegisterService(&metaservicepb.HoraeMetaRpcService_ServiceDesc, grpcService)
 	}
 
 	return srv, nil
@@ -224,7 +224,7 @@ func (srv *Server) startGrpcServer(_ context.Context) error {
 	server := grpc.NewServer(opts...)
 
 	grpcService := metagrpc.NewService(srv.cfg.GrpcHandleTimeout(), srv)
-	server.RegisterService(&metaservicepb.CeresmetaRpcService_ServiceDesc, grpcService)
+	server.RegisterService(&metaservicepb.HoraeMetaRpcService_ServiceDesc, grpcService)
 	addr := fmt.Sprintf(":%d", srv.cfg.GrpcPort)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {

@@ -29,7 +29,7 @@ RUN make build
 ## HoraeMeta
 FROM ubuntu:20.04
 
-RUN useradd -m -s /bin/bash ceres
+RUN useradd -m -s /bin/bash horae
 
 RUN apt update && \
     apt install --yes curl gdb iotop cron vim less net-tools && \
@@ -44,6 +44,6 @@ COPY ./config/example-standalone.toml /etc/horaemeta/horaemeta.toml
 COPY ./docker/tini /tini
 RUN chmod +x /tini
 
-ARG USER ceres
+ARG USER horae
 
 ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]

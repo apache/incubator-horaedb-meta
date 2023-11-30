@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/clusterpb"
 	"github.com/CeresDB/horaemeta/pkg/log"
 	"github.com/CeresDB/horaemeta/server/etcdutil"
 	"github.com/pkg/errors"

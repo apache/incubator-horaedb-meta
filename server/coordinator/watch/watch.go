@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaeventpb"
 	"github.com/CeresDB/horaemeta/server/storage"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/api/v3/mvccpb"

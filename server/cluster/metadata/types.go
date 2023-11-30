@@ -19,7 +19,7 @@ package metadata
 import (
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/horaemeta/server/storage"
 	"github.com/pkg/errors"
 )

@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/clusterpb"
-	"github.com/CeresDB/ceresdbproto/golang/pkg/commonpb"
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/clusterpb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/commonpb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/horaemeta/pkg/coderr"
 	"github.com/CeresDB/horaemeta/pkg/log"
 	"github.com/CeresDB/horaemeta/server/cluster"
@@ -39,7 +39,7 @@ import (
 )
 
 type Service struct {
-	metaservicepb.UnimplementedCeresmetaRpcServiceServer
+	metaservicepb.UnimplementedHoraeMetaRpcServiceServer
 	opTimeout time.Duration
 	h         Handler
 
@@ -50,7 +50,7 @@ type Service struct {
 
 func NewService(opTimeout time.Duration, h Handler) *Service {
 	return &Service{
-		UnimplementedCeresmetaRpcServiceServer: metaservicepb.UnimplementedCeresmetaRpcServiceServer{},
+		UnimplementedHoraeMetaRpcServiceServer: metaservicepb.UnimplementedHoraeMetaRpcServiceServer{},
 		opTimeout:                              opTimeout,
 		h:                                      h,
 		conns:                                  sync.Map{},

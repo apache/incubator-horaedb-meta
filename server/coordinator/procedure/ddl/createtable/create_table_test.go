@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/horaemeta/server/cluster/metadata"
 	"github.com/CeresDB/horaemeta/server/coordinator/procedure/ddl/createtable"
 	"github.com/CeresDB/horaemeta/server/coordinator/procedure/test"

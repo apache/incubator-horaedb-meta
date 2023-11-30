@@ -18,7 +18,7 @@
 set -exo pipefail
 
 ## init varibles
-USER="ceres"
+USER="horae"
 DATA_DIR="/tmp/horaemeta0"
 CONFIG_FILE="/etc/horaemeta/horaemeta.toml"
 

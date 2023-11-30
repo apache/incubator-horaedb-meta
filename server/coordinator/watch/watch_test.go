@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaeventpb"
 	"github.com/CeresDB/horaemeta/server/etcdutil"
 	"github.com/CeresDB/horaemeta/server/storage"
 	"github.com/stretchr/testify/require"

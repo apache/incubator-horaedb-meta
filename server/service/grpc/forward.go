@@ -19,7 +19,7 @@ package grpc
 import (
 	"context"
 
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
+	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/horaemeta/pkg/log"
 	"github.com/CeresDB/horaemeta/server/service"
 	"github.com/pkg/errors"
@@ -28,7 +28,7 @@ import (
 )
 
 // getForwardedMetaClient get forwarded horaemeta client. When current node is the leader, this func will return (nil,nil).
-func (s *Service) getForwardedMetaClient(ctx context.Context) (metaservicepb.CeresmetaRpcServiceClient, error) {
+func (s *Service) getForwardedMetaClient(ctx context.Context) (metaservicepb.HoraeMetaRpcServiceClient, error) {
 	forwardedAddr, _, err := s.getForwardedAddr(ctx)
 	if err != nil {
 		return nil, errors.WithMessage(err, "get forwarded horaemeta client")
@@ -44,12 +44,12 @@ func (s *Service) getForwardedMetaClient(ctx context.Context) (metaservicepb.Cer
 	return nil, nil
 }
 
-func (s *Service) getMetaClient(ctx context.Context, addr string) (metaservicepb.CeresmetaRpcServiceClient, error) {
+func (s *Service) getMetaClient(ctx context.Context, addr string) (metaservicepb.HoraeMetaRpcServiceClient, error) {
 	client, err := s.getForwardedGrpcClient(ctx, addr)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get horaemeta client, addr:%s", addr)
 	}
-	return metaservicepb.NewCeresmetaRpcServiceClient(client), nil
+	return metaservicepb.NewHoraeMetaRpcServiceClient(client), nil
 }
 
 func (s *Service) getForwardedGrpcClient(ctx context.Context, forwardedAddr string) (*grpc.ClientConn, error) {
