@@ -318,7 +318,7 @@ func (p *Procedure) persistProcedure(ctx context.Context) error {
 		FsmState:   p.fsm.Current(),
 		ShardID:    p.params.ShardID,
 	}
-	meta, err := convertToMeta(persistData, p.ID(), p.Typ(), p.State())
+	meta, err := convertToMeta(persistData, p.ID(), p.Kind(), p.State())
 	if err != nil {
 		return err
 	}
@@ -340,7 +340,7 @@ type persistData struct {
 	FsmState string
 }
 
-func convertToMeta(data persistData, id uint64, typ procedure.Typ, state procedure.State) (procedure.Meta, error) {
+func convertToMeta(data persistData, id uint64, kind procedure.Kind, state procedure.State) (procedure.Meta, error) {
 	var emptyMeta procedure.Meta
 
 	bytes, err := json.Marshal(data)
@@ -350,7 +350,7 @@ func convertToMeta(data persistData, id uint64, typ procedure.Typ, state procedu
 
 	meta := procedure.Meta{
 		ID:      id,
-		Typ:     typ,
+		Kind:    kind,
 		State:   state,
 		RawData: bytes,
 	}
@@ -374,7 +374,7 @@ func loadPersistData(storage procedure.Storage, schemaName string, tableName str
 	var emptyPersistData persistData
 
 	// Try to load persist data.
-	metas, err := storage.List(context.Background(), 100)
+	metas, err := storage.List(context.Background(), procedure.CreateTable, 100)
 	if err != nil {
 		return emptyPersistData, false, err
 	}
