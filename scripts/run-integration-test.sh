@@ -21,7 +21,7 @@ INTEGRATION_TEST_PATH=$(mktemp -d)
 
 # Download CeresDB Code
 cd $INTEGRATION_TEST_PATH
-git clone --depth 1 https://github.com/ceresdb/ceresdb.git --branch main
+git clone --depth 1 https://github.com/ceresdb/ceresdb.git --branch dev
 
 # Run integration_test
 cd ceresdb/integration_tests
