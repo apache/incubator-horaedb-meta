@@ -115,7 +115,8 @@ func (c *ClusterMetadata) Load(ctx context.Context) error {
 		return errors.WithMessage(err, "load table manager")
 	}
 
-	if err := c.topologyManager.Load(ctx); err != nil {
+	schemas := c.tableManager.GetSchemas()
+	if err := c.topologyManager.Load(ctx, schemas); err != nil {
 		return errors.WithMessage(err, "load topology manager")
 	}
 
@@ -390,6 +391,18 @@ func (c *ClusterMetadata) CreateTable(ctx context.Context, request CreateTableRe
 	}
 	c.logger.Info("create table succeed", zap.String("cluster", c.Name()), zap.String("result", fmt.Sprintf("%+v", ret)))
 	return ret, nil
+}
+
+func (c *ClusterMetadata) GetAssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string) (storage.ShardID, bool) {
+	return c.topologyManager.GetAssignTableResult(ctx, schemaID, tableName)
+}
+
+func (c *ClusterMetadata) AssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string, shardID storage.ShardID) error {
+	return c.topologyManager.AssignTable(ctx, schemaID, tableName, shardID)
+}
+
+func (c *ClusterMetadata) DeleteAssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string) error {
+	return c.topologyManager.DeleteAssignTable(ctx, schemaID, tableName)
 }
 
 func (c *ClusterMetadata) GetShards() []storage.ShardID {

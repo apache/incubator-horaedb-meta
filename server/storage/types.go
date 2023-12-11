@@ -141,6 +141,28 @@ type DeleteTableRequest struct {
 	TableName string
 }
 
+type AssignTableRequest struct {
+	ClusterID ClusterID
+	SchemaID  SchemaID
+	TableName string
+	ShardID   ShardID
+}
+
+type DeleteAssignTableRequest struct {
+	ClusterID ClusterID
+	SchemaID  SchemaID
+	TableName string
+}
+
+type ListAssignTableRequest struct {
+	ClusterID ClusterID
+	SchemaID  SchemaID
+}
+
+type ListAssignTableResult struct {
+	TableAssigns []TableAssign
+}
+
 type CreateShardViewsRequest struct {
 	ClusterID  ClusterID
 	ShardViews []ShardView
@@ -230,6 +252,11 @@ type Table struct {
 
 func (t Table) IsPartitioned() bool {
 	return t.PartitionInfo.Info != nil
+}
+
+type TableAssign struct {
+	TableName string
+	ShardID   ShardID
 }
 
 type ShardView struct {
