@@ -393,8 +393,12 @@ func (c *ClusterMetadata) CreateTable(ctx context.Context, request CreateTableRe
 	return ret, nil
 }
 
-func (c *ClusterMetadata) GetAssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string) (storage.ShardID, bool) {
-	return c.topologyManager.GetAssignTableResult(ctx, schemaID, tableName)
+func (c *ClusterMetadata) GetAssignTable(ctx context.Context, schemaName string, tableName string) (storage.ShardID, bool) {
+	schema, exists := c.tableManager.GetSchema(schemaName)
+	if !exists {
+		return 0, false
+	}
+	return c.topologyManager.GetAssignTableResult(ctx, schema.ID, tableName)
 }
 
 func (c *ClusterMetadata) AssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string, shardID storage.ShardID) error {

@@ -129,14 +129,21 @@ func (f *Factory) makeCreateTableProcedure(ctx context.Context, request CreateTa
 	}
 	snapshot := request.ClusterMetadata.GetClusterSnapshot()
 
-	shards, err := f.shardPicker.PickShards(ctx, snapshot, 1)
-	if err != nil {
-		f.logger.Error("pick table shard", zap.Error(err))
-		return nil, errors.WithMessage(err, "pick table shard")
-	}
-	if len(shards) != 1 {
-		f.logger.Error("pick table shards length not equal 1", zap.Int("shards", len(shards)))
-		return nil, errors.WithMessagef(procedure.ErrPickShard, "pick table shard, shards length:%d", len(shards))
+	var targetShardID storage.ShardID
+	shardID, exists := request.ClusterMetadata.GetAssignTable(ctx, request.SourceReq.SchemaName, request.SourceReq.Name)
+	if exists {
+		targetShardID = shardID
+	} else {
+		shards, err := f.shardPicker.PickShards(ctx, snapshot, 1)
+		if err != nil {
+			f.logger.Error("pick table shard", zap.Error(err))
+			return nil, errors.WithMessage(err, "pick table shard")
+		}
+		if len(shards) != 1 {
+			f.logger.Error("pick table shards length not equal 1", zap.Int("shards", len(shards)))
+			return nil, errors.WithMessagef(procedure.ErrPickShard, "pick table shard, shards length:%d", len(shards))
+		}
+		targetShardID = shards[0].ID
 	}
 
 	return createtable.NewProcedure(createtable.ProcedureParams{
@@ -144,7 +151,7 @@ func (f *Factory) makeCreateTableProcedure(ctx context.Context, request CreateTa
 		ClusterMetadata: request.ClusterMetadata,
 		ClusterSnapshot: snapshot,
 		ID:              id,
-		ShardID:         shards[0].ID,
+		ShardID:         targetShardID,
 		SourceReq:       request.SourceReq,
 		OnSucceeded:     request.OnSucceeded,
 		OnFailed:        request.OnFailed,
