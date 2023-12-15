@@ -34,6 +34,7 @@ const (
 
 type Typ uint
 
+// TODO: split following const in different block.
 const (
 	// Cluster Operation
 	Create Typ = iota
@@ -49,6 +50,7 @@ const (
 	DropTable
 	CreatePartitionTable
 	DropPartitionTable
+	TransferTable
 )
 
 type Priority uint32

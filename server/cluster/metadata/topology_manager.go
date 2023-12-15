@@ -116,6 +116,13 @@ func (t *Topology) IsPrepareFinished() bool {
 	return true
 }
 
+func (t *Topology) ShardVersion(shardID storage.ShardID) (uint64, error) {
+	if shardView, ok := t.ShardViewsMapping[shardID]; ok {
+		return shardView.Version, nil
+	}
+	return 0, errors.Errorf("shard not found, shardID:%d", shardID)
+}
+
 type TopologyManagerImpl struct {
 	logger       *zap.Logger
 	storage      storage.Storage

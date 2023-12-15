@@ -18,6 +18,7 @@ package coordinator
 
 import (
 	"context"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/transfertable"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
@@ -96,6 +97,16 @@ type CreatePartitionTableRequest struct {
 type BatchRequest struct {
 	Batch     []procedure.Procedure
 	BatchType procedure.Typ
+}
+
+type TransferTableRequest struct {
+	ClusterMetadata *metadata.ClusterMetadata
+	SchemaName      string
+	TableName       string
+	DestShardID     storage.ShardID
+
+	OnSucceeded func() error
+	OnFailed    func(error) error
 }
 
 func NewFactory(logger *zap.Logger, allocator id.Allocator, dispatch eventdispatch.Dispatch, storage procedure.Storage) *Factory {
@@ -278,6 +289,24 @@ func (f *Factory) CreateBatchTransferLeaderProcedure(ctx context.Context, reques
 	}
 
 	return transferleader.NewBatchTransferLeaderProcedure(id, request.Batch)
+}
+
+func (f *Factory) CreateTransferTableProcedure(ctx context.Context, request TransferTableRequest) (procedure.Procedure, error) {
+	id, err := f.allocProcedureID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return transfertable.NewProcedure(transfertable.ProcedureParams{
+		Dispatch:        f.dispatch,
+		ClusterMetadata: request.ClusterMetadata,
+		ID:              id,
+		SchemaName:      request.SchemaName,
+		TableName:       request.TableName,
+		DestShardID:     request.DestShardID,
+		OnSucceeded:     request.OnSucceeded,
+		OnFailed:        request.OnFailed,
+	})
 }
 
 func (f *Factory) allocProcedureID(ctx context.Context) (uint64, error) {

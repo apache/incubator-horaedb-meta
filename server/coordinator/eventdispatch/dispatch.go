@@ -18,6 +18,7 @@ package eventdispatch
 
 import (
 	"context"
+	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
 
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 )
@@ -27,8 +28,8 @@ type Dispatch interface {
 	CloseShard(context context.Context, address string, request CloseShardRequest) error
 	CreateTableOnShard(context context.Context, address string, request CreateTableOnShardRequest) (uint64, error)
 	DropTableOnShard(context context.Context, address string, request DropTableOnShardRequest) (uint64, error)
-	OpenTableOnShard(ctx context.Context, address string, request OpenTableOnShardRequest) error
-	CloseTableOnShard(context context.Context, address string, request CloseTableOnShardRequest) error
+	OpenTableOnShard(ctx context.Context, address string, request OpenTableOnShardRequest) (OpenTableOnShardResponse, error)
+	CloseTableOnShard(context context.Context, address string, request CloseTableOnShardRequest) (CloseTableOnShardResponse, error)
 }
 
 type OpenShardRequest struct {
@@ -62,7 +63,27 @@ type OpenTableOnShardRequest struct {
 	TableInfo       metadata.TableInfo
 }
 
+type OpenTableOnShardResponse struct {
+	Version uint64
+}
+
 type CloseTableOnShardRequest struct {
 	UpdateShardInfo UpdateShardInfo
 	TableInfo       metadata.TableInfo
+}
+
+type CloseTableOnShardResponse struct {
+	Version uint64
+}
+
+func convertOpenTableOnShardResponse(resp *metaeventpb.OpenTableOnShardResponse) OpenTableOnShardResponse {
+	return OpenTableOnShardResponse{
+		Version: 1,
+	}
+}
+
+func convertCloseTableOnShardResponse(resp *metaeventpb.CloseTableOnShardResponse) CloseTableOnShardResponse {
+	return CloseTableOnShardResponse{
+		Version: 1,
+	}
 }

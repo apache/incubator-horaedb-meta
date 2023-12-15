@@ -306,6 +306,23 @@ func (c *ClusterMetadata) CreateTableMetadata(ctx context.Context, request Creat
 	return res, nil
 }
 
+func (c *ClusterMetadata) RemoveTableTopology(ctx context.Context, shardID storage.ShardID, version uint64, tableID storage.TableID) error {
+	c.logger.Info("remove table topology start", zap.String("cluster", c.Name()), zap.Uint64("tableID", uint64(tableID)))
+
+	if !c.ensureClusterStable() {
+		return errors.WithMessage(ErrClusterStateInvalid, "invalid cluster state, cluster state must be stable")
+	}
+
+	// Remove table from topology manager.
+	err := c.topologyManager.RemoveTable(ctx, shardID, version, []storage.TableID{tableID})
+	if err != nil {
+		return errors.WithMessage(err, "topology manager remove table")
+	}
+
+	c.logger.Info("remove table topology succeed", zap.String("cluster", c.Name()), zap.Uint64("tableID", uint64(tableID)))
+	return nil
+}
+
 func (c *ClusterMetadata) AddTableTopology(ctx context.Context, shardVersionUpdate ShardVersionUpdate, table storage.Table) error {
 	c.logger.Info("add table topology start", zap.String("cluster", c.Name()), zap.String("tableName", table.Name))
 
@@ -703,6 +720,10 @@ func (c *ClusterMetadata) GetTables(schemaName string, tableNames []string) ([]s
 
 func (c *ClusterMetadata) GetTablesByIDs(tableIDs []storage.TableID) []storage.Table {
 	return c.tableManager.GetTablesByIDs(tableIDs)
+}
+
+func (c *ClusterMetadata) Topology() Topology {
+	return c.topologyManager.GetTopology()
 }
 
 func needUpdate(oldCache RegisteredNode, registeredNode RegisteredNode) bool {

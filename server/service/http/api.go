@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/pprof"
+	"time"
 
 	"github.com/CeresDB/ceresmeta/pkg/coderr"
 	"github.com/CeresDB/ceresmeta/pkg/log"
@@ -57,6 +58,7 @@ func (a *API) NewAPIRouter() *Router {
 	// Register API.
 	router.Post("/getShardTables", wrap(a.getShardTables, true, a.forwardClient))
 	router.Post("/transferLeader", wrap(a.transferLeader, true, a.forwardClient))
+	router.Post("/transferTable", wrap(a.transferTable, true, a.forwardClient))
 	router.Post("/split", wrap(a.split, true, a.forwardClient))
 	router.Post("/route", wrap(a.route, true, a.forwardClient))
 	router.Del("/table", wrap(a.dropTable, true, a.forwardClient))
@@ -169,6 +171,62 @@ func (a *API) transferLeader(req *http.Request) apiFuncResult {
 	}
 
 	return okResult(statusSuccess)
+}
+
+func (a *API) transferTable(req *http.Request) apiFuncResult {
+	start := time.Now()
+
+	var transferTableRequest TransferTableRequest
+	err := json.NewDecoder(req.Body).Decode(&transferTableRequest)
+	if err != nil {
+		return errResult(ErrParseRequest, err.Error())
+	}
+	log.Info("transfer table request", zap.String("request", fmt.Sprintf("%+v", transferTableRequest)))
+
+	c, err := a.clusterManager.GetCluster(req.Context(), transferTableRequest.ClusterName)
+	if err != nil {
+		log.Error("get cluster failed", zap.String("clusterName", transferTableRequest.ClusterName), zap.Error(err))
+		return errResult(ErrGetCluster, fmt.Sprintf("clusterName: %s, err: %s", transferTableRequest.ClusterName, err.Error()))
+	}
+
+	errorCh := make(chan error, 1)
+	resultCh := make(chan struct{}, 1)
+
+	onSucceeded := func() error {
+		resultCh <- struct{}{}
+		return nil
+	}
+	onFailed := func(err error) error {
+		errorCh <- err
+		return nil
+	}
+
+	transferTableProcedure, err := c.GetProcedureFactory().CreateTransferTableProcedure(req.Context(), coordinator.TransferTableRequest{
+		ClusterMetadata: c.GetMetadata(),
+		SchemaName:      transferTableRequest.SchemaName,
+		TableName:       transferTableRequest.TableName,
+		DestShardID:     storage.ShardID(transferTableRequest.DestShardID),
+		OnSucceeded:     onSucceeded,
+		OnFailed:        onFailed,
+	})
+	if err != nil {
+		log.Error("create transfer table procedure failed", zap.Error(err))
+		return errResult(ErrCreateProcedure, err.Error())
+	}
+	err = c.GetProcedureManager().Submit(req.Context(), transferTableProcedure)
+	if err != nil {
+		log.Error("submit transfer table procedure failed", zap.Error(err))
+		return errResult(ErrSubmitProcedure, err.Error())
+	}
+
+	select {
+	case _ = <-resultCh:
+		log.Info("transfer leader succeed", zap.String("request", fmt.Sprintf("%+v", transferTableRequest)), zap.Int64("costTime", time.Since(start).Milliseconds()))
+		return okResult(statusSuccess)
+	case err = <-errorCh:
+		log.Error("transfer leader failed", zap.String("request", fmt.Sprintf("%+v", transferTableRequest)), zap.Int64("costTime", time.Since(start).Milliseconds()), zap.Error(err))
+		return errResult(ErrSubmitProcedure, err.Error())
+	}
 }
 
 func (a *API) route(req *http.Request) apiFuncResult {
