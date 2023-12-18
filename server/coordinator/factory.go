@@ -18,7 +18,6 @@ package coordinator
 
 import (
 	"context"
-	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/transfertable"
 
 	"github.com/CeresDB/ceresdbproto/golang/pkg/metaservicepb"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
@@ -30,6 +29,7 @@ import (
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/ddl/droptable"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/split"
 	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/transferleader"
+	"github.com/CeresDB/ceresmeta/server/coordinator/procedure/operation/transfertable"
 	"github.com/CeresDB/ceresmeta/server/id"
 	"github.com/CeresDB/ceresmeta/server/storage"
 	"github.com/pkg/errors"

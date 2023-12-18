@@ -18,8 +18,8 @@ package eventdispatch
 
 import (
 	"context"
-	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
 
+	"github.com/CeresDB/ceresdbproto/golang/pkg/metaeventpb"
 	"github.com/CeresDB/ceresmeta/server/cluster/metadata"
 )
 

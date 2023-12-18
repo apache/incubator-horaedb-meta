@@ -105,35 +105,39 @@ func (d *DispatchImpl) DropTableOnShard(ctx context.Context, addr string, reques
 }
 
 func (d *DispatchImpl) OpenTableOnShard(ctx context.Context, addr string, request OpenTableOnShardRequest) (OpenTableOnShardResponse, error) {
+	var ret OpenTableOnShardResponse
 	client, err := d.getMetaEventClient(ctx, addr)
 	if err != nil {
-		return OpenTableOnShardResponse{}, err
+		return ret, err
 	}
 
 	resp, err := client.OpenTableOnShard(ctx, convertOpenTableOnShardRequestToPB(request))
 	if err != nil {
-		return OpenTableOnShardResponse{}, errors.WithMessagef(err, "open table on shard, addr:%s, request:%v", addr, request)
+		return ret, errors.WithMessagef(err, "open table on shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return OpenTableOnShardResponse{}, ErrDispatch.WithCausef("open table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
+		return ret, ErrDispatch.WithCausef("open table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
-	return convertOpenTableOnShardResponse(resp), nil
+	ret = convertOpenTableOnShardResponse(resp)
+	return ret, nil
 }
 
 func (d *DispatchImpl) CloseTableOnShard(ctx context.Context, addr string, request CloseTableOnShardRequest) (CloseTableOnShardResponse, error) {
+	var ret CloseTableOnShardResponse
 	client, err := d.getMetaEventClient(ctx, addr)
 	if err != nil {
-		return CloseTableOnShardResponse{}, err
+		return ret, err
 	}
 
 	resp, err := client.CloseTableOnShard(ctx, convertCloseTableOnShardRequestToPB(request))
 	if err != nil {
-		return CloseTableOnShardResponse{}, errors.WithMessagef(err, "close table on shard, addr:%s, request:%v", addr, request)
+		return ret, errors.WithMessagef(err, "close table on shard, addr:%s, request:%v", addr, request)
 	}
 	if resp.GetHeader().Code != 0 {
-		return CloseTableOnShardResponse{}, ErrDispatch.WithCausef("close table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
+		return ret, ErrDispatch.WithCausef("close table on shard, addr:%s, request:%v, err:%s", addr, request, resp.GetHeader().GetError())
 	}
-	return convertCloseTableOnShardResponse(resp), nil
+	ret = convertCloseTableOnShardResponse(resp)
+	return ret, nil
 }
 
 func (d *DispatchImpl) getGrpcClient(ctx context.Context, addr string) (*grpc.ClientConn, error) {

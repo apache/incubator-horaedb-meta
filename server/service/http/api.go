@@ -220,7 +220,7 @@ func (a *API) transferTable(req *http.Request) apiFuncResult {
 	}
 
 	select {
-	case _ = <-resultCh:
+	case <-resultCh:
 		log.Info("transfer leader succeed", zap.String("request", fmt.Sprintf("%+v", transferTableRequest)), zap.Int64("costTime", time.Since(start).Milliseconds()))
 		return okResult(statusSuccess)
 	case err = <-errorCh:

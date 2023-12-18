@@ -162,12 +162,14 @@ type RouteTablesResult struct {
 }
 
 func (r RouteTablesResult) GetTableInfo(tableName string) (TableInfo, bool) {
+	var tableInfo TableInfo
 	entry, ok := r.RouteEntries[tableName]
 	if !ok {
-		return TableInfo{}, false
+		return tableInfo, false
 	}
 
-	return entry.Table, true
+	tableInfo = entry.Table
+	return tableInfo, true
 }
 
 func (r RouteTablesResult) GetShardID(tableName string) (storage.ShardID, bool) {

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2023 The CeresDB Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package transfertable
 
 import (
@@ -47,8 +63,7 @@ type Procedure struct {
 	params ProcedureParams
 
 	tableInfo               metadata.TableInfo
-	hasSrcShardNode         bool
-	srcShardNodeWithVersion metadata.ShardNodeWithVersion
+	srcShardNodeWithVersion *metadata.ShardNodeWithVersion
 	relatedVersionInfo      procedure.RelatedVersionInfo
 
 	// Protect the state.
@@ -89,11 +104,9 @@ func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
 	}
 
 	shardWithVersion := map[storage.ShardID]uint64{}
-	hasSrcShardNode := false
-	srcShardNodeWithVersion := metadata.ShardNodeWithVersion{}
+	var srcShardNodeWithVersion *metadata.ShardNodeWithVersion
 	if len(entry.NodeShards) != 0 {
-		hasSrcShardNode = true
-		srcShardNodeWithVersion = entry.NodeShards[0]
+		srcShardNodeWithVersion = &entry.NodeShards[0]
 		shardWithVersion[srcShardNodeWithVersion.ShardID()] = srcShardNodeWithVersion.ShardInfo.Version
 	}
 
@@ -118,7 +131,6 @@ func NewProcedure(params ProcedureParams) (procedure.Procedure, error) {
 		fsm:                     transferTableOperationFsm,
 		params:                  params,
 		tableInfo:               tableInfo,
-		hasSrcShardNode:         hasSrcShardNode,
 		srcShardNodeWithVersion: srcShardNodeWithVersion,
 		relatedVersionInfo:      relatedVersionInfo,
 		lock:                    sync.RWMutex{},
@@ -153,7 +165,7 @@ func (p *Procedure) Start(ctx context.Context) error {
 				return errors.WithMessage(err, "transferTable procedure persist")
 			}
 
-			if p.hasSrcShardNode {
+			if p.srcShardNodeWithVersion != nil {
 				if err := p.fsm.Event(eventCloseTable, transferTableRequest); err != nil {
 					p.updateStateWithLock(procedure.StateFailed)
 					_ = p.params.OnFailed(err)
@@ -273,8 +285,10 @@ func openTableCallback(event *fsm.Event) {
 		return
 	}
 	nodeAddr := nodes[0].NodeName
+	var shardInfo metadata.ShardInfo
+	shardInfo.ID = shardID
 	openShardRequest := eventdispatch.OpenTableOnShardRequest{
-		UpdateShardInfo: eventdispatch.UpdateShardInfo{CurrShardInfo: metadata.ShardInfo{ID: shardID}},
+		UpdateShardInfo: eventdispatch.UpdateShardInfo{CurrShardInfo: shardInfo},
 		TableInfo:       req.p.tableInfo,
 	}
 
