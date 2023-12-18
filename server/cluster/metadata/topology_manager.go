@@ -44,6 +44,8 @@ type TopologyManager interface {
 	AddTable(ctx context.Context, shardID storage.ShardID, latestVersion uint64, tables []storage.Table) error
 	// RemoveTable remove table on target shards from cluster topology.
 	RemoveTable(ctx context.Context, shardID storage.ShardID, latestVersion uint64, tableIDs []storage.TableID) error
+	// GetTableShard get the shardID of the shard where the table is located.
+	GetTableShard(ctx context.Context, table storage.Table) (storage.ShardID, bool)
 	// AssignTable persistent table shard mapping, it is used to store assign results and make the table creation idempotent.
 	AssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string, shardID storage.ShardID) error
 	// GetAssignTableResult get table assign result.
@@ -158,6 +160,7 @@ func NewTopologyManagerImpl(logger *zap.Logger, storage storage.Storage, cluster
 		nodeShardsMapping:  nil,
 		shardTablesMapping: nil,
 		tableShardMapping:  nil,
+		tableAssignMapping: nil,
 		nodes:              nil,
 	}
 }
@@ -307,9 +310,21 @@ func (m *TopologyManagerImpl) RemoveTable(ctx context.Context, shardID storage.S
 	return nil
 }
 
-func (m *TopologyManagerImpl) AssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string, shardID storage.ShardID) error {
+func (m *TopologyManagerImpl) GetTableShard(_ context.Context, table storage.Table) (storage.ShardID, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
+
+	shardIDs, exists := m.tableShardMapping[table.ID]
+	if exists {
+		return shardIDs[0], true
+	}
+
+	return 0, false
+}
+
+func (m *TopologyManagerImpl) AssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string, shardID storage.ShardID) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	if err := m.storage.AssignTable(ctx, storage.AssignTableRequest{
 		ClusterID: m.clusterID,
@@ -321,6 +336,10 @@ func (m *TopologyManagerImpl) AssignTable(ctx context.Context, schemaID storage.
 	}
 
 	// Update cache im memory.
+	if _, exists := m.tableAssignMapping[schemaID]; !exists {
+		m.tableAssignMapping[schemaID] = make(map[string]storage.ShardID, 0)
+	}
+
 	m.tableAssignMapping[schemaID][tableName] = shardID
 
 	return nil
@@ -332,8 +351,8 @@ func (m *TopologyManagerImpl) GetAssignTableResult(_ context.Context, schemaID s
 }
 
 func (m *TopologyManagerImpl) DeleteAssignTable(ctx context.Context, schemaID storage.SchemaID, tableName string) error {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	if err := m.storage.DeleteAssignTable(ctx, storage.DeleteAssignTableRequest{
 		ClusterID: m.clusterID,
@@ -640,11 +659,15 @@ func (m *TopologyManagerImpl) loadShardViews(ctx context.Context) error {
 }
 
 func (m *TopologyManagerImpl) loadAssignTable(ctx context.Context, schemas []storage.Schema) error {
+	m.tableAssignMapping = make(map[storage.SchemaID]map[string]storage.ShardID, len(schemas))
 	for _, schema := range schemas {
+		m.tableAssignMapping[schema.ID] = make(map[string]storage.ShardID, 0)
+
 		listAssignTableResult, err := m.storage.ListAssignTable(ctx, storage.ListAssignTableRequest{ClusterID: m.clusterID, SchemaID: schema.ID})
 		if err != nil {
 			return errors.WithMessage(err, "storage list assign table")
 		}
+		//m.tableAssignMapping[schema.ID] = make(map[string]storage.ShardID, len(listAssignTableResult.TableAssigns))
 		for _, assignTable := range listAssignTableResult.TableAssigns {
 			m.tableAssignMapping[schema.ID][assignTable.TableName] = assignTable.ShardID
 		}

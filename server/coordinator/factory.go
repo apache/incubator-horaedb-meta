@@ -130,7 +130,10 @@ func (f *Factory) makeCreateTableProcedure(ctx context.Context, request CreateTa
 	snapshot := request.ClusterMetadata.GetClusterSnapshot()
 
 	var targetShardID storage.ShardID
-	shardID, exists := request.ClusterMetadata.GetAssignTable(ctx, request.SourceReq.SchemaName, request.SourceReq.Name)
+	shardID, exists, err := request.ClusterMetadata.GetAssignTable(ctx, request.SourceReq.SchemaName, request.SourceReq.Name)
+	if err != nil {
+		return nil, err
+	}
 	if exists {
 		targetShardID = shardID
 	} else {
