@@ -23,11 +23,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/CeresDB/horaemeta/pkg/assert"
-	"github.com/CeresDB/horaemeta/server/cluster/metadata"
-	"github.com/CeresDB/horaemeta/server/coordinator/scheduler"
-	"github.com/CeresDB/horaemeta/server/coordinator/scheduler/nodepicker/hash"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/pkg/assert"
+	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/scheduler"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/scheduler/nodepicker/hash"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/spaolacci/murmur3"
 	"go.uber.org/zap"
 )

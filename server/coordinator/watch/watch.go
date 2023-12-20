@@ -26,8 +26,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CeresDB/horaedbproto/golang/pkg/metaeventpb"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-proto/golang/pkg/metaeventpb"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"

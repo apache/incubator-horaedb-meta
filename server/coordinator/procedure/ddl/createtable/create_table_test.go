@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
-	"github.com/CeresDB/horaemeta/server/cluster/metadata"
-	"github.com/CeresDB/horaemeta/server/coordinator/procedure/ddl/createtable"
-	"github.com/CeresDB/horaemeta/server/coordinator/procedure/test"
+	"github.com/apache/incubator-horaedb-proto/golang/pkg/metaservicepb"
+	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure/ddl/createtable"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure/test"
 	"github.com/stretchr/testify/require"
 )
 

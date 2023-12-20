@@ -26,10 +26,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CeresDB/horaemeta/pkg/log"
-	"github.com/CeresDB/horaemeta/server/cluster/metadata"
-	"github.com/CeresDB/horaemeta/server/id"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/pkg/log"
+	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
+	"github.com/apache/incubator-horaedb-meta/server/id"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
@@ -292,7 +292,7 @@ func (m *managerImpl) GetTablesByShardIDs(clusterName, _ string, shardIDs []stor
 }
 
 // DropTable is only used for the HTTP interface.
-// It only deletes the table data in ETCD and does not initiate a table deletion request to CeresDB.
+// It only deletes the table data in ETCD and does not initiate a table deletion request to HoraeDB.
 func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, tableName string) error {
 	cluster, err := m.getCluster(clusterName)
 	if err != nil {

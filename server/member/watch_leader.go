@@ -23,10 +23,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/CeresDB/horaedbproto/golang/pkg/metastoragepb"
-	"github.com/CeresDB/horaemeta/pkg/assert"
-	"github.com/CeresDB/horaemeta/pkg/log"
-	"github.com/CeresDB/horaemeta/server/etcdutil"
+	"github.com/apache/incubator-horaedb-proto/golang/pkg/metastoragepb"
+	"github.com/apache/incubator-horaedb-meta/pkg/assert"
+	"github.com/apache/incubator-horaedb-meta/pkg/log"
+	"github.com/apache/incubator-horaedb-meta/server/etcdutil"
 	"go.uber.org/zap"
 )
 

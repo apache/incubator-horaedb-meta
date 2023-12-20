@@ -19,6 +19,6 @@
 
 package static
 
-import "github.com/CeresDB/horaemeta/pkg/coderr"
+import "github.com/apache/incubator-horaedb-meta/pkg/coderr"
 
 var ErrNotImplemented = coderr.NewCodeError(coderr.ErrNotImplemented, "no")

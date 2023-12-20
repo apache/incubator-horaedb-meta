@@ -59,4 +59,4 @@ linters-settings:
     confidence: 3
   exhaustruct:
     include:
-      - 'github.com.CeresDB.horaemeta.*'
+      - 'github.com.apache.incubator-horaedb-meta.*'

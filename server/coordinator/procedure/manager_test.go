@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/horaemeta/server/coordinator/procedure"
-	"github.com/CeresDB/horaemeta/server/coordinator/procedure/test"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure/test"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )

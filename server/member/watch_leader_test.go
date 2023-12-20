@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/horaemeta/server/etcdutil"
+	"github.com/apache/incubator-horaedb-meta/server/etcdutil"
 	"github.com/stretchr/testify/assert"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/etcdserver"

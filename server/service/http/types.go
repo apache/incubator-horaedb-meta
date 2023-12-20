@@ -22,11 +22,11 @@ package http
 import (
 	"net/http"
 
-	"github.com/CeresDB/horaemeta/pkg/coderr"
-	"github.com/CeresDB/horaemeta/server/cluster"
-	"github.com/CeresDB/horaemeta/server/limiter"
-	"github.com/CeresDB/horaemeta/server/status"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/pkg/coderr"
+	"github.com/apache/incubator-horaedb-meta/server/cluster"
+	"github.com/apache/incubator-horaedb-meta/server/limiter"
+	"github.com/apache/incubator-horaedb-meta/server/status"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 )
 
 const (

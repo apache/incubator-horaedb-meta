@@ -25,7 +25,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// Storage defines the storage operations on the ceresdb cluster meta info.
+// Storage defines the storage operations on the HoraeDB cluster meta info.
 type Storage interface {
 	// GetCluster get cluster metadata by clusterID.
 	GetCluster(ctx context.Context, clusterID ClusterID) (Cluster, error)

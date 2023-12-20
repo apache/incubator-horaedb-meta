@@ -19,7 +19,7 @@
 
 package http
 
-import "github.com/CeresDB/horaemeta/pkg/coderr"
+import "github.com/apache/incubator-horaedb-meta/pkg/coderr"
 
 var (
 	ErrParseRequest                  = coderr.NewCodeError(coderr.BadRequest, "parse request params")

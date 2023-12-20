@@ -23,9 +23,9 @@ import (
 	"context"
 	"sort"
 
-	"github.com/CeresDB/horaemeta/pkg/assert"
-	"github.com/CeresDB/horaemeta/server/cluster/metadata"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/pkg/assert"
+	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/pkg/errors"
 )
 

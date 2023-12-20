@@ -24,11 +24,11 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ceresdb/horaemeta-server
+  IMAGE_NAME: apache/horaemeta-server
 
 jobs:
   docker:
-    if: github.repository_owner == 'CeresDB'
+    if: github.repository_owner == 'FIXME'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -61,4 +61,4 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:nightly-${{ env.BUILD_DATE }}-${{ env.SHORT_SHA }}
-            registry.cn-hangzhou.aliyuncs.com/ceresdb/horaemeta-server:nightly-${{ env.BUILD_DATE }}-${{ env.SHORT_SHA }}
+            registry.cn-hangzhou.aliyuncs.com/apache/horaemeta-server:nightly-${{ env.BUILD_DATE }}-${{ env.SHORT_SHA }}

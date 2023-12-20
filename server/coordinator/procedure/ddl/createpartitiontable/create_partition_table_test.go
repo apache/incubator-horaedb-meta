@@ -23,12 +23,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
-	"github.com/CeresDB/horaemeta/server/cluster/metadata"
-	"github.com/CeresDB/horaemeta/server/coordinator"
-	"github.com/CeresDB/horaemeta/server/coordinator/procedure/ddl/createpartitiontable"
-	"github.com/CeresDB/horaemeta/server/coordinator/procedure/test"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-proto/golang/pkg/metaservicepb"
+	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure/ddl/createpartitiontable"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure/test"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/stretchr/testify/require"
 )
 

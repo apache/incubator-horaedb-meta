@@ -22,7 +22,7 @@ package procedure
 import (
 	"context"
 
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 )
 
 type State string

@@ -19,6 +19,6 @@
 
 package nodepicker
 
-import "github.com/CeresDB/horaemeta/pkg/coderr"
+import "github.com/apache/incubator-horaedb-meta/pkg/coderr"
 
 var ErrNoAliveNodes = coderr.NewCodeError(coderr.InvalidParams, "no alive nodes is found")

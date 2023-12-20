@@ -25,7 +25,7 @@ on:
 
 jobs:
   docker:
-    if: github.repository_owner == 'CeresDB'
+    if: github.repository_owner == 'FIXME'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,4 +42,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ceresdb/horaemeta-server:latest,horaedb/horaemeta-server:${{github.ref_name}}
+          tags: apache/horaemeta-server:latest,horaedb/horaemeta-server:${{github.ref_name}}

@@ -16,10 +16,10 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/toml v1.1.0 h1:ksErzDEI1khOiGPgpwuI7x2ebx/uXQNw7xJpn9Eq1+I=
 github.com/BurntSushi/toml v1.1.0/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/CeresDB/horaedbproto/golang v0.0.0-20231129131648-5d5d868218c3 h1:RgOKVfdbnF4W5/TVFf7cIahom5HcV1v0GP2BYDc0BEM=
-github.com/CeresDB/horaedbproto/golang v0.0.0-20231129131648-5d5d868218c3/go.mod h1:RHgzmQBZC4P5+Jm58flXMynMFGbiVQrw1t2ce3wLVas=
-github.com/CeresDB/horaedbproto/golang v0.0.0-20231130070551-6f27270143a8 h1:0DZTY1Pc6eXETDAe8JHoYNEek2imJRwvQbWN218FJNE=
-github.com/CeresDB/horaedbproto/golang v0.0.0-20231130070551-6f27270143a8/go.mod h1:RHgzmQBZC4P5+Jm58flXMynMFGbiVQrw1t2ce3wLVas=
+github.com/apache/incubator-horaedb-proto/golang v0.0.0-20231129131648-5d5d868218c3 h1:RgOKVfdbnF4W5/TVFf7cIahom5HcV1v0GP2BYDc0BEM=
+github.com/apache/incubator-horaedb-proto/golang v0.0.0-20231129131648-5d5d868218c3/go.mod h1:RHgzmQBZC4P5+Jm58flXMynMFGbiVQrw1t2ce3wLVas=
+github.com/apache/incubator-horaedb-proto/golang v0.0.0-20231130070551-6f27270143a8 h1:0DZTY1Pc6eXETDAe8JHoYNEek2imJRwvQbWN218FJNE=
+github.com/apache/incubator-horaedb-proto/golang v0.0.0-20231130070551-6f27270143a8/go.mod h1:RHgzmQBZC4P5+Jm58flXMynMFGbiVQrw1t2ce3wLVas=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=

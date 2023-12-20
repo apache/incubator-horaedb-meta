@@ -22,7 +22,7 @@ package limiter
 import (
 	"sync"
 
-	"github.com/CeresDB/horaemeta/server/config"
+	"github.com/apache/incubator-horaedb-meta/server/config"
 	"golang.org/x/time/rate"
 )
 

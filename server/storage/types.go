@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CeresDB/horaedbproto/golang/pkg/clusterpb"
-	"github.com/CeresDB/horaedbproto/golang/pkg/metaservicepb"
+	"github.com/apache/incubator-horaedb-proto/golang/pkg/clusterpb"
+	"github.com/apache/incubator-horaedb-proto/golang/pkg/metaservicepb"
 )
 
 type (

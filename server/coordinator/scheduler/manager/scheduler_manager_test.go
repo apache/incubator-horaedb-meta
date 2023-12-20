@@ -23,12 +23,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/CeresDB/horaemeta/server/coordinator"
-	"github.com/CeresDB/horaemeta/server/coordinator/procedure"
-	"github.com/CeresDB/horaemeta/server/coordinator/procedure/test"
-	"github.com/CeresDB/horaemeta/server/coordinator/scheduler/manager"
-	"github.com/CeresDB/horaemeta/server/etcdutil"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure/test"
+	"github.com/apache/incubator-horaedb-meta/server/coordinator/scheduler/manager"
+	"github.com/apache/incubator-horaedb-meta/server/etcdutil"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )

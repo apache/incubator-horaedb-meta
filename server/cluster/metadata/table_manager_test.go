@@ -24,10 +24,10 @@ import (
 	"path"
 	"testing"
 
-	"github.com/CeresDB/horaemeta/server/cluster/metadata"
-	"github.com/CeresDB/horaemeta/server/etcdutil"
-	"github.com/CeresDB/horaemeta/server/id"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
+	"github.com/apache/incubator-horaedb-meta/server/etcdutil"
+	"github.com/apache/incubator-horaedb-meta/server/id"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )

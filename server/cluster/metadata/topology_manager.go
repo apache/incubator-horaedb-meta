@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/CeresDB/horaemeta/server/id"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/server/id"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )

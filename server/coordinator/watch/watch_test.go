@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/horaedbproto/golang/pkg/metaeventpb"
-	"github.com/CeresDB/horaemeta/server/etcdutil"
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-proto/golang/pkg/metaeventpb"
+	"github.com/apache/incubator-horaedb-meta/server/etcdutil"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"

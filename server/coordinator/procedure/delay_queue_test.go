@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CeresDB/horaemeta/server/storage"
+	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/stretchr/testify/require"
 )
 
