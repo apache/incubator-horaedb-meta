@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CeresDB/horaemeta/pkg/log"
+	"github.com/apache/incubator-horaedb-meta/pkg/log"
 	"github.com/caarlos0/env/v6"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
