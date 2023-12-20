@@ -19,10 +19,11 @@ package etcdutil
 
 import (
 	"context"
+	"path"
+
 	"github.com/CeresDB/ceresmeta/pkg/log"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
-	"path"
 )
 
 func Get(ctx context.Context, client *clientv3.Client, key string) (string, error) {

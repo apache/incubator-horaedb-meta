@@ -667,7 +667,6 @@ func (m *TopologyManagerImpl) loadAssignTable(ctx context.Context, schemas []sto
 		if err != nil {
 			return errors.WithMessage(err, "storage list assign table")
 		}
-		//m.tableAssignMapping[schema.ID] = make(map[string]storage.ShardID, len(listAssignTableResult.TableAssigns))
 		for _, assignTable := range listAssignTableResult.TableAssigns {
 			m.tableAssignMapping[schema.ID][assignTable.TableName] = assignTable.ShardID
 		}
