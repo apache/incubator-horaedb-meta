@@ -231,7 +231,8 @@ func (a *API) dropNodeShards(req *http.Request) apiFuncResult {
 		log.Error("drop node shards failed", zap.Error(err))
 		return errResult(ErrDropNodeShards, err.Error())
 	}
-	return okResult(statusSuccess)
+
+	return okResult(targetShardNodes)
 }
 
 func (a *API) dropTable(req *http.Request) apiFuncResult {
