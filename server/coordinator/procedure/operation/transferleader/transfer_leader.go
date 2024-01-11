@@ -60,6 +60,8 @@ var (
 	}
 )
 
+// Procedure will not persist.
+// TODO: After supporting the expiration cleanup mechanism of Procedure, we can consider persisting it to facilitate tracing historical information.
 type Procedure struct {
 	fsm                *fsm.FSM
 	params             ProcedureParams
