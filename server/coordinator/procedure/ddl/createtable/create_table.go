@@ -85,7 +85,7 @@ func checkTableExists(event *fsm.Event) {
 	// Check whether the table shard mapping already exists.
 	_, exists = params.ClusterMetadata.GetTableShard(req.ctx, table)
 	if exists {
-		procedure.CancelEventWithLog(event, metadata.ErrTableAlreadyExists, "table already exists")
+		procedure.CancelEventWithLog(event, metadata.ErrTableAlreadyExists, "table shard already exists")
 		return
 	}
 }
