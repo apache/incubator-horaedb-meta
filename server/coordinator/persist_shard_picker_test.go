@@ -2,12 +2,13 @@ package coordinator_test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
 	"github.com/apache/incubator-horaedb-meta/server/coordinator"
 	"github.com/apache/incubator-horaedb-meta/server/coordinator/procedure/test"
 	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestPersistShardPicker(t *testing.T) {

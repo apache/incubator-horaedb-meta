@@ -39,12 +39,11 @@ import (
 )
 
 type Factory struct {
-	logger          *zap.Logger
-	idAllocator     id.Allocator
-	dispatch        eventdispatch.Dispatch
-	storage         procedure.Storage
-	shardPicker     *PersistShardPicker
-	clusterMetadata *metadata.ClusterMetadata
+	logger      *zap.Logger
+	idAllocator id.Allocator
+	dispatch    eventdispatch.Dispatch
+	storage     procedure.Storage
+	shardPicker *PersistShardPicker
 }
 
 type CreateTableRequest struct {

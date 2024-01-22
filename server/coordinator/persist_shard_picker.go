@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+
 	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
 	"github.com/apache/incubator-horaedb-meta/server/storage"
 	"github.com/pkg/errors"
