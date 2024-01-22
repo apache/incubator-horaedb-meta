@@ -37,34 +37,30 @@ import (
 )
 
 const (
-	eventCheckTableExists  = "EventCheckTableExists"
-	eventCreateTableAssign = "EventCreateTableAssign"
-	eventCreateMetadata    = "EventCreateMetadata"
-	eventCreateOnShard     = "EventCreateOnShard"
-	eventFinish            = "EventFinish"
+	eventCheckTableExists = "EventCheckTableExists"
+	eventCreateMetadata   = "EventCreateMetadata"
+	eventCreateOnShard    = "EventCreateOnShard"
+	eventFinish           = "EventFinish"
 
-	stateBegin             = "StateBegin"
-	stateCheckTableExists  = "StateCheckTableExists"
-	stateCreateTableAssign = "StateCreateTableAssign"
-	stateCreateMetadata    = "StateCreateMetadata"
-	stateCreateOnShard     = "StateCreateOnShard"
-	stateFinish            = "StateFinish"
+	stateBegin            = "StateBegin"
+	stateCheckTableExists = "StateCheckTableExists"
+	stateCreateMetadata   = "StateCreateMetadata"
+	stateCreateOnShard    = "StateCreateOnShard"
+	stateFinish           = "StateFinish"
 )
 
 var (
 	createTableEvents = fsm.Events{
 		{Name: eventCheckTableExists, Src: []string{stateBegin}, Dst: stateCheckTableExists},
-		{Name: eventCreateTableAssign, Src: []string{stateCheckTableExists}, Dst: stateCreateTableAssign},
-		{Name: eventCreateMetadata, Src: []string{stateCreateTableAssign}, Dst: stateCreateMetadata},
+		{Name: eventCreateMetadata, Src: []string{stateCheckTableExists}, Dst: stateCreateMetadata},
 		{Name: eventCreateOnShard, Src: []string{stateCreateMetadata}, Dst: stateCreateOnShard},
 		{Name: eventFinish, Src: []string{stateCreateOnShard}, Dst: stateFinish},
 	}
 	createTableCallbacks = fsm.Callbacks{
-		eventCheckTableExists:  checkTableExists,
-		eventCreateTableAssign: createTableAssign,
-		eventCreateMetadata:    createMetadata,
-		eventCreateOnShard:     createOnShard,
-		eventFinish:            createFinish,
+		eventCheckTableExists: checkTableExists,
+		eventCreateMetadata:   createMetadata,
+		eventCreateOnShard:    createOnShard,
+		eventFinish:           createFinish,
 	}
 )
 
@@ -92,38 +88,6 @@ func checkTableExists(event *fsm.Event) {
 		procedure.CancelEventWithLog(event, metadata.ErrTableAlreadyExists, "table already exists")
 		return
 	}
-}
-
-func createTableAssign(event *fsm.Event) {
-	req, err := procedure.GetRequestFromEvent[*callbackRequest](event)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get request from event")
-		return
-	}
-	params := req.p.params
-
-	schemaName := params.SourceReq.GetSchemaName()
-	tableName := params.SourceReq.GetName()
-
-	targetShardID, exists, err := params.ClusterMetadata.GetAssignTable(req.ctx, schemaName, tableName)
-	if err != nil {
-		procedure.CancelEventWithLog(event, err, "get table assign", zap.String("schemaName", schemaName), zap.String("tableName", tableName))
-		return
-	}
-	if exists {
-		if targetShardID != params.ShardID {
-			procedure.CancelEventWithLog(event, procedure.ErrShardNotMatch, "target shard not match to persist data", zap.String("schemaName", schemaName), zap.String("tableName", tableName), zap.Uint32("targetShardID", uint32(targetShardID)), zap.Uint32("persistShardID", uint32(params.ShardID)))
-			return
-		}
-		return
-	}
-
-	if err := params.ClusterMetadata.AssignTable(req.ctx, schemaName, tableName, params.ShardID); err != nil {
-		procedure.CancelEventWithLog(event, err, "persist table assign")
-		return
-	}
-
-	log.Debug("create table assign finish", zap.String("schemaName", schemaName), zap.String("tableName", tableName))
 }
 
 func createMetadata(event *fsm.Event) {
@@ -324,11 +288,6 @@ func (p *Procedure) Start(ctx context.Context) error {
 				return err
 			}
 		case stateCheckTableExists:
-			if err := p.fsm.Event(eventCreateTableAssign, req); err != nil {
-				_ = p.params.OnFailed(err)
-				return err
-			}
-		case stateCreateTableAssign:
 			if err := p.fsm.Event(eventCreateMetadata, req); err != nil {
 				_ = p.params.OnFailed(err)
 				return err

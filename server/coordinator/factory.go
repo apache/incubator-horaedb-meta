@@ -39,11 +39,12 @@ import (
 )
 
 type Factory struct {
-	logger      *zap.Logger
-	idAllocator id.Allocator
-	dispatch    eventdispatch.Dispatch
-	storage     procedure.Storage
-	shardPicker ShardPicker
+	logger          *zap.Logger
+	idAllocator     id.Allocator
+	dispatch        eventdispatch.Dispatch
+	storage         procedure.Storage
+	shardPicker     *PersistShardPicker
+	clusterMetadata *metadata.ClusterMetadata
 }
 
 type CreateTableRequest struct {
@@ -101,13 +102,13 @@ type BatchRequest struct {
 	BatchType procedure.Kind
 }
 
-func NewFactory(logger *zap.Logger, allocator id.Allocator, dispatch eventdispatch.Dispatch, storage procedure.Storage) *Factory {
+func NewFactory(logger *zap.Logger, allocator id.Allocator, dispatch eventdispatch.Dispatch, storage procedure.Storage, clusterMetadata *metadata.ClusterMetadata) *Factory {
 	return &Factory{
 		idAllocator: allocator,
 		dispatch:    dispatch,
 		storage:     storage,
 		logger:      logger,
-		shardPicker: NewLeastTableShardPicker(),
+		shardPicker: NewPersistShardPicker(clusterMetadata, NewLeastTableShardPicker()),
 	}
 }
 
@@ -137,7 +138,7 @@ func (f *Factory) makeCreateTableProcedure(ctx context.Context, request CreateTa
 	if exists {
 		targetShardID = shardID
 	} else {
-		shards, err := f.shardPicker.PickShards(ctx, snapshot, 1)
+		shards, err := f.shardPicker.PickShards(ctx, snapshot, request.SourceReq.GetSchemaName(), []string{request.SourceReq.GetName()})
 		if err != nil {
 			f.logger.Error("pick table shard", zap.Error(err))
 			return nil, errors.WithMessage(err, "pick table shard")
@@ -146,7 +147,7 @@ func (f *Factory) makeCreateTableProcedure(ctx context.Context, request CreateTa
 			f.logger.Error("pick table shards length not equal 1", zap.Int("shards", len(shards)))
 			return nil, errors.WithMessagef(procedure.ErrPickShard, "pick table shard, shards length:%d", len(shards))
 		}
-		targetShardID = shards[0].ID
+		targetShardID = shards[request.SourceReq.GetName()].ID
 	}
 
 	return createtable.NewProcedure(createtable.ProcedureParams{
@@ -174,7 +175,7 @@ func (f *Factory) makeCreatePartitionTableProcedure(ctx context.Context, request
 		nodeNames[shardNode.NodeName] = 1
 	}
 
-	subTableShards, err := f.shardPicker.PickShards(ctx, snapshot, len(request.SourceReq.PartitionTableInfo.SubTableNames))
+	subTableShards, err := f.shardPicker.PickShards(ctx, snapshot, request.SourceReq.GetSchemaName(), request.SourceReq.PartitionTableInfo.SubTableNames)
 	if err != nil {
 		return nil, errors.WithMessage(err, "pick sub table shards")
 	}
