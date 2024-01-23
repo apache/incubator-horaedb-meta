@@ -38,7 +38,7 @@ func NewPersistShardPicker(cluster *metadata.ClusterMetadata, internal ShardPick
 func (p *PersistShardPicker) PickShards(ctx context.Context, snapshot metadata.Snapshot, schemaName string, tableNames []string) (map[string]storage.ShardNode, error) {
 	result := map[string]storage.ShardNode{}
 
-	shardNodeMap := map[storage.ShardID]storage.ShardNode{}
+	shardNodeMap := make(map[storage.ShardID]storage.ShardNode, len(tableNames))
 	for _, shardNode := range snapshot.Topology.ClusterView.ShardNodes {
 		shardNodeMap[shardNode.ID] = shardNode
 	}
@@ -57,26 +57,20 @@ func (p *PersistShardPicker) PickShards(ctx context.Context, snapshot metadata.S
 		}
 	}
 
-	if len(result) == len(tableNames) {
+	// All table has been assigned to shard.
+	if len(missingTables) == 0 {
 		return result, nil
 	}
 
-	var tablesNeedToAssignShard []string
-	if len(missingTables) > 0 {
-		tablesNeedToAssignShard = missingTables
-	} else {
-		tablesNeedToAssignShard = tableNames
-	}
-
 	// No table assign has been created, try to pick shard and save table assigns.
-	shardNodes, err := p.internal.PickShards(ctx, snapshot, len(tablesNeedToAssignShard))
+	shardNodes, err := p.internal.PickShards(ctx, snapshot, len(missingTables))
 	if err != nil {
 		return map[string]storage.ShardNode{}, err
 	}
 
 	for i, shardNode := range shardNodes {
-		result[tablesNeedToAssignShard[i]] = shardNode
-		err = p.cluster.AssignTableToShard(ctx, schemaName, tablesNeedToAssignShard[i], shardNode.ID)
+		result[missingTables[i]] = shardNode
+		err = p.cluster.AssignTableToShard(ctx, schemaName, missingTables[i], shardNode.ID)
 		if err != nil {
 			return map[string]storage.ShardNode{}, err
 		}
