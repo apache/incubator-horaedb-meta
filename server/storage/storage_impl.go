@@ -418,7 +418,7 @@ func (s *metaStorageImpl) DeleteTable(ctx context.Context, req DeleteTableReques
 	return nil
 }
 
-func (s *metaStorageImpl) AssignTable(ctx context.Context, req AssignTableRequest) error {
+func (s *metaStorageImpl) AssignTableToShard(ctx context.Context, req AssignTableToShardRequest) error {
 	key := makeTableAssignKey(s.rootPath, uint32(req.ClusterID), uint32(req.SchemaID), req.TableName)
 
 	// Check if the key exists, if not，save table assign result; Otherwise, the table assign result already exists and return an error.
@@ -439,7 +439,7 @@ func (s *metaStorageImpl) AssignTable(ctx context.Context, req AssignTableReques
 	return nil
 }
 
-func (s *metaStorageImpl) DeleteAssignTable(ctx context.Context, req DeleteAssignTableRequest) error {
+func (s *metaStorageImpl) DeleteTableAssignedShard(ctx context.Context, req DeleteTableAssignedRequest) error {
 	key := makeTableAssignKey(s.rootPath, uint32(req.ClusterID), uint32(req.SchemaID), req.TableName)
 
 	keyExists := clientv3util.KeyExists(key)
@@ -459,7 +459,7 @@ func (s *metaStorageImpl) DeleteAssignTable(ctx context.Context, req DeleteAssig
 	return nil
 }
 
-func (s *metaStorageImpl) ListAssignTable(ctx context.Context, req ListAssignTableRequest) (ListAssignTableResult, error) {
+func (s *metaStorageImpl) ListTableAssignedShard(ctx context.Context, req ListAssignTableRequest) (ListTableAssignedShardResult, error) {
 	key := makeTableAssignPrefixKey(s.rootPath, uint32(req.ClusterID), uint32(req.SchemaID))
 	rangeLimit := s.opts.MaxScanLimit
 
@@ -478,11 +478,11 @@ func (s *metaStorageImpl) ListAssignTable(ctx context.Context, req ListAssignTab
 		return nil
 	}
 
-	if err := etcdutil.ScanWithPrefix(ctx, s.client, key, rangeLimit, do); err != nil {
-		return ListAssignTableResult{}, errors.WithMessagef(err, "scan tables, clusterID:%d, schemaID:%d, prefix key:%s, range limit:%d", req.ClusterID, req.SchemaID, key, rangeLimit)
+	if err := etcdutil.ScanWithPrefix(ctx, s.client, key, do); err != nil {
+		return ListTableAssignedShardResult{}, errors.WithMessagef(err, "scan tables, clusterID:%d, schemaID:%d, prefix key:%s, range limit:%d", req.ClusterID, req.SchemaID, key, rangeLimit)
 	}
 
-	return ListAssignTableResult{TableAssigns: tableAssigns}, nil
+	return ListTableAssignedShardResult{TableAssigns: tableAssigns}, nil
 }
 
 func (s *metaStorageImpl) createNShardViews(ctx context.Context, clusterID ClusterID, shardViews []ShardView, ifConds []clientv3.Cmp, opCreates []clientv3.Op) error {

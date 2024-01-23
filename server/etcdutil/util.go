@@ -128,31 +128,28 @@ func Scan(ctx context.Context, client *clientv3.Client, startKey, endKey string,
 	}
 }
 
-func ScanWithPrefix(ctx context.Context, client *clientv3.Client, prefix string, batchSize int, do func(key string, val []byte) error) error {
+func ScanWithPrefix(ctx context.Context, client *clientv3.Client, prefix string, do func(key string, val []byte) error) error {
 	rangeEnd := clientv3.GetPrefixRangeEnd(prefix)
-
-	for {
-		resp, err := client.Get(ctx, prefix, clientv3.WithRange(rangeEnd), clientv3.WithLimit(int64(batchSize)))
-		if err != nil {
-			return ErrEtcdKVGet.WithCause(err)
-		}
-		// Check whether the keys are exhausted.
-		if len(resp.Kvs) == 0 {
-			return nil
-		}
-
-		for _, item := range resp.Kvs {
-			err := do(string(item.Key), item.Value)
-			if err != nil {
-				return err
-			}
-		}
-
-		rangeEnd = string(resp.Kvs[len(resp.Kvs)-1].Key)
+	resp, err := client.Get(ctx, prefix, clientv3.WithRange(rangeEnd))
+	if err != nil {
+		return ErrEtcdKVGet.WithCause(err)
 	}
+	// Check whether the keys are exhausted.
+	if len(resp.Kvs) == 0 {
+		return nil
+	}
+
+	for _, item := range resp.Kvs {
+		err := do(string(item.Key), item.Value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-// GetLastPathSegment get
+// GetLastPathSegment get the last path segment from completePath, path is split by '/'.
 func GetLastPathSegment(completePath string) string {
 	return path.Base(path.Clean(completePath))
 }

@@ -141,14 +141,14 @@ type DeleteTableRequest struct {
 	TableName string
 }
 
-type AssignTableRequest struct {
+type AssignTableToShardRequest struct {
 	ClusterID ClusterID
 	SchemaID  SchemaID
 	TableName string
 	ShardID   ShardID
 }
 
-type DeleteAssignTableRequest struct {
+type DeleteTableAssignedRequest struct {
 	ClusterID ClusterID
 	SchemaID  SchemaID
 	TableName string
@@ -159,7 +159,7 @@ type ListAssignTableRequest struct {
 	SchemaID  SchemaID
 }
 
-type ListAssignTableResult struct {
+type ListTableAssignedShardResult struct {
 	TableAssigns []TableAssign
 }
 

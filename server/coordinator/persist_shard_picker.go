@@ -24,7 +24,6 @@ import (
 
 	"github.com/apache/incubator-horaedb-meta/server/cluster/metadata"
 	"github.com/apache/incubator-horaedb-meta/server/storage"
-	"github.com/pkg/errors"
 )
 
 type PersistShardPicker struct {
@@ -44,14 +43,17 @@ func (p *PersistShardPicker) PickShards(ctx context.Context, snapshot metadata.S
 		shardNodeMap[shardNode.ID] = shardNode
 	}
 
+	var missingTables []string
 	// If table assign has been created, just reuse it.
 	for i := 0; i < len(tableNames); i++ {
-		shardID, exists, err := p.cluster.GetAssignTable(ctx, schemaName, tableNames[i])
+		shardID, exists, err := p.cluster.GetTableAssignedShard(ctx, schemaName, tableNames[i])
 		if err != nil {
 			return map[string]storage.ShardNode{}, err
 		}
 		if exists {
 			result[tableNames[i]] = shardNodeMap[shardID]
+		} else {
+			missingTables = append(missingTables, tableNames[i])
 		}
 	}
 
@@ -59,20 +61,22 @@ func (p *PersistShardPicker) PickShards(ctx context.Context, snapshot metadata.S
 		return result, nil
 	}
 
-	if len(result) != len(tableNames) && len(result) != 0 {
-		// TODO: Should all table assigns be cleared?
-		return result, errors.WithMessagef(ErrPickNode, "The number of table assign %d is inconsistent with the number of tables %d", len(result), len(tableNames))
+	var tablesNeedToAssignShard []string
+	if len(missingTables) > 0 {
+		tablesNeedToAssignShard = missingTables
+	} else {
+		tablesNeedToAssignShard = tableNames
 	}
 
 	// No table assign has been created, try to pick shard and save table assigns.
-	shardNodes, err := p.internal.PickShards(ctx, snapshot, len(tableNames))
+	shardNodes, err := p.internal.PickShards(ctx, snapshot, len(tablesNeedToAssignShard))
 	if err != nil {
 		return map[string]storage.ShardNode{}, err
 	}
 
 	for i, shardNode := range shardNodes {
-		result[tableNames[i]] = shardNode
-		err = p.cluster.AssignTable(ctx, schemaName, tableNames[i], shardNode.ID)
+		result[tablesNeedToAssignShard[i]] = shardNode
+		err = p.cluster.AssignTableToShard(ctx, schemaName, tablesNeedToAssignShard[i], shardNode.ID)
 		if err != nil {
 			return map[string]storage.ShardNode{}, err
 		}

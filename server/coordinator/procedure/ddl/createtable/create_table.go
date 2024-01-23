@@ -181,7 +181,7 @@ func createFinish(event *fsm.Event) {
 	}
 	params := req.p.params
 
-	if err := req.p.params.ClusterMetadata.DeleteAssignTable(req.ctx, params.SourceReq.GetSchemaName(), params.SourceReq.GetName()); err != nil {
+	if err := req.p.params.ClusterMetadata.DeleteTableAssignedShard(req.ctx, params.SourceReq.GetSchemaName(), params.SourceReq.GetName()); err != nil {
 		log.Warn("delete assign table failed", zap.String("schemaName", params.SourceReq.GetSchemaName()), zap.String("tableName", params.SourceReq.GetName()))
 	}
 

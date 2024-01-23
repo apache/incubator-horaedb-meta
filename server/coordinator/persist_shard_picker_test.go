@@ -76,7 +76,7 @@ func TestPersistShardPicker(t *testing.T) {
 	re.Equal(len(pickResult), 1)
 	re.Equal(newPickResult[test.TestTableName1], pickResult[test.TestTableName1])
 
-	err = c.GetMetadata().DeleteAssignTable(ctx, test.TestSchemaName, test.TestTableName1)
+	err = c.GetMetadata().DeleteTableAssignedShard(ctx, test.TestSchemaName, test.TestTableName1)
 	re.NoError(err)
 
 	// Try to pick another for table1 after drop table1 assign result.
