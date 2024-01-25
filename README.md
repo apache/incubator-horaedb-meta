@@ -1,3 +1,7 @@
+> :warning: This repository has been deprecated at 2024-01-25, further development will move to [here](https://github.com/apache/incubator-horaedb/tree/main/horaemeta).
+
+--- 
+
 # HoraeMeta
 
 [![codecov](https://codecov.io/gh/apache/incubator-horaedb-meta/branch/main/graph/badge.svg?token=VTYXEAB2WU)](https://codecov.io/gh/apache/incubator-horaedb-meta)
