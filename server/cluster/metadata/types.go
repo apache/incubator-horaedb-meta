@@ -62,6 +62,18 @@ type ShardNodeWithVersion struct {
 	ShardNode storage.ShardNode
 }
 
+func (s ShardNodeWithVersion) ShardID() storage.ShardID {
+	return s.ShardInfo.ID
+}
+
+func (s ShardNodeWithVersion) NodeName() string {
+	return s.ShardNode.NodeName
+}
+
+func (s ShardNodeWithVersion) Version() uint64 {
+	return s.ShardInfo.Version
+}
+
 type CreateClusterOpts struct {
 	NodeCount                   uint32
 	ShardTotal                  uint32
@@ -139,13 +151,53 @@ type ShardVersionUpdate struct {
 }
 
 type RouteEntry struct {
-	Table      TableInfo
+	Table TableInfo
+	// Currently, we only support one shard per table.
 	NodeShards []ShardNodeWithVersion
 }
 
 type RouteTablesResult struct {
 	ClusterViewVersion uint64
 	RouteEntries       map[string]RouteEntry
+}
+
+func (r RouteTablesResult) GetTableInfo(tableName string) (TableInfo, bool) {
+	var tableInfo TableInfo
+	entry, ok := r.RouteEntries[tableName]
+	if !ok {
+		return tableInfo, false
+	}
+
+	tableInfo = entry.Table
+	return tableInfo, true
+}
+
+func (r RouteTablesResult) GetShardID(tableName string) (storage.ShardID, bool) {
+	entry, ok := r.RouteEntries[tableName]
+	if !ok {
+		return 0, false
+	}
+
+	if len(entry.NodeShards) == 0 {
+		return 0, false
+	}
+
+	// Return the first shard id.
+	return entry.NodeShards[0].ShardInfo.ID, true
+}
+
+func (r RouteTablesResult) GetNodeName(tableName string) (string, bool) {
+	entry, ok := r.RouteEntries[tableName]
+	if !ok {
+		return "", false
+	}
+
+	if len(entry.NodeShards) == 0 {
+		return "", false
+	}
+
+	// Return the first shard id.
+	return entry.NodeShards[0].ShardNode.NodeName, true
 }
 
 type GetNodeShardsResult struct {

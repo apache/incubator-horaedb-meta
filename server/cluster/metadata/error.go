@@ -33,4 +33,5 @@ var (
 	ErrTableAlreadyExists   = coderr.NewCodeError(coderr.Internal, "table already exists")
 	ErrOpenTable            = coderr.NewCodeError(coderr.Internal, "open table")
 	ErrParseTopologyType    = coderr.NewCodeError(coderr.Internal, "parse topology type")
+	ErrTransferTable        = coderr.NewCodeError(coderr.Internal, "transfer table")
 )

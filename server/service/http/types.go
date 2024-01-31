@@ -106,6 +106,13 @@ type TransferLeaderRequest struct {
 	NewLeaderNodeName string `json:"newLeaderNodeName"`
 }
 
+type TransferTableRequest struct {
+	ClusterName string `json:"clusterName"`
+	SchemaName  string `json:"schemaName"`
+	TableName   string `json:"tableName"`
+	DestShardID uint32 `json:"destShardID"`
+}
+
 type RouteRequest struct {
 	ClusterName string   `json:"clusterName"`
 	SchemaName  string   `json:"schemaName"`

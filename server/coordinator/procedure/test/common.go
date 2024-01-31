@@ -69,12 +69,12 @@ func (m MockDispatch) DropTableOnShard(_ context.Context, _ string, _ eventdispa
 	return 0, nil
 }
 
-func (m MockDispatch) OpenTableOnShard(_ context.Context, _ string, _ eventdispatch.OpenTableOnShardRequest) error {
-	return nil
+func (m MockDispatch) OpenTableOnShard(_ context.Context, _ string, _ eventdispatch.OpenTableOnShardRequest) (eventdispatch.OpenTableOnShardResponse, error) {
+	return eventdispatch.OpenTableOnShardResponse{Version: 0}, nil
 }
 
-func (m MockDispatch) CloseTableOnShard(_ context.Context, _ string, _ eventdispatch.CloseTableOnShardRequest) error {
-	return nil
+func (m MockDispatch) CloseTableOnShard(_ context.Context, _ string, _ eventdispatch.CloseTableOnShardRequest) (eventdispatch.CloseTableOnShardResponse, error) {
+	return eventdispatch.CloseTableOnShardResponse{Version: 0}, nil
 }
 
 type MockStorage struct{}
