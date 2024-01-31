@@ -306,6 +306,18 @@ func (m *managerImpl) DropTable(ctx context.Context, clusterName, schemaName, ta
 		return errors.WithMessage(err, "get table")
 	}
 
+	// If the table is partitioned, delete the table metadata directly.
+	if table.IsPartitioned() {
+		_, err = cluster.metadata.DropTableMetadata(ctx,
+			schemaName,
+			tableName,
+		)
+		if err != nil {
+			return errors.WithMessage(err, "cluster drop table")
+		}
+		return nil
+	}
+
 	getShardNodeResult, err := cluster.metadata.GetShardNodeByTableIDs([]storage.TableID{table.ID})
 	if err != nil {
 		return errors.WithMessage(err, "get shard node by tableID")
